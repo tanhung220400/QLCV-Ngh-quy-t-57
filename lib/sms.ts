@@ -52,15 +52,11 @@ export const SMS_MAC_DINH: SmsConfig = {
   im_lang_den: "06:30",
 };
 
-let cache: { t: number; v: SmsConfig } | null = null;
-
-export async function getSmsConfig(fresh = false): Promise<SmsConfig> {
-  if (!fresh && cache && Date.now() - cache.t < 60000) return cache.v;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function getSmsConfig(_fresh = false): Promise<SmsConfig> {
   const sql = await db();
   const r = await sql`SELECT gia_tri FROM cai_dat WHERE khoa = 'sms'`;
-  const v = { ...SMS_MAC_DINH, ...((r[0]?.gia_tri as Partial<SmsConfig>) || {}) };
-  cache = { t: Date.now(), v };
-  return v;
+  return { ...SMS_MAC_DINH, ...((r[0]?.gia_tri as Partial<SmsConfig>) || {}) };
 }
 
 export async function saveSmsConfig(v: Partial<SmsConfig>) {
@@ -68,7 +64,6 @@ export async function saveSmsConfig(v: Partial<SmsConfig>) {
   const cur = await getSmsConfig(true);
   const next = { ...cur, ...v };
   await sql`INSERT INTO cai_dat (khoa, gia_tri) VALUES ('sms', ${sql.json(next as never)}) ON CONFLICT (khoa) DO UPDATE SET gia_tri = EXCLUDED.gia_tri`;
-  cache = null;
 }
 
 export function smsReady(c: SmsConfig): boolean {
@@ -115,8 +110,9 @@ type Q = postgres.Sql | postgres.TransactionSql;
 
 /** Đưa SMS vào hàng đợi cho các người nhận (gọi trong cùng giao dịch với thông báo ứng dụng) */
 export async function queueSms(sql: Q, recipients: number[], loai: string, tieuDe: string, noiDung: string | null, path: string | null, khoa: string | null) {
+  if (!recipients.length) return;
   const c = await getSmsConfig();
-  if (!c.bat || !c.su_kien.includes(loai) || !recipients.length) return;
+  if (!c.bat || !c.su_kien.includes(loai)) return;
   const users = await sql`SELECT id, sdt FROM nguoi_dung WHERE id IN ${sql(recipients)} AND trang_thai = 'hoat_dong'`;
   const text = buildSmsText(c, tieuDe, noiDung, path);
   for (const u of users) {
