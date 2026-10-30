@@ -14,6 +14,7 @@ export const KPI_COLUMNS = [
   { header: "Lãnh đạo phụ trách", key: "ld", width: 24 },
   { header: "Kỳ cập nhật (Tháng / Quý / Tuần)", key: "ky", width: 14 },
   { header: "Ngày hết hạn (dd/mm/yyyy)", key: "han", width: 14 },
+  { header: "Lĩnh vực (theo danh mục)", key: "lv", width: 26 },
 ];
 
 export function styleHeader(ws: ExcelJS.Worksheet, row = 1) {

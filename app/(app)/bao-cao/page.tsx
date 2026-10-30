@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requirePerm } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { taskScope } from "@/lib/perm";
 import { personStats } from "@/lib/stats";
@@ -10,20 +10,34 @@ export const dynamic = "force-dynamic";
 
 export default async function Reports({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePerm("bc.xem");
   const sql = await db();
+  const canExport = user.quyen.includes("bc.xuat");
+  const canPeople = user.quyen.includes("bc.danh_gia");
   const w = weekRange();
   const nam = vnDate().slice(0, 4);
   const tu = sp.tu || `${nam}-01-01`;
   const den = sp.den || vnDate();
-  const people = await personStats(sql, (await taskScope(sql, user)).q, fromVN(tu, "00:00"), fromVN(den, "23:59"));
+  const people = !canPeople ? [] : await personStats(sql, (await taskScope(sql, user)).q, fromVN(tu, "00:00"), fromVN(den, "23:59"));
   const meetings = await meetingList(user);
 
   return (
     <div className="space-y-4">
       <h1 className="h1">Báo cáo</h1>
       <p className="muted">Báo cáo lập tự động từ dữ liệu trên phần mềm, không cần nhập tay. Phạm vi theo quyền xem của bạn.</p>
+      {user.quyen.includes("bc.tra_cuu") && (
+        <Link href="/tra-cuu" className="card flex items-center gap-3 border-brand-100 bg-brand-50 hover:shadow-md">
+          <span className="text-2xl" aria-hidden>🔎</span>
+          <span className="flex-1">
+            <b className="text-brand-800">Tra cứu, tổng hợp theo yêu cầu</b>
+            <span className="block text-slate-600">Gõ hoặc nói câu hỏi, ví dụ “việc quá hạn của phòng kinh tế tháng này”, phần mềm tự lọc và tổng hợp số liệu.</span>
+          </span>
+          <span className="text-brand-700">›</span>
+        </Link>
+      )}
+      {!canExport && <p className="rounded-xl bg-amber-50 px-3 py-2 text-amber-900">Tài khoản chưa được cấp quyền xuất báo cáo. Liên hệ quản trị nếu cần.</p>}
 
+      {canExport && (
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card">
           <h2 className="h2">Tình hình thực hiện nhiệm vụ tuần</h2>
@@ -116,6 +130,9 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         </section>
       </div>
 
+      )}
+
+      {canPeople && (
       <section className="card">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
@@ -180,6 +197,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
           </table>
         </div>
       </section>
+      )}
     </div>
   );
 }

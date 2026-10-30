@@ -65,6 +65,11 @@ export async function otpAction(_: ActionState, fd: FormData): Promise<ActionSta
 }
 
 export async function logoutAction() {
+  const u = await getUser().catch(() => null);
+  if (u) {
+    const sql = await db();
+    await writeLog(sql, u.id, "dang_xuat", "nguoi_dung", u.id);
+  }
   await destroySession();
   redirect("/dang-nhap");
 }
@@ -165,4 +170,63 @@ export async function cancelDelegateAction(_: ActionState, fd: FormData): Promis
   await sql`UPDATE uy_quyen SET huy = TRUE WHERE id = ${id} AND id_nguoi_uy_quyen = ${user.id}`;
   await writeLog(sql, user.id, "huy_uy_quyen", "nguoi_dung", user.id, null, { id });
   return { ok: true, message: "Đã thu hồi ủy quyền." };
+}
+
+// ---------- Quên mật khẩu ----------
+export async function forgotRequestAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const username = String(fd.get("ten_dang_nhap") || "").trim().toLowerCase();
+  if (!username) return { error: "Nhập tên đăng nhập." };
+  const sql = await db();
+  const generic = "Nếu tài khoản tồn tại và có số điện thoại, mã xác nhận đã được gửi qua SMS. Nếu không nhận được tin, yêu cầu sẽ được chuyển cho quản trị hệ thống cấp lại mật khẩu.";
+  const recent = await sql`SELECT count(*)::int AS n FROM nhat_ky WHERE hanh_dong = 'quen_mat_khau' AND gia_tri_moi->>'u' = ${username} AND thoi_gian > now() - interval '1 hour'`;
+  if (recent[0].n >= 3) return { error: "Bạn đã yêu cầu nhiều lần. Vui lòng thử lại sau 1 giờ hoặc liên hệ quản trị." };
+  const u = (await sql`SELECT id, ho_ten, sdt, trang_thai FROM nguoi_dung WHERE ten_dang_nhap = ${username}`)[0];
+  await writeLog(sql, u?.id ?? null, "quen_mat_khau", "nguoi_dung", u?.id ?? null, null, { u: username });
+  if (!u || u.trang_thai !== "hoat_dong") return { ok: true, message: generic, redirect: `/quen-mat-khau?u=${encodeURIComponent(username)}&b=2` };
+  const { getSmsConfig, smsReady, sendSms, chuanSdt, khongDau } = await import("@/lib/sms");
+  const c = await getSmsConfig(true);
+  const sdt = chuanSdt(u.sdt);
+  let sentSms = false;
+  if (smsReady(c) && sdt) {
+    const { randomInt } = await import("crypto");
+    const code = String(randomInt(100000, 1000000));
+    await sql`UPDATE dat_lai_mat_khau SET da_dung = TRUE WHERE id_nguoi_dung = ${u.id} AND NOT da_dung`;
+    await sql`INSERT INTO dat_lai_mat_khau (id_nguoi_dung, ma_hash, het_han) VALUES (${u.id}, ${await hashPassword(code)}, now() + interval '10 minutes')`;
+    const r = await sendSms(c, sdt, `[${khongDau(c.tien_to)}] Ma dat lai mat khau cua ban la ${code}. Ma co hieu luc 10 phut. Khong cung cap ma nay cho bat ky ai.`);
+    sentSms = r.ok;
+    await sql`INSERT INTO sms_hang_doi (id_nguoi_nhan, sdt, noi_dung, loai, trang_thai, so_lan, loi, gui_luc)
+      VALUES (${u.id}, ${sdt}, ${"[Mã đặt lại mật khẩu - đã ẩn]"}, 'dat_lai_mat_khau', ${r.ok ? "da_gui" : "loi"}, 1, ${r.error ?? null}, now())`;
+  }
+  if (!sentSms) {
+    const admins = await sql`SELECT id, vai_tro, quyen FROM nguoi_dung WHERE trang_thai = 'hoat_dong'`;
+    const { tinhQuyen } = await import("@/lib/quyen");
+    const { notify } = await import("@/lib/log");
+    const ids = admins.filter((a) => tinhQuyen(a.vai_tro, a.quyen).has("qt.nguoi_dung")).map((a) => a.id as number);
+    await notify(sql, ids, "yeu_cau_mat_khau", `Yêu cầu cấp lại mật khẩu: ${u.ho_ten}`, `Tài khoản ${username}. Vào Quản trị → Cán bộ để cấp mật khẩu tạm.`, "nguoi_dung", u.id, `quenmk:${u.id}:${new Date().toISOString().slice(0, 13)}`);
+  }
+  return { ok: true, message: generic, redirect: `/quen-mat-khau?u=${encodeURIComponent(username)}&b=2` };
+}
+
+export async function forgotResetAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const username = String(fd.get("ten_dang_nhap") || "").trim().toLowerCase();
+  const code = String(fd.get("ma") || "").replace(/\s/g, "");
+  const p1 = String(fd.get("mat_khau_moi") || "");
+  const p2 = String(fd.get("nhap_lai") || "");
+  if (!/^\d{6}$/.test(code)) return { error: "Mã xác nhận gồm 6 chữ số." };
+  if (p1.length < 8) return { error: "Mật khẩu mới phải có ít nhất 8 ký tự." };
+  if (p1 !== p2) return { error: "Hai lần nhập mật khẩu không khớp." };
+  const sql = await db();
+  const u = (await sql`SELECT id, phien FROM nguoi_dung WHERE ten_dang_nhap = ${username} AND trang_thai = 'hoat_dong'`)[0];
+  const bad = { error: "Mã không đúng hoặc đã hết hạn. Hãy yêu cầu mã mới." };
+  if (!u) return bad;
+  const r = (await sql`SELECT * FROM dat_lai_mat_khau WHERE id_nguoi_dung = ${u.id} AND NOT da_dung AND het_han > now() ORDER BY id DESC LIMIT 1`)[0];
+  if (!r || r.so_lan_thu >= 5) return bad;
+  if (!(await checkPassword(code, r.ma_hash))) {
+    await sql`UPDATE dat_lai_mat_khau SET so_lan_thu = so_lan_thu + 1 WHERE id = ${r.id}`;
+    return bad;
+  }
+  await sql`UPDATE dat_lai_mat_khau SET da_dung = TRUE WHERE id = ${r.id}`;
+  await sql`UPDATE nguoi_dung SET mat_khau = ${await hashPassword(p1)}, doi_mat_khau = FALSE, phien = phien + 1 WHERE id = ${u.id}`;
+  await writeLog(sql, u.id, "dat_lai_mat_khau", "nguoi_dung", u.id, null, { qua: "sms" });
+  return { ok: true, message: "Đã đặt lại mật khẩu. Mời đăng nhập.", redirect: "/dang-nhap?dat_lai=1" };
 }

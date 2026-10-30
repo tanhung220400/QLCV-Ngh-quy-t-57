@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { getUser } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
-import { canCreateTask } from "@/lib/perm";
+import { canCreateTask, isAdmin } from "@/lib/perm";
 import { Nav } from "@/components/Nav";
 import { runScan } from "@/lib/scan";
+import { flushSms } from "@/lib/sms";
 import { OfflineSync } from "@/components/OfflineSync";
 
 export const dynamic = "force-dynamic";
@@ -24,25 +25,32 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   after(async () => {
     try {
       await runScan(false);
+      await flushSms();
     } catch (e) {
       console.error("scan", e);
     }
   });
 
+  const q = new Set(user.quyen);
   const items = [
     { href: "/", label: "Tổng quan", icon: "home" },
     { href: "/viec", label: "Công việc", icon: "list" },
     ...(canCreateTask(user) ? [{ href: "/viec/moi", label: "Giao việc", icon: "plus" }] : []),
-    { href: "/chi-tieu", label: "Chỉ tiêu", icon: "target" },
-    { href: "/bao-cao", label: "Báo cáo", icon: "chart" },
+    ...(q.has("ct.xem") ? [{ href: "/chi-tieu", label: "Chỉ tiêu", icon: "target" }] : []),
+    ...(q.has("bc.xem") ? [{ href: "/bao-cao", label: "Báo cáo", icon: "chart" }] : []),
+    ...(q.has("bc.tra_cuu") ? [{ href: "/tra-cuu", label: "Tra cứu, tổng hợp", icon: "search" }] : []),
     { href: "/thong-bao", label: "Thông báo", icon: "bell" },
     { href: "/tai-khoan", label: "Tài khoản", icon: "user" },
-    ...(user.vai_tro === "quan_tri" ? [{ href: "/quan-tri", label: "Quản trị", icon: "cog" }] : []),
+    ...(isAdmin(user) ? [{ href: "/quan-tri", label: "Quản trị", icon: "cog" }] : []),
   ];
   const mobile = [
     { href: "/", label: "Tổng quan", icon: "home" },
     { href: "/viec", label: "Việc", icon: "list" },
-    canCreateTask(user) ? { href: "/viec/moi", label: "Giao việc", icon: "plus" } : { href: "/chi-tieu", label: "Chỉ tiêu", icon: "target" },
+    canCreateTask(user)
+      ? { href: "/viec/moi", label: "Giao việc", icon: "plus" }
+      : q.has("bc.tra_cuu")
+        ? { href: "/tra-cuu", label: "Tra cứu", icon: "search" }
+        : { href: "/tai-khoan", label: "Tài khoản", icon: "user" },
     { href: "/thong-bao", label: "Thông báo", icon: "bell" },
   ];
 

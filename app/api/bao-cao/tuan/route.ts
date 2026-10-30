@@ -1,12 +1,12 @@
-import { getUser } from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { weeklyData, weekRange } from "@/lib/reports";
 import { header, signature, p, table, docResponse } from "@/lib/word";
 import { fmtDate, fmtDue } from "@/lib/time";
 
 export async function GET(req: Request) {
-  const user = await getUser();
-  if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+  const user = await apiUser("bc.xuat");
+  if (user instanceof Response) return user;
   const u = new URL(req.url);
   const { tu, den } = weekRange(u.searchParams.get("tu") || "", u.searchParams.get("den") || "");
   const cfg = await getSettings();

@@ -1,12 +1,12 @@
-import { getUser } from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { meetingData, taskStatusText } from "@/lib/reports";
 import { header, signature, p, table, docResponse } from "@/lib/word";
 import { fmtDue } from "@/lib/time";
 
 export async function GET(req: Request) {
-  const user = await getUser();
-  if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+  const user = await apiUser("bc.xuat");
+  if (user instanceof Response) return user;
   const ten = new URL(req.url).searchParams.get("ten") || "";
   const cfg = await getSettings();
   const rows = await meetingData(user, ten);

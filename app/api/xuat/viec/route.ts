@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { getUser } from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { queryTasks } from "@/lib/taskQuery";
 import { styleHeader, toResponse, borderAll } from "@/lib/excel";
 import { TRANG_THAI, UU_TIEN } from "@/lib/const";
@@ -7,8 +7,8 @@ import { fmtDue, fmtDate } from "@/lib/time";
 import { taskStatusText } from "@/lib/reports";
 
 export async function GET(req: Request) {
-  const user = await getUser();
-  if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+  const user = await apiUser("cv.xuat", "bc.xuat");
+  if (user instanceof Response) return user;
   const sp = Object.fromEntries(new URL(req.url).searchParams.entries());
   const tasks = await queryTasks(user, sp, 5000);
   const wb = new ExcelJS.Workbook();

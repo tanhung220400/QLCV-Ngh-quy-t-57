@@ -1,18 +1,17 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requirePerm } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { kpiScope, canManageKpi } from "@/lib/perm";
-import { loadKpis, fmtNum } from "@/lib/kpi";
+import { loadKpis } from "@/lib/kpi";
 import { getSettings } from "@/lib/settings";
-import { KpiBar, KpiStatus } from "@/components/Charts";
-import { LOAI_CHI_TIEU } from "@/lib/const";
+import { KpiCount, KpiDot } from "@/components/Charts";
 import { vnDate } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 export default async function KpiList({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePerm("ct.xem");
   const sql = await db();
   const cfg = await getSettings();
   const years = (await sql`SELECT DISTINCT nam FROM chi_tieu WHERE NOT huy ORDER BY nam DESC`).map((r) => r.nam as number);
@@ -23,18 +22,22 @@ export default async function KpiList({ searchParams }: { searchParams: Promise<
   if (sp.loc === "nguy_co") kpis = kpis.filter((k) => k.nguy_co);
   if (sp.loc === "cho_xac_nhan") kpis = kpis.filter((k) => k.cho_xac_nhan > 0);
   const top = kpis.filter((k) => !k.id_cha || !kpis.some((p) => p.id === k.id_cha));
-  const groups = [...new Set(top.map((k) => k.nhom))];
+  const keyOf = (k: (typeof kpis)[number]) => k.linh_vuc || "Chưa phân lĩnh vực";
+  const groups = [...new Set(top.map(keyOf))].sort((a, b) => (a === "Chưa phân lĩnh vực" ? 1 : b === "Chưa phân lĩnh vực" ? -1 : a.localeCompare(b, "vi")));
   const manage = canManageKpi(user);
   const pending = kpis.filter((k) => k.cho_xac_nhan > 0).length;
-
+  const openAll = sp.mo === "tat_ca" || !!sp.loc;
+  const qsBase = `/chi-tieu?nam=${nam}${sp.loc ? `&loc=${sp.loc}` : ""}`;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="h1">Chỉ tiêu năm {nam}</h1>
         <div className="flex flex-wrap gap-2">
-          <a href={`/api/xuat/chi-tieu?nam=${nam}`} className="btn btn-outline btn-sm">
-            Xuất Excel
-          </a>
+          {user.quyen.includes("bc.xuat") && (
+            <a href={`/api/xuat/chi-tieu?nam=${nam}`} className="btn btn-outline btn-sm">
+              Xuất Excel
+            </a>
+          )}
           {manage && (
             <>
               <Link href="/chi-tieu/nhap" className="btn btn-outline btn-sm">
@@ -67,55 +70,69 @@ export default async function KpiList({ searchParams }: { searchParams: Promise<
         ) : null}
       </div>
       <p className="text-sm text-slate-500">
-        Thanh màu là % hoàn thành so với kế hoạch năm, vạch đen là mức lẽ ra phải đạt đến kỳ này. Chậm hơn quá {cfg.nguong_nguy_co} điểm % thì đánh dấu nguy cơ.
+        Chỉ tiêu được thu gọn theo lĩnh vực. Bấm vào lĩnh vực để xem danh sách, bấm vào chỉ tiêu để xem chi tiết. Số % là mức hoàn thành so với kế hoạch năm; chậm hơn mức lẽ ra phải đạt quá {cfg.nguong_nguy_co} điểm % thì đánh dấu nguy cơ.
       </p>
       {groups.length === 0 && <div className="card text-slate-500">Chưa có chỉ tiêu nào{manage ? ". Bấm “Nhập từ Excel” để nhập chỉ tiêu Nghị quyết HĐND." : "."}</div>}
-      {groups.map((g) => (
-        <section key={g} className="card">
-          <h2 className="h2">{g}</h2>
-          <div className="mt-2 divide-y divide-slate-100">
-            {top
-              .filter((k) => k.nhom === g)
-              .map((k) => (
-                <div key={k.id}>
-                  <Link href={`/chi-tieu/${k.id}`} className="grid gap-1 py-3 md:grid-cols-[1fr_240px_170px] md:items-center md:gap-4">
-                    <div>
-                      <div className="font-semibold">{k.ten}</div>
-                      <div className="text-sm text-slate-600">
-                        Kế hoạch {fmtNum(k.ke_hoach_nam)} {k.don_vi_tinh} · Thực hiện <b>{fmtNum(k.thuc_hien)}</b> · {LOAI_CHI_TIEU[k.loai]}
-                        {k.chieu_tot === "thap" ? " · càng thấp càng tốt" : ""}
-                      </div>
-                      <div className="text-sm text-slate-500">
-                        {k.ten_don_vi || ""}
-                        {k.ten_phu_trach ? ` · ${k.ten_phu_trach}` : ""}
-                        {k.cho_xac_nhan > 0 && <span className="ml-1 font-semibold text-amber-700">· {k.cho_xac_nhan} số liệu chờ xác nhận</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <KpiBar pct={k.pct} leRa={k.pct_le_ra} mau={k.mau} />
-                      <span className="w-12 text-right font-semibold tabular-nums">{k.pct == null ? "–" : `${Math.round(k.pct)}%`}</span>
-                    </div>
-                    <KpiStatus mau={k.mau} />
-                  </Link>
-                  {kpis
-                    .filter((c) => c.id_cha === k.id)
-                    .map((c) => (
-                      <Link key={c.id} href={`/chi-tieu/${c.id}`} className="ml-4 grid gap-1 border-l-2 border-slate-200 py-2 pl-3 text-[15px] md:grid-cols-[1fr_220px_170px] md:items-center md:gap-4">
-                        <div>
-                          {c.ten} <span className="text-slate-500">· {fmtNum(c.thuc_hien)}/{fmtNum(c.ke_hoach_nam)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <KpiBar pct={c.pct} leRa={c.pct_le_ra} mau={c.mau} />
-                          <span className="w-12 text-right text-sm tabular-nums">{c.pct == null ? "–" : `${Math.round(c.pct)}%`}</span>
-                        </div>
-                        <KpiStatus mau={c.mau} />
-                      </Link>
-                    ))}
-                </div>
-              ))}
+      {groups.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div className="flex flex-wrap gap-3 text-slate-700">
+            <span className="inline-flex items-center gap-1"><KpiDot mau="xanh" /> Đúng tiến độ</span>
+            <span className="inline-flex items-center gap-1"><KpiDot mau="vang" /> Chậm nhẹ</span>
+            <span className="inline-flex items-center gap-1"><KpiDot mau="do" /> Nguy cơ</span>
+            <span className="inline-flex items-center gap-1"><KpiDot mau="xam" /> Chưa có số liệu</span>
           </div>
-        </section>
-      ))}
+          <div className="flex gap-3">
+          <Link href={`${qsBase}&mo=tat_ca`} className="text-brand-700 underline">
+            Mở tất cả
+          </Link>
+          <Link href={qsBase} className="text-brand-700 underline">
+            Thu gọn tất cả
+          </Link>
+          </div>
+        </div>
+      )}
+      <div className="space-y-3">
+        {groups.map((g) => {
+          const list = top.filter((k) => keyOf(k) === g);
+          const n = { xanh: 0, vang: 0, do: 0, xam: 0 } as Record<string, number>;
+          for (const k of list) n[k.mau]++;
+          return (
+            <details key={g} className="card group p-0" open={openAll || sp.mo === g}>
+              <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                <span className="text-slate-400 transition group-open:rotate-90" aria-hidden>
+                  ▶
+                </span>
+                <span className="min-w-0 flex-1 text-lg font-bold">{g}</span>
+                <span className="text-sm text-slate-600">{list.length} chỉ tiêu</span>
+                <span className="flex gap-2 text-sm">
+                  {n.xanh > 0 && <KpiCount mau="xanh" n={n.xanh} />}
+                  {n.vang > 0 && <KpiCount mau="vang" n={n.vang} />}
+                  {n.do > 0 && <KpiCount mau="do" n={n.do} />}
+                  {n.xam > 0 && <KpiCount mau="xam" n={n.xam} />}
+                </span>
+              </summary>
+              <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                {list.map((k) => (
+                  <li key={k.id}>
+                    <Link href={`/chi-tieu/${k.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+                      <KpiDot mau={k.mau} />
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium">{k.ten}</span>
+                        {k.cho_xac_nhan > 0 && <span className="ml-2 text-sm font-semibold text-amber-700">· chờ xác nhận</span>}
+                        {k.so_phan_ra > 0 && <span className="ml-2 text-sm text-slate-500">· {k.so_phan_ra} phần phân rã</span>}
+                      </span>
+                      <span className="w-14 text-right font-semibold tabular-nums">{k.pct == null ? "–" : `${Math.round(k.pct)}%`}</span>
+                      <span className="text-slate-400" aria-hidden>
+                        ›
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          );
+        })}
+      </div>
     </div>
   );
 }

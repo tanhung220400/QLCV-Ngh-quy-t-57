@@ -19,6 +19,7 @@ export type KpiRow = {
   ky_cap_nhat: string;
   ngay_chot: number;
   id_cha: number | null;
+  linh_vuc?: string | null;
   ten_phu_trach?: string | null;
   ten_don_vi?: string | null;
   ten_lanh_dao?: string | null;

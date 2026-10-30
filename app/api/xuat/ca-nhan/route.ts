@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { getUser } from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { taskScope, kpiScope } from "@/lib/perm";
 import { personStats } from "@/lib/stats";
@@ -9,8 +9,8 @@ import { styleHeader, toResponse, borderAll } from "@/lib/excel";
 import { fromVN, vnDate } from "@/lib/time";
 
 export async function GET(req: Request) {
-  const user = await getUser();
-  if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+  const user = await apiUser("bc.danh_gia");
+  if (user instanceof Response) return user;
   const u = new URL(req.url);
   const tu = u.searchParams.get("tu") || `${vnDate().slice(0, 4)}-01-01`;
   const den = u.searchParams.get("den") || vnDate();

@@ -14,6 +14,7 @@ export function KpiForm({
   nhom,
   nguon,
   dvt,
+  linhVuc,
 }: {
   k?: K;
   parent?: K;
@@ -23,6 +24,7 @@ export function KpiForm({
   nhom: string[];
   nguon: string[];
   dvt: string[];
+  linhVuc: string[];
 }) {
   const base = k || parent || {};
   const year = (base.nam as number) || new Date().getFullYear();
@@ -53,6 +55,18 @@ export function KpiForm({
               <option key={x}>{x}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <label className="label req">Lĩnh vực</label>
+          <select name="linh_vuc" className="input" defaultValue={String(g("linh_vuc", ""))} required>
+            <option value="" disabled>
+              Chọn lĩnh vực
+            </option>
+            {linhVuc.map((x) => (
+              <option key={x}>{x}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-sm text-slate-500">Lãnh đạo phụ trách lĩnh vực này sẽ xem được chỉ tiêu.</p>
         </div>
         <div>
           <label className="label req">Đơn vị tính</label>

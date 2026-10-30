@@ -1,4 +1,4 @@
-import { getUser } from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { kpiReportData, kpiRowText } from "@/lib/reports";
 import { header, signature, p, table, docResponse } from "@/lib/word";
@@ -7,8 +7,8 @@ import { vnDate } from "@/lib/time";
 const KY: Record<string, string> = { thang: "tháng", quy: "quý", "6thang": "6 tháng", nam: "năm" };
 
 export async function GET(req: Request) {
-  const user = await getUser();
-  if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+  const user = await apiUser("bc.xuat");
+  if (user instanceof Response) return user;
   const u = new URL(req.url);
   const nam = Number(u.searchParams.get("nam")) || Number(vnDate().slice(0, 4));
   const ky = u.searchParams.get("ky") || "thang";

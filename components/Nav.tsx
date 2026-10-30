@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { logoutAction } from "@/app/actions/auth";
 
 type Item = { href: string; label: string; icon: string };
 
@@ -31,6 +32,13 @@ const ICONS: Record<string, React.ReactNode> = {
     </>
   ),
   more: <path d="M4 6h16M4 12h16M4 18h16" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </>
+  ),
+  logout: <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" />,
 };
 
 export function Icon({ name, className = "h-6 w-6" }: { name: string; className?: string }) {
@@ -69,6 +77,12 @@ export function Nav({ items, mobile, unread, user }: { items: Item[]; mobile: It
             </Link>
           ))}
         </nav>
+        <form action={logoutAction} className="border-t border-slate-200 p-3">
+          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-red-700 hover:bg-red-50">
+            <Icon name="logout" />
+            Đăng xuất
+          </button>
+        </form>
       </aside>
 
       {/* Thanh dưới trên điện thoại */}
@@ -112,6 +126,12 @@ export function Nav({ items, mobile, unread, user }: { items: Item[]; mobile: It
                 </Link>
               ))}
             </div>
+            <form action={logoutAction} className="mt-3">
+              <button className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-3 font-semibold text-red-700">
+                <Icon name="logout" />
+                Đăng xuất
+              </button>
+            </form>
           </div>
         </div>
       )}

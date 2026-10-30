@@ -154,3 +154,26 @@ export function KpiStatus({ mau }: { mau: string }) {
     </span>
   );
 }
+
+export function KpiDot({ mau }: { mau: string }) {
+  const icon: Record<string, string> = { xanh: "✓", vang: "!", do: "▲", xam: "–" };
+  return (
+    <span
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+      style={{ background: KPI_COLOR[mau], color: mau === "vang" ? "#0b0b0b" : "#fff" }}
+      title={KPI_LABEL[mau]}
+      aria-label={KPI_LABEL[mau]}
+    >
+      {icon[mau]}
+    </span>
+  );
+}
+
+export function KpiCount({ mau, n }: { mau: string; n: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap text-slate-700" title={KPI_LABEL[mau]}>
+      <KpiDot mau={mau} />
+      {n}
+    </span>
+  );
+}

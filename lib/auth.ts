@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import * as OTPAuth from "otpauth";
 import { db } from "./db";
 import { vnDate } from "./time";
+import { tinhQuyen, tinhPhamVi, type PhamVi } from "./quyen";
 
 const COOKIE = "qlcv_s";
 const PENDING = "qlcv_otp";
@@ -30,7 +31,13 @@ export type User = {
   doi_mat_khau: boolean;
   /** id những người đang ủy quyền cho người này (hôm nay) */
   uy_quyen_tu: number[];
+  /** Quyền chức năng hiệu lực (gồm cả quyền của người ủy quyền) */
+  quyen: string[];
+  pham_vi: PhamVi;
 };
+
+/** Kiểm tra người dùng có quyền chức năng */
+export const co = (u: Pick<User, "quyen">, q: string) => u.quyen.includes(q);
 
 export async function hashPassword(p: string) {
   return bcrypt.hash(p, 10);
@@ -89,7 +96,7 @@ export async function getUser(): Promise<User | null> {
   const sql = await db();
   const rows = await sql`
     SELECT u.id, u.ho_ten, u.ten_dang_nhap, u.sdt, u.email, u.id_don_vi, d.ten AS ten_don_vi, u.chuc_vu, u.vai_tro,
-           u.linh_vuc_phu_trach, u.otp_bat, u.doi_mat_khau, u.phien, u.trang_thai
+           u.linh_vuc_phu_trach, u.otp_bat, u.doi_mat_khau, u.phien, u.trang_thai, u.quyen, u.pham_vi
     FROM nguoi_dung u LEFT JOIN don_vi d ON d.id = u.id_don_vi
     WHERE u.id = ${uid}`;
   const u = rows[0];
@@ -98,6 +105,11 @@ export async function getUser(): Promise<User | null> {
   const uq = await sql`
     SELECT id_nguoi_uy_quyen FROM uy_quyen
     WHERE id_nguoi_duoc = ${uid} AND NOT huy AND tu_ngay <= ${today} AND den_ngay >= ${today}`;
+  const quyen = tinhQuyen(u.vai_tro, u.quyen);
+  if (uq.length) {
+    const others = await sql`SELECT vai_tro, quyen FROM nguoi_dung WHERE id IN ${sql(uq.map((r) => r.id_nguoi_uy_quyen as number))}`;
+    for (const o of others) for (const q of tinhQuyen(o.vai_tro, o.quyen)) if (!q.startsWith("qt.")) quyen.add(q);
+  }
   return {
     id: u.id,
     ho_ten: u.ho_ten,
@@ -112,6 +124,8 @@ export async function getUser(): Promise<User | null> {
     otp_bat: u.otp_bat,
     doi_mat_khau: u.doi_mat_khau,
     uy_quyen_tu: uq.map((r) => r.id_nguoi_uy_quyen as number),
+    quyen: [...quyen],
+    pham_vi: tinhPhamVi(u.vai_tro, u.id_don_vi, u.linh_vuc_phu_trach || [], u.pham_vi),
   };
 }
 
@@ -124,6 +138,13 @@ export async function requireUser(): Promise<User> {
 export async function requireRole(...roles: string[]): Promise<User> {
   const u = await requireUser();
   if (!roles.includes(u.vai_tro)) redirect("/");
+  return u;
+}
+
+/** Yêu cầu có ít nhất một trong các quyền, nếu không về trang chủ */
+export async function requirePerm(...qs: string[]): Promise<User> {
+  const u = await requireUser();
+  if (!qs.some((q) => u.quyen.includes(q))) redirect("/?khong_quyen=1");
   return u;
 }
 
@@ -140,4 +161,12 @@ export function otpUri(secretB32: string, label: string) {
 export function verifyOtp(secretB32: string, code: string) {
   const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secretB32), digits: 6, period: 30 });
   return totp.validate({ token: code.replace(/\s/g, ""), window: 1 }) !== null;
+}
+
+/** Dùng trong route API: trả về người dùng hoặc Response lỗi */
+export async function apiUser(...qs: string[]): Promise<User | Response> {
+  const u = await getUser();
+  if (!u) return new Response("Chưa đăng nhập", { status: 401 });
+  if (qs.length && !qs.some((q) => u.quyen.includes(q))) return new Response("Tài khoản chưa được phân quyền chức năng này", { status: 403 });
+  return u;
 }

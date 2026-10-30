@@ -56,6 +56,10 @@ export async function runScan(force = false) {
       await notify(sql, [...owners, ...(await unitHeads(t.id_don_vi_chu_tri))], "den_han", `Đến hạn hôm nay: ${t.ten}`, `Hạn ${fmtDue(han, t.han_co_gio)}`, "cong_viec", t.id, `denhan:${t.id}:${hanDay}`);
       sent++;
     }
+    if (qua && hanDay < today) {
+      await notify(sql, owners, "qua_han_ct", `Đã quá hạn: ${t.ten}`, `Hạn ${fmtDue(han, t.han_co_gio)}. Đề nghị khẩn trương hoàn thành hoặc xin gia hạn`, "cong_viec", t.id, `quahanct:${t.id}:${hanDay}`);
+      sent++;
+    }
     if (qua && -con >= cfg.bao_cap_tren_sau) {
       await notify(sql, [t.id_nguoi_giao, ...leadersFor(t.linh_vuc)], "qua_han", `Quá hạn ${-con} ngày: ${t.ten}`, `Hạn ${fmtDue(han, t.han_co_gio)}`, "cong_viec", t.id, `baocaptren:${t.id}:${hanDay}`);
       sent++;

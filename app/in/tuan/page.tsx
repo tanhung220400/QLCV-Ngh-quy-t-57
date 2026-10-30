@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requirePerm } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { weeklyData, weekRange } from "@/lib/reports";
 import { PrintDoc, PTable } from "@/components/PrintDoc";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PrintWeek({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const user = await requireUser();
+  const user = await requirePerm("bc.xuat");
   const cfg = await getSettings();
   const { tu, den } = weekRange(sp.tu, sp.den);
   const d = await weeklyData(user, tu, den);

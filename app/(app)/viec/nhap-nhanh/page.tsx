@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { canCreateTask } from "@/lib/perm";
 import { taskFormOptions } from "@/lib/options";
 import { BulkImport } from "@/components/BulkImport";
 import { addWorkingDays, vnDate } from "@/lib/time";
@@ -10,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BulkPage() {
   const user = await requireUser();
-  if (!canCreateTask(user)) redirect("/viec");
+  if (!user.quyen.includes("cv.nhap_nhanh")) redirect("/viec");
   const o = await taskFormOptions(user);
   const due = addWorkingDays(vnDate(), 10, await getHolidays());
   return (

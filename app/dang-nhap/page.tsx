@@ -5,10 +5,12 @@ import { getUser } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { AuthShell } from "@/components/AuthShell";
+import { LoginFields } from "@/components/LoginFields";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const sp = await searchParams;
   if (!hasDatabase()) redirect("/cai-dat-ban-dau");
   const sql = await db();
   if ((await sql`SELECT count(*)::int AS n FROM nguoi_dung`)[0].n === 0) redirect("/cai-dat-ban-dau");
@@ -17,19 +19,9 @@ export default async function LoginPage() {
   const demo = (await sql`SELECT 1 FROM nguoi_dung WHERE ten_dang_nhap = 'chutich' LIMIT 1`).length > 0;
   return (
     <AuthShell title="Đăng nhập" sub={cfg.ten_don_vi}>
+      {sp.dat_lai && <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-emerald-800">Đã đặt lại mật khẩu. Mời đăng nhập.</p>}
       <ActionForm action={loginAction} className="space-y-4">
-        <div>
-          <label className="label" htmlFor="u">
-            Tên đăng nhập
-          </label>
-          <input id="u" name="ten_dang_nhap" className="input" autoComplete="username" autoCapitalize="none" required autoFocus />
-        </div>
-        <div>
-          <label className="label" htmlFor="p">
-            Mật khẩu
-          </label>
-          <input id="p" name="mat_khau" type="password" className="input" autoComplete="current-password" required />
-        </div>
+        <LoginFields />
         <Submit className="btn btn-primary w-full text-lg">Đăng nhập</Submit>
       </ActionForm>
       {demo && (

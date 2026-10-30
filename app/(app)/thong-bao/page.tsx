@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const ICON: Record<string, string> = {
   giao_viec: "📌", phoi_hop: "🤝", nhac_han: "⏰", den_han: "⏰", qua_han: "🔴", chua_nhan: "❔", tra_lai: "↩️", cho_duyet: "📝",
   hoan_thanh: "✅", lam_lai: "🔁", xin_gia_han: "📅", gia_han: "📅", nhac_ten: "💬", binh_luan: "💬", nhac: "🔔", tom_tat: "📋",
-  nguy_co: "⚠️", chot_so_lieu: "📊", xac_nhan_so_lieu: "📊", so_lieu: "📊", giao_chi_tieu: "🎯", het_han_chi_tieu: "⚠️", doi_han: "📅", trang_thai: "ℹ️", nhan_viec: "👍",
+  nguy_co: "⚠️", qua_han_ct: "🔴", yeu_cau_mat_khau: "🔑", uy_quyen: "🤝", chot_so_lieu: "📊", xac_nhan_so_lieu: "📊", so_lieu: "📊", giao_chi_tieu: "🎯", het_han_chi_tieu: "⚠️", doi_han: "📅", trang_thai: "ℹ️", nhan_viec: "👍",
 };
 
 export default async function Notifications({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
@@ -31,7 +31,7 @@ export default async function Notifications({ searchParams }: { searchParams: Pr
       </div>
       <div className="card divide-y divide-slate-100 p-0">
         {rows.map((n) => {
-          const href = n.doi_tuong === "cong_viec" ? `/viec/${n.id_doi_tuong}` : n.doi_tuong === "chi_tieu" ? `/chi-tieu/${n.id_doi_tuong}` : n.loai === "tom_tat" ? "/viec?tab=cua_toi&trang_thai=dang_mo" : "#";
+          const href = n.doi_tuong === "cong_viec" ? `/viec/${n.id_doi_tuong}` : n.doi_tuong === "chi_tieu" ? `/chi-tieu/${n.id_doi_tuong}` : n.doi_tuong === "nguoi_dung" && n.id_doi_tuong ? `/quan-tri?muc=nguoi_dung&sua=${n.id_doi_tuong}` : n.loai === "tom_tat" ? "/viec?tab=cua_toi&trang_thai=dang_mo" : "#";
           return (
             <MarkRead key={n.id} id={n.id} href={href}>
               <div className={`flex gap-3 px-4 py-3 ${n.da_doc ? "" : "bg-brand-50"}`}>

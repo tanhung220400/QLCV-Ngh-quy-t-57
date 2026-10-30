@@ -1,12 +1,12 @@
 import ExcelJS from "exceljs";
-import { getUser } from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { kpiReportData, kpiRowText } from "@/lib/reports";
 import { styleHeader, toResponse, borderAll } from "@/lib/excel";
 import { vnDate } from "@/lib/time";
 
 export async function GET(req: Request) {
-  const user = await getUser();
-  if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+  const user = await apiUser("bc.xuat");
+  if (user instanceof Response) return user;
   const nam = Number(new URL(req.url).searchParams.get("nam")) || Number(vnDate().slice(0, 4));
   const kpis = await kpiReportData(user, nam);
   const wb = new ExcelJS.Workbook();

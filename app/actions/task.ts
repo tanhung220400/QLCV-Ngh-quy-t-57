@@ -1,9 +1,11 @@
 "use server";
 import type postgres from "postgres";
 import { randomUUID } from "crypto";
+import { after } from "next/server";
+import { flushSms } from "@/lib/sms";
 import { db } from "@/lib/db";
 import { getUser, type User } from "@/lib/auth";
-import { canCreateTask, identities, subtree, allUnits, taskPerms, type TaskRow } from "@/lib/perm";
+import { canCreateTask, identities, assignableUnits, taskPerms, type TaskRow } from "@/lib/perm";
 import { notify, writeLog } from "@/lib/log";
 import { fromVN, fmtDue } from "@/lib/time";
 import { recomputePercent } from "@/lib/tasks";
@@ -14,12 +16,19 @@ type Tx = postgres.TransactionSql;
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
+/** Gửi SMS đang chờ sau khi trả kết quả cho người dùng (không làm chậm thao tác) */
+function sendSmsLater() {
+  try {
+    after(() => flushSms().catch((e) => console.error("sms", e)));
+  } catch {
+    // ngoài phạm vi request (ví dụ gọi từ tác vụ định kỳ) thì bỏ qua
+  }
+}
+
 /** Người dùng được phép giao việc cho những ai */
 async function allowedAssignees(user: User): Promise<{ all: boolean; units: number[] }> {
-  const ids = await identities(user);
-  if (ids.some((i) => i.vai_tro === "lanh_dao" || i.vai_tro === "tong_hop")) return { all: true, units: [] };
-  const units = await allUnits();
-  return { all: false, units: ids.flatMap((i) => (i.id_don_vi ? subtree(units, i.id_don_vi) : [])) };
+  const u = await assignableUnits(user);
+  return u === null ? { all: true, units: [] } : { all: false, units: u };
 }
 
 async function unitHead(sql: Tx, dv: number): Promise<number | null> {
@@ -128,6 +137,7 @@ export async function createTaskAction(_: ActionState, fd: FormData): Promise<Ac
     if (idCha) await recomputePercent(tx, idCha);
   });
   if (err) return { error: err };
+  sendSmsLater();
   if (idCha) return { ok: true, message: "Đã thêm việc con.", reset: true };
   if (created.length === 1) return { redirect: `/viec/${created[0]}?moi=1` };
   return { redirect: `/viec?tab=toi_giao&moi=${created.length}` };
@@ -137,7 +147,7 @@ export async function createTaskAction(_: ActionState, fd: FormData): Promise<Ac
 export async function bulkCreateAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const user = await getUser();
   if (!user) return { redirect: "/dang-nhap" };
-  if (!canCreateTask(user)) return { error: "Bạn không có quyền giao việc." };
+  if (!user.quyen.includes("cv.nhap_nhanh")) return { error: "Bạn không có quyền giao việc từ kết luận họp." };
   const rows = JSON.parse(str(fd, "rows") || "[]") as { ten: string; chu_tri: string; han: string; san_pham: string; linh_vuc: string; uu_tien: string }[];
   const valid = rows.filter((r) => r.ten.trim());
   if (!valid.length) return { error: "Chưa có việc nào." };
@@ -447,6 +457,7 @@ export async function taskAction(_: ActionState, fd: FormData): Promise<ActionSt
     }
   });
   if (error) return { error };
+  sendSmsLater();
   return { ok: true, message: msg, reset: ["binh_luan", "checklist_them", "xin_gia_han", "tra_lai"].includes(op) };
 }
 

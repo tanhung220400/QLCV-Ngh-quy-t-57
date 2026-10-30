@@ -1,5 +1,5 @@
 // Mô hình dữ liệu theo mục 8 của đặc tả. Chạy lại nhiều lần không sao (IF NOT EXISTS).
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS don_vi (
@@ -245,4 +245,49 @@ CREATE TABLE IF NOT EXISTS cai_dat (
   khoa TEXT PRIMARY KEY,
   gia_tri JSONB NOT NULL
 );
+
+-- ===== Phiên bản 2: phân quyền chi tiết, SMS, quên mật khẩu, lĩnh vực chỉ tiêu, tra cứu không dấu =====
+ALTER TABLE nguoi_dung ADD COLUMN IF NOT EXISTS quyen JSONB;          -- {"them": [...], "bo": [...]} so với mặc định của vai trò
+ALTER TABLE nguoi_dung ADD COLUMN IF NOT EXISTS pham_vi JSONB;        -- {"loai": "toan_xa|linh_vuc|don_vi|ca_nhan", "linh_vuc": [], "don_vi": []}
+ALTER TABLE chi_tieu ADD COLUMN IF NOT EXISTS linh_vuc TEXT;
+UPDATE chi_tieu SET linh_vuc = CASE nhom
+    WHEN 'Kinh tế' THEN 'Kinh tế, tài chính'
+    WHEN 'Văn hóa - xã hội' THEN 'Văn hóa - xã hội'
+    WHEN 'Quốc phòng - an ninh' THEN 'An ninh, quốc phòng'
+    WHEN 'Xây dựng chính quyền' THEN 'Nội vụ, xây dựng chính quyền'
+    ELSE NULL END
+  WHERE linh_vuc IS NULL;
+
+CREATE TABLE IF NOT EXISTS sms_hang_doi (
+  id SERIAL PRIMARY KEY,
+  id_nguoi_nhan INT REFERENCES nguoi_dung(id),
+  sdt TEXT NOT NULL,
+  noi_dung TEXT NOT NULL,
+  loai TEXT NOT NULL,
+  trang_thai TEXT NOT NULL DEFAULT 'cho',   -- cho / da_gui / loi / bo_qua
+  so_lan INT NOT NULL DEFAULT 0,
+  loi TEXT,
+  ma_nha_mang TEXT,
+  khoa TEXT UNIQUE,
+  tao_luc TIMESTAMPTZ NOT NULL DEFAULT now(),
+  gui_luc TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS sms_cho ON sms_hang_doi(trang_thai, tao_luc);
+
+CREATE TABLE IF NOT EXISTS dat_lai_mat_khau (
+  id SERIAL PRIMARY KEY,
+  id_nguoi_dung INT NOT NULL REFERENCES nguoi_dung(id),
+  ma_hash TEXT NOT NULL,
+  het_han TIMESTAMPTZ NOT NULL,
+  so_lan_thu INT NOT NULL DEFAULT 0,
+  da_dung BOOLEAN NOT NULL DEFAULT FALSE,
+  tao_luc TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Bỏ dấu tiếng Việt để tìm kiếm không phân biệt dấu (không cần extension unaccent)
+CREATE OR REPLACE FUNCTION bo_dau(t TEXT) RETURNS TEXT AS $$
+  SELECT translate(lower(coalesce(t, '')),
+    'àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ',
+    'aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyyd')
+$$ LANGUAGE sql IMMUTABLE;
 `;

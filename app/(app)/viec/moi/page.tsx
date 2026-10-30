@@ -15,9 +15,11 @@ export default async function NewTaskPage() {
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className="h1">Giao việc</h1>
-        <Link href="/viec/nhap-nhanh" className="btn btn-outline btn-sm">
-          Nhập nhiều việc từ kết luận họp
-        </Link>
+        {user.quyen.includes("cv.nhap_nhanh") && (
+          <Link href="/viec/nhap-nhanh" className="btn btn-outline btn-sm">
+            Nhập nhiều việc từ kết luận họp
+          </Link>
+        )}
       </div>
       <div className="card">
         <TaskForm

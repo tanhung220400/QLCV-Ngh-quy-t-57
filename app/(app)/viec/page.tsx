@@ -17,7 +17,7 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const user = await requireUser();
   const view = sp.xem || "ds";
-  const tab = sp.tab || (user.vai_tro === "lanh_dao" || user.vai_tro === "tong_hop" ? "tat_ca" : "cua_toi");
+  const tab = sp.tab || (user.pham_vi.loai === "toan_xa" || user.pham_vi.loai === "linh_vuc" ? "tat_ca" : "cua_toi");
   const f: TaskFilter = { ...sp, tab };
   const thang = /^\d{4}-\d{2}$/.test(sp.thang || "") ? sp.thang : vnDate().slice(0, 7);
   if (view === "lich") {
@@ -57,9 +57,11 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
         <div className="flex gap-2">
           {canCreateTask(user) && (
             <>
-              <Link href="/viec/nhap-nhanh" className="btn btn-outline btn-sm">
-                Nhập từ kết luận họp
-              </Link>
+              {user.quyen.includes("cv.nhap_nhanh") && (
+                <Link href="/viec/nhap-nhanh" className="btn btn-outline btn-sm">
+                  Nhập từ kết luận họp
+                </Link>
+              )}
               <Link href="/viec/moi" className="btn btn-primary btn-sm">
                 + Giao việc
               </Link>
@@ -94,9 +96,11 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
           {counts.do > 0 && <span className="ml-2 font-semibold text-red-700">· {counts.do} quá hạn</span>}
           {counts.vang > 0 && <span className="ml-2 font-semibold text-amber-700">· {counts.vang} sắp đến hạn</span>}
         </span>
-        <a href={`/api/xuat/viec?${new URLSearchParams({ ...sp, tab }).toString()}`} className="btn btn-outline btn-sm ml-auto">
-          Xuất Excel
-        </a>
+        {user.quyen.includes("cv.xuat") && (
+          <a href={`/api/xuat/viec?${new URLSearchParams({ ...sp, tab }).toString()}`} className="btn btn-outline btn-sm ml-auto">
+            Xuất Excel
+          </a>
+        )}
       </div>
 
       <details className="card" open={hasFilter}>

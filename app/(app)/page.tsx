@@ -19,7 +19,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const user = await requireUser();
   const sql = await db();
   const ids = await identities(user);
-  const leader = ids.some((i) => seesAll(i) || i.vai_tro === "lanh_dao" || i.vai_tro === "truong_don_vi");
+  const leader = user.quyen.includes("bc.dashboard");
   const scope = (await taskScope(sql, user)).q;
   const [cfg, holidays, h] = await Promise.all([getSettings(), getHolidays(), headline(sql, scope)]);
   const kpis = (await loadKpis(sql, (await kpiScope(sql, user)).q, cfg.nguong_nguy_co, Number(vnDate().slice(0, 4)))).filter((k) => !k.id_cha);
@@ -37,15 +37,19 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   // Việc cá nhân
   const mine = await queryTasks(user, { tab: "cua_toi", trang_thai: "dang_mo" }, 50);
   const myTodo = mine.filter((t) => ["moi_giao", "da_nhan", "dang_thuc_hien"].includes(t.trang_thai));
-  const toApprove = leader || user.vai_tro === "tong_hop" ? await queryTasks(user, { tab: "toi_giao", trang_thai: "cho_duyet" }, 20) : [];
+  const toApprove = leader || user.quyen.includes("cv.duyet") ? await queryTasks(user, { tab: "toi_giao", trang_thai: "cho_duyet" }, 20) : [];
   const extPending = await sql`
     SELECT g.id, cv.id AS id_cv, cv.ten, g.han_moi, n.ho_ten FROM gia_han g JOIN cong_viec cv ON cv.id = g.id_cong_viec JOIN nguoi_dung n ON n.id = g.id_nguoi_xin
     WHERE g.trang_thai_duyet = 'cho_duyet' AND cv.id_nguoi_giao IN ${sql(ids.map((i) => i.id))} ORDER BY g.tao_luc`;
 
+  const deny = sp.khong_quyen ? (
+    <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">Tài khoản của bạn chưa được phân quyền vào mục vừa chọn. Liên hệ quản trị nếu cần.</p>
+  ) : null;
   if (!leader) {
     const overdue = myTodo.filter((t) => new Date(t.han) < new Date());
     return (
       <div className="space-y-5">
+        {deny}
         <div>
           <h1 className="h1">
             {hello}, {user.ho_ten.split(" ").slice(-1)[0]}
@@ -56,7 +60,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           {stat("Việc đang làm", myTodo.length, "/viec?tab=cua_toi&trang_thai=dang_mo")}
           {stat("Quá hạn", overdue.length, "/viec?tab=qua_han", "bad")}
           {stat("Chờ nhận", myTodo.filter((t) => t.trang_thai === "moi_giao").length, "/viec?tab=cua_toi&trang_thai=moi_giao")}
-          {stat("Chỉ tiêu phụ trách", kpis.length, "/chi-tieu", "plain", risky ? `${risky} có nguy cơ` : undefined)}
+          {user.quyen.includes("ct.xem") ? stat("Chỉ tiêu được xem", kpis.length, "/chi-tieu", "plain", risky ? `${risky} có nguy cơ` : undefined) : stat("Chờ duyệt", myTodo.filter((t) => t.trang_thai === "cho_duyet").length, "/viec?tab=cua_toi&trang_thai=cho_duyet")}
         </div>
         <section>
           <h2 className="h2 mb-2">Việc cần làm</h2>
@@ -85,9 +89,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
   return (
     <div className="space-y-5">
+      {deny}
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="h1">Tình hình {seesAll(ids[0]) ? "toàn xã" : user.vai_tro === "truong_don_vi" ? user.ten_don_vi || "đơn vị" : "lĩnh vực phụ trách"}</h1>
+          <h1 className="h1">Tình hình {seesAll(ids[0]) ? "toàn xã" : user.pham_vi.loai === "don_vi" ? user.ten_don_vi || "đơn vị" : user.pham_vi.loai === "linh_vuc" ? "lĩnh vực phụ trách" : "công việc của tôi"}</h1>
           <p className="muted">
             {hello}, {user.ho_ten}
           </p>

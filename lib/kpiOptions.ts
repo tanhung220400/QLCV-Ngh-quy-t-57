@@ -14,5 +14,6 @@ export async function kpiFormOptions() {
     nhom: await getCatalog("nhom_chi_tieu"),
     nguon: await getCatalog("nguon_chi_tieu"),
     dvt: await getCatalog("don_vi_tinh"),
+    linhVuc: await getCatalog("linh_vuc"),
   };
 }

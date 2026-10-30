@@ -119,22 +119,22 @@ async function seedDemo(tx: Tx, ld: number, vp: number) {
   // Chỉ tiêu Nghị quyết HĐND xã
   const nam = Number(today.slice(0, 4));
   const curMonth = Number(today.slice(5, 7));
-  type K = { ten: string; nhom: string; dvt: string; loai: string; chieu?: string; kh: number; dau?: number; pt: number; dv: number; ld: number; monthly: (m: number) => number; nguon?: string };
+  type K = { ten: string; lv: string; nhom: string; dvt: string; loai: string; chieu?: string; kh: number; dau?: number; pt: number; dv: number; ld: number; monthly: (m: number) => number; nguon?: string };
   const kpis: K[] = [
-    { ten: "Tổng thu ngân sách nhà nước trên địa bàn", nhom: "Kinh tế", dvt: "triệu đồng", loai: "cong_don", kh: 12000, pt: tkt, dv: kt, ld: pkt, monthly: () => 900 },
-    { ten: "Diện tích gieo trồng cây hằng năm", nhom: "Kinh tế", dvt: "ha", loai: "cong_don", kh: 850, pt: k2, dv: kt, ld: pkt, monthly: (m) => (m === 2 || m === 7 ? 380 : 0) },
-    { ten: "Tỷ lệ người dân tham gia bảo hiểm y tế", nhom: "Văn hóa - xã hội", dvt: "%", loai: "ty_le", kh: 95, pt: v1, dv: vh, ld: pvx, monthly: (m) => 88 + m * 0.4, nguon: "Chỉ tiêu tỉnh giao" },
-    { ten: "Tỷ lệ hộ nghèo", nhom: "Văn hóa - xã hội", dvt: "%", loai: "ty_le", chieu: "thap", kh: 2.5, dau: 3.4, pt: v1, dv: vh, ld: pvx, monthly: (m) => 3.4 - m * 0.04 },
-    { ten: "Tỷ lệ hồ sơ thủ tục hành chính giải quyết đúng hạn", nhom: "Xây dựng chính quyền", dvt: "%", loai: "ty_le", kh: 98, pt: thc, dv: hcc, ld: ctx, monthly: () => 98.6 },
-    { ten: "Tỷ lệ hồ sơ thủ tục hành chính nộp trực tuyến", nhom: "Xây dựng chính quyền", dvt: "%", loai: "ty_le", kh: 80, pt: thc, dv: hcc, ld: ctx, monthly: (m) => 50 + m * 2, nguon: "Chỉ tiêu tỉnh giao" },
-    { ten: "Xã đạt chuẩn văn hóa nông thôn mới", nhom: "Văn hóa - xã hội", dvt: "tiêu chí", loai: "dat_khong", kh: 1, pt: tvh, dv: vh, ld: pvx, monthly: () => 0 },
-    { ten: "Số thanh niên nhập ngũ", nhom: "Quốc phòng - an ninh", dvt: "người", loai: "cong_don", kh: 25, pt: vph, dv: vp, ld: ctx, monthly: (m) => (m === 2 ? 25 : 0) },
-    { ten: "Đường giao thông nông thôn được cứng hóa", nhom: "Kinh tế", dvt: "km", loai: "cong_don", kh: 6, pt: tkt, dv: kt, ld: pkt, monthly: (m) => (m >= 4 && m <= 8 ? 0.45 : 0) },
+    { ten: "Tổng thu ngân sách nhà nước trên địa bàn", lv: "Kinh tế, tài chính", nhom: "Kinh tế", dvt: "triệu đồng", loai: "cong_don", kh: 12000, pt: tkt, dv: kt, ld: pkt, monthly: () => 900 },
+    { ten: "Diện tích gieo trồng cây hằng năm", lv: "Nông nghiệp, môi trường", nhom: "Kinh tế", dvt: "ha", loai: "cong_don", kh: 850, pt: k2, dv: kt, ld: pkt, monthly: (m) => (m === 2 || m === 7 ? 380 : 0) },
+    { ten: "Tỷ lệ người dân tham gia bảo hiểm y tế", lv: "Giáo dục, y tế", nhom: "Văn hóa - xã hội", dvt: "%", loai: "ty_le", kh: 95, pt: v1, dv: vh, ld: pvx, monthly: (m) => 88 + m * 0.4, nguon: "Chỉ tiêu tỉnh giao" },
+    { ten: "Tỷ lệ hộ nghèo", lv: "Văn hóa - xã hội", nhom: "Văn hóa - xã hội", dvt: "%", loai: "ty_le", chieu: "thap", kh: 2.5, dau: 3.4, pt: v1, dv: vh, ld: pvx, monthly: (m) => 3.4 - m * 0.04 },
+    { ten: "Tỷ lệ hồ sơ thủ tục hành chính giải quyết đúng hạn", lv: "Cải cách hành chính", nhom: "Xây dựng chính quyền", dvt: "%", loai: "ty_le", kh: 98, pt: thc, dv: hcc, ld: ctx, monthly: () => 98.6 },
+    { ten: "Tỷ lệ hồ sơ thủ tục hành chính nộp trực tuyến", lv: "Khoa học, công nghệ, chuyển đổi số", nhom: "Xây dựng chính quyền", dvt: "%", loai: "ty_le", kh: 80, pt: thc, dv: hcc, ld: ctx, monthly: (m) => 50 + m * 2, nguon: "Chỉ tiêu tỉnh giao" },
+    { ten: "Xã đạt chuẩn văn hóa nông thôn mới", lv: "Văn hóa - xã hội", nhom: "Văn hóa - xã hội", dvt: "tiêu chí", loai: "dat_khong", kh: 1, pt: tvh, dv: vh, ld: pvx, monthly: () => 0 },
+    { ten: "Số thanh niên nhập ngũ", lv: "An ninh, quốc phòng", nhom: "Quốc phòng - an ninh", dvt: "người", loai: "cong_don", kh: 25, pt: vph, dv: vp, ld: ctx, monthly: (m) => (m === 2 ? 25 : 0) },
+    { ten: "Đường giao thông nông thôn được cứng hóa", lv: "Xây dựng, giao thông", nhom: "Kinh tế", dvt: "km", loai: "cong_don", kh: 6, pt: tkt, dv: kt, ld: pkt, monthly: (m) => (m >= 4 && m <= 8 ? 0.45 : 0) },
   ];
   const kpiIds: number[] = [];
   for (const [i, k] of kpis.entries()) {
-    const [r] = await tx`INSERT INTO chi_tieu (ten, nguon, nhom, don_vi_tinh, loai, chieu_tot, ke_hoach_nam, gia_tri_dau_nam, nam, han, id_phu_trach, id_don_vi_phu_trach, id_lanh_dao, ky_cap_nhat, thu_tu)
-      VALUES (${k.ten}, ${k.nguon || "Nghị quyết HĐND xã"}, ${k.nhom}, ${k.dvt}, ${k.loai}, ${k.chieu || "cao"}, ${k.kh}, ${k.dau ?? null}, ${nam}, ${`${nam}-12-31`},
+    const [r] = await tx`INSERT INTO chi_tieu (ten, linh_vuc, nguon, nhom, don_vi_tinh, loai, chieu_tot, ke_hoach_nam, gia_tri_dau_nam, nam, han, id_phu_trach, id_don_vi_phu_trach, id_lanh_dao, ky_cap_nhat, thu_tu)
+      VALUES (${k.ten}, ${k.lv}, ${k.nguon || "Nghị quyết HĐND xã"}, ${k.nhom}, ${k.dvt}, ${k.loai}, ${k.chieu || "cao"}, ${k.kh}, ${k.dau ?? null}, ${nam}, ${`${nam}-12-31`},
         ${k.pt}, ${k.dv}, ${k.ld}, 'thang', ${i}) RETURNING id`;
     kpiIds.push(r.id);
     for (let m = 1; m < curMonth; m++) {
@@ -146,8 +146,8 @@ async function seedDemo(tx: Tx, ld: number, vp: number) {
   }
   // Phân rã chỉ tiêu thu ngân sách xuống thôn
   for (const [ten, dv, kh] of [["Thu ngân sách - Thôn Đông", th1, 4000], ["Thu ngân sách - Thôn Tây", th2, 3000]] as const) {
-    await tx`INSERT INTO chi_tieu (ten, nguon, nhom, don_vi_tinh, loai, chieu_tot, ke_hoach_nam, nam, han, id_phu_trach, id_don_vi_phu_trach, id_lanh_dao, ky_cap_nhat, id_cha)
-      VALUES (${ten}, 'Nghị quyết HĐND xã', 'Kinh tế', 'triệu đồng', 'cong_don', 'cao', ${kh}, ${nam}, ${`${nam}-12-31`}, ${dv === th1 ? t1 : null}, ${dv}, ${pkt}, 'thang', ${kpiIds[0]})`;
+    await tx`INSERT INTO chi_tieu (ten, linh_vuc, nguon, nhom, don_vi_tinh, loai, chieu_tot, ke_hoach_nam, nam, han, id_phu_trach, id_don_vi_phu_trach, id_lanh_dao, ky_cap_nhat, id_cha)
+      VALUES (${ten}, 'Kinh tế, tài chính', 'Nghị quyết HĐND xã', 'Kinh tế', 'triệu đồng', 'cong_don', 'cao', ${kh}, ${nam}, ${`${nam}-12-31`}, ${dv === th1 ? t1 : null}, ${dv}, ${pkt}, 'thang', ${kpiIds[0]})`;
   }
   await tx`INSERT INTO cong_viec_chi_tieu VALUES (${ids[4]}, ${kpiIds[0]}), (${ids[5]}, ${kpiIds[2]}), (${ids[7]}, ${kpiIds[3]}), (${ids[8]}, ${kpiIds[4]}), (${ids[9]}, ${kpiIds[5]}), (${ids[6]}, ${kpiIds[6]})`;
   // Số liệu tháng trước chưa xác nhận (để thấy luồng xác nhận)

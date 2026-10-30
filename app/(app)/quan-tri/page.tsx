@@ -1,28 +1,33 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { requirePerm } from "@/lib/auth";
+import { PermissionEditor } from "@/components/PermissionEditor";
+import { tinhQuyen, LOAI_PHAM_VI } from "@/lib/quyen";
+import { getSmsConfig, SU_KIEN_SMS, smsReady } from "@/lib/sms";
 import { db } from "@/lib/db";
 import { getCatalog, getSettings } from "@/lib/settings";
 import { ActionForm, Submit } from "@/components/ActionForm";
-import { saveUnitAction, saveUserAction, resetPasswordAction, importUsersAction, saveCatalogAction, saveHolidaysAction, saveSettingsAction } from "@/app/actions/admin";
+import { saveUnitAction, saveUserAction, resetPasswordAction, importUsersAction, saveCatalogAction, saveHolidaysAction, saveSettingsAction, saveSmsAction, testSmsAction } from "@/app/actions/admin";
 import { VAI_TRO, LOAI_DON_VI } from "@/lib/const";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-const MUC = [
-  ["nguoi_dung", "Cán bộ, tài khoản"],
-  ["don_vi", "Cơ cấu tổ chức"],
-  ["danh_muc", "Danh mục"],
-  ["ngay_nghi", "Ngày nghỉ, lễ"],
-  ["cai_dat", "Cài đặt, mẫu báo cáo"],
-  ["nhat_ky", "Nhật ký thao tác"],
+const MUC: [string, string, string][] = [
+  ["nguoi_dung", "Cán bộ, phân quyền", "qt.nguoi_dung"],
+  ["don_vi", "Cơ cấu tổ chức", "qt.co_cau"],
+  ["danh_muc", "Danh mục", "qt.co_cau"],
+  ["ngay_nghi", "Ngày nghỉ, lễ", "qt.co_cau"],
+  ["cai_dat", "Cài đặt, mẫu báo cáo", "qt.cai_dat"],
+  ["sms", "Tin nhắn SMS", "qt.cai_dat"],
+  ["nhat_ky", "Nhật ký thao tác", "qt.nhat_ky"],
 ];
 const DM: Record<string, string> = { linh_vuc: "Lĩnh vực", nguon_giao: "Nguồn giao việc", san_pham: "Sản phẩm đầu ra", nhom_chi_tieu: "Nhóm chỉ tiêu", don_vi_tinh: "Đơn vị tính", nguon_chi_tieu: "Nguồn chỉ tiêu" };
 
 export default async function Admin({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  await requireRole("quan_tri");
-  const muc = sp.muc || "nguoi_dung";
+  const me = await requirePerm("qt.nguoi_dung", "qt.co_cau", "qt.cai_dat", "qt.nhat_ky");
+  const allowed = MUC.filter((m) => me.quyen.includes(m[2]));
+  const muc = allowed.some((m) => m[0] === sp.muc) ? sp.muc : allowed[0][0];
   const sql = await db();
   const units = await sql`SELECT d.*, c.ten AS ten_cha, (SELECT count(*)::int FROM nguoi_dung n WHERE n.id_don_vi = d.id) AS so_nguoi FROM don_vi d LEFT JOIN don_vi c ON c.id = d.id_cha ORDER BY d.thu_tu, d.ten`;
   const linhVuc = await getCatalog("linh_vuc");
@@ -31,7 +36,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
     <div className="space-y-4">
       <h1 className="h1">Quản trị hệ thống</h1>
       <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1">
-        {MUC.map(([k, l]) => (
+        {allowed.map(([k, l]) => (
           <Link key={k} href={`/quan-tri?muc=${k}`} className={`tab ${muc === k ? "tab-on" : ""}`}>
             {l}
           </Link>
@@ -99,6 +104,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
       {muc === "ngay_nghi" && <Holidays />}
       {muc === "cai_dat" && <Settings />}
       {muc === "nhat_ky" && <Logs q={sp.q || ""} />}
+      {muc === "sms" && <Sms />}
     </div>
   );
 }
@@ -157,16 +163,9 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
         ))}
       </select>
       <input name="chuc_vu" className="input" placeholder="Chức vụ" defaultValue={u?.chuc_vu ?? ""} />
-      <select name="vai_tro" className="input" defaultValue={u?.vai_tro || "cong_chuc"}>
-        {Object.entries(VAI_TRO).map(([k, v]) => (
-          <option key={k} value={k}>
-            {v}
-          </option>
-        ))}
-      </select>
-      <input name="sdt" className="input" placeholder="Số điện thoại" defaultValue={u?.sdt ?? ""} />
+      <input name="sdt" className="input" inputMode="tel" placeholder="Số điện thoại (nhận SMS nhắc việc)" defaultValue={u?.sdt ?? ""} />
       <div className="sm:col-span-2">
-        <label className="label">Lĩnh vực phụ trách (chỉ với Phó Chủ tịch; để trống = toàn xã)</label>
+        <label className="label">Lĩnh vực phụ trách (với lãnh đạo; để trống = toàn xã)</label>
         <div className="flex flex-wrap gap-2">
           {linhVuc.map((l) => (
             <label key={l} className="chip cursor-pointer border-slate-300 bg-white py-1">
@@ -176,6 +175,14 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
           ))}
         </div>
       </div>
+      <PermissionEditor
+        key={u?.id ?? "moi"}
+        vaiTro={(u?.vai_tro as unknown as string) || "cong_chuc"}
+        quyen={u ? [...tinhQuyen(u.vai_tro as unknown as string, u.quyen as never)] : null}
+        phamVi={(u?.pham_vi as never) ?? null}
+        units={units}
+        linhVuc={linhVuc}
+      />
       {u && (
         <select name="trang_thai" className="input" defaultValue={u.trang_thai}>
           <option value="hoat_dong">Đang hoạt động</option>
@@ -242,6 +249,12 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
                 <td>
                   {VAI_TRO[u.vai_tro]}
                   {u.linh_vuc_phu_trach?.length ? <span className="block text-xs text-slate-500">{u.linh_vuc_phu_trach.join(", ")}</span> : null}
+                  {u.pham_vi?.loai && <span className="block text-xs text-indigo-700">Phạm vi: {LOAI_PHAM_VI[u.pham_vi.loai as keyof typeof LOAI_PHAM_VI]}</span>}
+                  {u.quyen && (u.quyen.them?.length || u.quyen.bo?.length) ? (
+                    <span className="block text-xs text-amber-700">
+                      Quyền riêng: {u.quyen.them?.length ? `+${u.quyen.them.length}` : ""} {u.quyen.bo?.length ? `−${u.quyen.bo.length}` : ""}
+                    </span>
+                  ) : null}
                 </td>
                 <td>{u.otp_bat ? "✓" : ""}</td>
                 <td>
@@ -394,6 +407,131 @@ async function Logs({ q }: { q: string }) {
         </tbody>
       </table>
       <p className="mt-2 text-xs text-slate-400">{fmtDate(new Date())}</p>
+    </div>
+  );
+}
+
+async function Sms() {
+  const c = await getSmsConfig(true);
+  const sql = await db();
+  const log = await sql`SELECT s.*, n.ho_ten FROM sms_hang_doi s LEFT JOIN nguoi_dung n ON n.id = s.id_nguoi_nhan ORDER BY s.id DESC LIMIT 40`;
+  const stat = (await sql`SELECT trang_thai, count(*)::int AS n FROM sms_hang_doi WHERE tao_luc > now() - interval '30 days' GROUP BY trang_thai`) as unknown as { trang_thai: string; n: number }[];
+  const noPhone = (await sql`SELECT count(*)::int AS n FROM nguoi_dung WHERE trang_thai = 'hoat_dong' AND vai_tro <> 'quan_tri' AND (sdt IS NULL OR sdt = '')`)[0].n;
+  const mask = (v: string) => (v ? "•".repeat(Math.min(12, v.length)) : "");
+  const ready = smsReady(c);
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
+      <ActionForm action={saveSmsAction} className="card space-y-3">
+        <h2 className="h2">Gửi thông báo qua SMS</h2>
+        <p className={`rounded-xl px-3 py-2 ${ready ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>
+          {ready ? "Đang bật, SMS được gửi tự động." : c.bat ? "Đã bật nhưng còn thiếu khóa API." : "Đang tắt. Thông báo chỉ hiện trong ứng dụng."}
+        </p>
+        <label className="flex items-center gap-2 font-semibold">
+          <input type="checkbox" name="bat" value="1" defaultChecked={c.bat} className="h-5 w-5" /> Bật gửi SMS
+        </label>
+        <label className="block">
+          <span className="label">Nhà cung cấp</span>
+          <select name="nha_cung_cap" className="input" defaultValue={c.nha_cung_cap}>
+            <option value="esms">eSMS.vn</option>
+            <option value="speedsms">SpeedSMS.vn</option>
+            <option value="twilio">Twilio</option>
+            <option value="webhook">Cổng riêng (webhook của tỉnh / nhà mạng)</option>
+          </select>
+        </label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="block">
+            <span className="label">API Key / Access token</span>
+            <input name="api_key" className="input" placeholder={mask(c.api_key) || "eSMS, SpeedSMS"} autoComplete="off" />
+          </label>
+          <label className="block">
+            <span className="label">Secret Key</span>
+            <input name="secret_key" className="input" placeholder={mask(c.secret_key) || "chỉ eSMS"} autoComplete="off" />
+          </label>
+          <label className="block">
+            <span className="label">Brandname (tên người gửi)</span>
+            <input name="brandname" className="input" defaultValue={c.brandname} placeholder="Đã đăng ký với nhà mạng" />
+          </label>
+          <label className="block">
+            <span className="label">Loại tin (SmsType)</span>
+            <input name="sms_type" className="input" defaultValue={c.sms_type} />
+          </label>
+          <label className="block">
+            <span className="label">Twilio Account SID</span>
+            <input name="twilio_sid" className="input" placeholder={mask(c.twilio_sid)} autoComplete="off" />
+          </label>
+          <label className="block">
+            <span className="label">Twilio Auth Token</span>
+            <input name="twilio_token" className="input" placeholder={mask(c.twilio_token)} autoComplete="off" />
+          </label>
+          <label className="block">
+            <span className="label">Twilio số gửi</span>
+            <input name="twilio_from" className="input" defaultValue={c.twilio_from} />
+          </label>
+          <label className="block">
+            <span className="label">Webhook URL</span>
+            <input name="webhook_url" className="input" defaultValue={c.webhook_url} placeholder="https://..." />
+          </label>
+          <label className="block">
+            <span className="label">Webhook token</span>
+            <input name="webhook_token" className="input" placeholder={mask(c.webhook_token)} autoComplete="off" />
+          </label>
+          <label className="block">
+            <span className="label">Tiền tố đầu tin</span>
+            <input name="tien_to" className="input" defaultValue={c.tien_to} />
+          </label>
+        </div>
+        <p className="text-sm text-slate-500">Ô khóa để trống thì giữ nguyên khóa đã lưu. Tin được gửi không dấu, kèm đường dẫn mở công việc.</p>
+        <fieldset>
+          <legend className="label">Gửi SMS khi</legend>
+          {Object.entries(SU_KIEN_SMS).map(([k, v]) => (
+            <label key={k} className="flex items-center gap-2 py-0.5">
+              <input type="checkbox" name="su_kien" value={k} defaultChecked={c.su_kien.includes(k)} className="h-5 w-5" /> {v}
+            </label>
+          ))}
+        </fieldset>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="label">Không gửi từ</span>
+            <input type="time" name="im_lang_tu" className="input" defaultValue={c.im_lang_tu} />
+          </label>
+          <label className="block">
+            <span className="label">đến</span>
+            <input type="time" name="im_lang_den" className="input" defaultValue={c.im_lang_den} />
+          </label>
+        </div>
+        <Submit>Lưu cài đặt SMS</Submit>
+      </ActionForm>
+      <div className="space-y-4">
+        <ActionForm action={testSmsAction} className="card space-y-2">
+          <h2 className="h2">Gửi tin thử</h2>
+          <input name="sdt" className="input" inputMode="tel" placeholder="Số điện thoại nhận thử" required />
+          <Submit className="btn btn-outline">Gửi thử</Submit>
+        </ActionForm>
+        <div className="card">
+          <h2 className="h2">30 ngày qua</h2>
+          <p className="mt-1">
+            Đã gửi: <b>{stat.find((x) => x.trang_thai === "da_gui")?.n ?? 0}</b> · Chờ: <b>{stat.find((x) => x.trang_thai === "cho")?.n ?? 0}</b> · Lỗi: <b>{stat.find((x) => x.trang_thai === "loi")?.n ?? 0}</b>
+          </p>
+          {noPhone > 0 && (
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {noPhone} cán bộ chưa có số điện thoại nên sẽ không nhận được SMS. Bổ sung ở mục Cán bộ, phân quyền.
+            </p>
+          )}
+          <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto text-sm">
+            {log.map((r) => (
+              <li key={r.id} className="border-b border-slate-100 pb-1">
+                <span className={r.trang_thai === "da_gui" ? "text-emerald-700" : r.trang_thai === "loi" ? "text-red-700" : "text-slate-500"}>
+                  {r.trang_thai === "da_gui" ? "✓ Đã gửi" : r.trang_thai === "loi" ? "✕ Lỗi" : "… Chờ"}
+                </span>{" "}
+                · {r.ho_ten || r.sdt} · {fmtDateTime(r.tao_luc)}
+                <span className="block text-slate-600">{r.noi_dung}</span>
+                {r.loi && <span className="block text-red-700">{r.loi}</span>}
+              </li>
+            ))}
+            {log.length === 0 && <li className="text-slate-500">Chưa có tin nào.</li>}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }

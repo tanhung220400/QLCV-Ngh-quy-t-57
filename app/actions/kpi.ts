@@ -1,7 +1,10 @@
 "use server";
+import { after } from "next/server";
 import { db } from "@/lib/db";
+import { flushSms } from "@/lib/sms";
 import { getUser, type User } from "@/lib/auth";
-import { canManageKpi, identities, allUnits, subtree } from "@/lib/perm";
+import { canManageKpi, canSeeKpi } from "@/lib/perm";
+import { kpiRights } from "@/lib/kpiRights";
 import { notify, writeLog } from "@/lib/log";
 import { periodLabel } from "@/lib/kpi";
 import type { ActionState } from "@/components/ActionForm";
@@ -15,16 +18,9 @@ const num = (s: string) => {
 async function kpiRole(user: User, kpiId: number) {
   const sql = await db();
   const k = (await sql`SELECT * FROM chi_tieu WHERE id = ${kpiId}`)[0];
-  if (!k) return null;
-  const ids = (await identities(user)).map((i) => i.id);
-  const units = await allUnits();
-  const isHead = user.vai_tro === "truong_don_vi" && k.id_don_vi_phu_trach != null && subtree(units, user.id_don_vi).includes(k.id_don_vi_phu_trach);
-  return {
-    k,
-    manage: canManageKpi(user),
-    enter: canManageKpi(user) || ids.includes(k.id_phu_trach) || isHead,
-    confirm: canManageKpi(user) || isHead,
-  };
+  if (!k || !(await canSeeKpi(user, kpiId))) return null;
+  const r = await kpiRights(user, k);
+  return { k, ...r };
 }
 
 export async function saveKpiAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -32,7 +28,7 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
   if (!user) return { redirect: "/dang-nhap" };
   const id = Number(str(fd, "id")) || null;
   const idCha = Number(str(fd, "id_cha")) || null;
-  if (!canManageKpi(user)) return { error: "Chỉ lãnh đạo, Văn phòng hoặc quản trị được giao chỉ tiêu." };
+  if (!canManageKpi(user)) return { error: "Bạn không có quyền quản lý chỉ tiêu." };
   const sql = await db();
   const kh = num(str(fd, "ke_hoach_nam"));
   const dau = str(fd, "gia_tri_dau_nam") ? num(str(fd, "gia_tri_dau_nam")) : null;
@@ -50,6 +46,7 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
     id_phu_trach: Number(str(fd, "id_phu_trach")) || null,
     id_don_vi_phu_trach: Number(str(fd, "id_don_vi_phu_trach")) || null,
     id_lanh_dao: Number(str(fd, "id_lanh_dao")) || null,
+    linh_vuc: str(fd, "linh_vuc") || null,
     ky_cap_nhat: ["tuan", "thang", "quy"].includes(str(fd, "ky_cap_nhat")) ? str(fd, "ky_cap_nhat") : "thang",
     ngay_chot: Math.min(28, Math.max(1, Number(str(fd, "ngay_chot")) || 25)),
     id_cha: idCha,
@@ -72,6 +69,7 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
     await writeLog(sql, user.id, "tao_chi_tieu", "chi_tieu", r.id, null, v);
     await notify(sql, [v.id_phu_trach], "giao_chi_tieu", `Được giao phụ trách chỉ tiêu: ${v.ten}`, `Kế hoạch năm ${v.nam}: ${kh} ${v.don_vi_tinh}`, "chi_tieu", r.id, `giaoct:${r.id}`, user.id);
   }
+  after(() => flushSms().catch(() => {}));
   return { redirect: `/chi-tieu/${idCha && !id ? idCha : newId}` };
 }
 
@@ -181,6 +179,8 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
   const sql = await db();
   const units = (await sql`SELECT id, ten FROM don_vi`) as unknown as { id: number; ten: string }[];
   const leaders = (await sql`SELECT id, ho_ten FROM nguoi_dung WHERE vai_tro = 'lanh_dao'`) as unknown as { id: number; ho_ten: string }[];
+  const { getCatalog } = await import("@/lib/settings");
+  const lvList = await getCatalog("linh_vuc");
   const rows: Record<string, unknown>[] = [];
   const errs: string[] = [];
   ws.eachRow((row, n) => {
@@ -205,6 +205,9 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
     if (Number.isNaN(kh) && loai !== "dat_khong") errs.push(`Dòng ${n}: kế hoạch năm không phải số.`);
     if (!dv) errs.push(`Dòng ${n}: không tìm thấy đơn vị “${c(10)}”.`);
     const kyT = noAccent(c(12));
+    const lvT = noAccent(c(14));
+    const lv = lvT ? lvList.find((x) => noAccent(x) === lvT) || lvList.find((x) => noAccent(x).includes(lvT) || lvT.includes(noAccent(x))) : undefined;
+    if (lvT && !lv) errs.push(`Dòng ${n}: lĩnh vực “${c(14)}” không có trong danh mục.`);
     rows.push({
       ten,
       nhom: c(3) || "Kinh tế",
@@ -219,6 +222,7 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
       id_don_vi_phu_trach: dv?.id ?? null,
       id_lanh_dao: ld?.id ?? null,
       ky_cap_nhat: kyT.startsWith("quy") ? "quy" : kyT.startsWith("tuan") ? "tuan" : "thang",
+      linh_vuc: lv ?? null,
       thu_tu: n,
     });
   });
@@ -232,5 +236,6 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
     }
     await writeLog(tx, user.id, "nhap_chi_tieu_excel", "chi_tieu", null, null, { so_dong: rows.length, tep: f.name });
   });
+  after(() => flushSms().catch(() => {}));
   return { ok: true, message: `Đã nhập ${rows.length} chỉ tiêu.`, redirect: `/chi-tieu?nam=${rows[0].nam}` };
 }

@@ -1,4 +1,5 @@
 import type postgres from "postgres";
+import { queueSms } from "./sms";
 
 type Q = postgres.Sql | postgres.TransactionSql;
 
@@ -30,10 +31,21 @@ export async function notify(
   exclude?: number,
 ) {
   const uniq = [...new Set(recipients.filter((x): x is number => typeof x === "number" && x !== exclude))];
+  const fresh: number[] = [];
   for (const r of uniq) {
     const k = khoa ? `${khoa}:${r}` : null;
-    await sql`INSERT INTO thong_bao (id_nguoi_nhan, loai, tieu_de, noi_dung, doi_tuong, id_doi_tuong, khoa)
+    const ins = await sql`INSERT INTO thong_bao (id_nguoi_nhan, loai, tieu_de, noi_dung, doi_tuong, id_doi_tuong, khoa)
       VALUES (${r}, ${loai}, ${tieu_de}, ${noi_dung}, ${doi_tuong}, ${id_doi_tuong}, ${k})
-      ON CONFLICT (khoa) DO NOTHING`;
+      ON CONFLICT (khoa) DO NOTHING RETURNING id`;
+    if (ins.length) fresh.push(r);
+  }
+  // Gửi kèm SMS cho các sự kiện quản trị đã bật (chỉ người chưa nhận thông báo này)
+  if (fresh.length) {
+    const path = doi_tuong === "cong_viec" && id_doi_tuong ? `/viec/${id_doi_tuong}` : doi_tuong === "chi_tieu" && id_doi_tuong ? `/chi-tieu/${id_doi_tuong}` : null;
+    try {
+      await queueSms(sql, fresh, loai, tieu_de, noi_dung, path, khoa ? `sms:${khoa}` : null);
+    } catch (e) {
+      console.error("queueSms", e);
+    }
   }
 }

@@ -6,12 +6,14 @@ import { writeLog } from "@/lib/log";
 import { saveSettings } from "@/lib/settings";
 import type { ActionState } from "@/components/ActionForm";
 import { VAI_TRO } from "@/lib/const";
+import { TAT_CA_QUYEN, QUYEN_MAC_DINH, LOAI_PHAM_VI } from "@/lib/quyen";
+import { saveSmsConfig, getSmsConfig, sendSms, smsReady, chuanSdt, buildSmsText, SU_KIEN_SMS, type SmsConfig } from "@/lib/sms";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
-async function admin() {
+async function need(q: string) {
   const u = await getUser();
-  if (!u || u.vai_tro !== "quan_tri") return null;
+  if (!u || !u.quyen.includes(q)) return null;
   return u;
 }
 
@@ -22,7 +24,7 @@ function tempPassword() {
 }
 
 export async function saveUnitAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  const u = await admin();
+  const u = await need("qt.co_cau");
   if (!u) return { error: "Không có quyền." };
   const sql = await db();
   const id = Number(str(fd, "id")) || null;
@@ -41,7 +43,7 @@ export async function saveUnitAction(_: ActionState, fd: FormData): Promise<Acti
 }
 
 export async function saveUserAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  const u = await admin();
+  const u = await need("qt.nguoi_dung");
   if (!u) return { error: "Không có quyền." };
   const sql = await db();
   const id = Number(str(fd, "id")) || null;
@@ -55,26 +57,43 @@ export async function saveUserAction(_: ActionState, fd: FormData): Promise<Acti
     vai_tro: VAI_TRO[str(fd, "vai_tro")] ? str(fd, "vai_tro") : "cong_chuc",
     linh_vuc_phu_trach: fd.getAll("linh_vuc_phu_trach").map(String).filter(Boolean),
     trang_thai: str(fd, "trang_thai") === "khoa" ? "khoa" : "hoat_dong",
-  };
+  } as Record<string, unknown>;
+  let logQuyen: unknown = undefined;
+  // Phân quyền chi tiết: so sánh quyền được chọn với mặc định của vai trò
+  if (fd.get("co_phan_quyen") === "1") {
+    const chosen = new Set(fd.getAll("quyen").map(String).filter((q) => TAT_CA_QUYEN.includes(q)));
+    const def = new Set(QUYEN_MAC_DINH[v.vai_tro as string] || []);
+    const them = [...chosen].filter((q) => !def.has(q));
+    const bo = [...def].filter((q) => !chosen.has(q));
+    const loai = str(fd, "pham_vi");
+    const pv =
+      loai && loai !== "mac_dinh" && LOAI_PHAM_VI[loai as keyof typeof LOAI_PHAM_VI]
+        ? { loai, linh_vuc: fd.getAll("pv_linh_vuc").map(String).filter(Boolean), don_vi: fd.getAll("pv_don_vi").map(Number).filter(Boolean) }
+        : null;
+    logQuyen = { them, bo, pham_vi: pv };
+    v.quyen = them.length || bo.length ? sql.json({ them, bo }) : null;
+    v.pham_vi = pv ? sql.json(pv) : null;
+    if (id === u.id && !chosen.has("qt.nguoi_dung")) return { error: "Không tự bỏ quyền quản lý tài khoản của chính mình." };
+  }
   if (!v.ho_ten || !v.ten_dang_nhap) return { error: "Nhập họ tên và tên đăng nhập." };
   if (!/^[a-z0-9._-]{3,40}$/.test(v.ten_dang_nhap)) return { error: "Tên đăng nhập chỉ gồm chữ không dấu, số, dấu chấm, gạch." };
   const dup = await sql`SELECT id FROM nguoi_dung WHERE ten_dang_nhap = ${v.ten_dang_nhap} AND id <> ${id ?? 0}`;
   if (dup.length) return { error: "Tên đăng nhập đã tồn tại." };
   if (id) {
     const cu = (await sql`SELECT ho_ten, ten_dang_nhap, id_don_vi, chuc_vu, vai_tro, linh_vuc_phu_trach, trang_thai FROM nguoi_dung WHERE id = ${id}`)[0];
-    if (id === u.id && (v.vai_tro !== "quan_tri" || v.trang_thai !== "hoat_dong")) return { error: "Không tự hạ quyền hoặc khóa tài khoản của chính mình." };
+    if (id === u.id && v.trang_thai !== "hoat_dong") return { error: "Không tự khóa tài khoản của chính mình." };
     await sql`UPDATE nguoi_dung SET ${sql(v as never)}, phien = CASE WHEN ${v.trang_thai} = 'khoa' THEN phien + 1 ELSE phien END WHERE id = ${id}`;
-    await writeLog(sql, u.id, "sua_nguoi_dung", "nguoi_dung", id, cu, v);
+    await writeLog(sql, u.id, "sua_nguoi_dung", "nguoi_dung", id, cu, { ...v, quyen: undefined, pham_vi: undefined, phan_quyen: logQuyen });
     return { ok: true, message: "Đã lưu. Quyền mới có hiệu lực ngay (phân quyền theo chức vụ + đơn vị)." };
   }
   const pw = tempPassword();
   const [r] = await sql`INSERT INTO nguoi_dung ${sql({ ...v, mat_khau: await hashPassword(pw), doi_mat_khau: true } as never)} RETURNING id`;
-  await writeLog(sql, u.id, "tao_nguoi_dung", "nguoi_dung", r.id, null, { ...v });
+  await writeLog(sql, u.id, "tao_nguoi_dung", "nguoi_dung", r.id, null, { ...v, quyen: undefined, pham_vi: undefined, phan_quyen: logQuyen });
   return { ok: true, message: `Đã tạo tài khoản ${v.ten_dang_nhap}. Mật khẩu tạm: ${pw} (người dùng phải đổi khi đăng nhập lần đầu).`, reset: true };
 }
 
 export async function resetPasswordAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  const u = await admin();
+  const u = await need("qt.nguoi_dung");
   if (!u) return { error: "Không có quyền." };
   const sql = await db();
   const id = Number(str(fd, "id"));
@@ -85,7 +104,7 @@ export async function resetPasswordAction(_: ActionState, fd: FormData): Promise
 }
 
 export async function importUsersAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  const u = await admin();
+  const u = await need("qt.nguoi_dung");
   if (!u) return { error: "Không có quyền." };
   const f = fd.get("file");
   if (!(f instanceof File) || !f.size) return { error: "Chọn tệp Excel." };
@@ -143,7 +162,7 @@ export async function importUsersAction(_: ActionState, fd: FormData): Promise<A
 }
 
 export async function saveCatalogAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  const u = await admin();
+  const u = await need("qt.co_cau");
   if (!u) return { error: "Không có quyền." };
   const loai = str(fd, "loai");
   const items = str(fd, "ds").split("\n").map((s) => s.trim()).filter(Boolean);
@@ -159,7 +178,7 @@ export async function saveCatalogAction(_: ActionState, fd: FormData): Promise<A
 }
 
 export async function saveHolidaysAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  const u = await admin();
+  const u = await need("qt.co_cau");
   if (!u) return { error: "Không có quyền." };
   const lines = str(fd, "ds").split("\n").map((s) => s.trim()).filter(Boolean);
   const rows: [string, string][] = [];
@@ -179,7 +198,7 @@ export async function saveHolidaysAction(_: ActionState, fd: FormData): Promise<
 }
 
 export async function saveSettingsAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  const u = await admin();
+  const u = await need("qt.cai_dat");
   if (!u) return { error: "Không có quyền." };
   const nums = (k: string) => str(fd, k).split(/[,; ]+/).map(Number).filter((n) => n > 0);
   const v = {
@@ -202,4 +221,51 @@ export async function saveSettingsAction(_: ActionState, fd: FormData): Promise<
   const sql = await db();
   await writeLog(sql, u.id, "sua_cai_dat", "cai_dat", null, null, v);
   return { ok: true, message: "Đã lưu cài đặt." };
+}
+
+export async function saveSmsAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await need("qt.cai_dat");
+  if (!u) return { error: "Không có quyền." };
+  const cur = await getSmsConfig(true);
+  const keep = (k: keyof SmsConfig) => {
+    const v = str(fd, k);
+    return v === "" || /^•+$/.test(v) ? (cur[k] as string) : v; // để trống = giữ khóa cũ
+  };
+  const ncc = ["esms", "speedsms", "twilio", "webhook"].includes(str(fd, "nha_cung_cap")) ? (str(fd, "nha_cung_cap") as SmsConfig["nha_cung_cap"]) : "esms";
+  const v: Partial<SmsConfig> = {
+    bat: fd.get("bat") === "1",
+    nha_cung_cap: ncc,
+    api_key: keep("api_key"),
+    secret_key: keep("secret_key"),
+    twilio_sid: keep("twilio_sid"),
+    twilio_token: keep("twilio_token"),
+    webhook_token: keep("webhook_token"),
+    brandname: str(fd, "brandname"),
+    sms_type: str(fd, "sms_type") || "2",
+    twilio_from: str(fd, "twilio_from"),
+    webhook_url: str(fd, "webhook_url"),
+    tien_to: str(fd, "tien_to") || "QLCV xa",
+    su_kien: fd.getAll("su_kien").map(String).filter((k) => k in SU_KIEN_SMS),
+    im_lang_tu: str(fd, "im_lang_tu"),
+    im_lang_den: str(fd, "im_lang_den"),
+  };
+  if (v.webhook_url && !/^https:\/\//.test(v.webhook_url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(v.webhook_url)) return { error: "Địa chỉ webhook phải bắt đầu bằng https://" };
+  await saveSmsConfig(v);
+  const sql = await db();
+  await writeLog(sql, u.id, "sua_cai_dat_sms", "cai_dat", null, null, { bat: v.bat, nha_cung_cap: v.nha_cung_cap, su_kien: v.su_kien });
+  const c = await getSmsConfig(true);
+  return { ok: true, message: v.bat && !smsReady(c) ? "Đã lưu, nhưng còn thiếu khóa API nên chưa gửi được SMS." : "Đã lưu cài đặt SMS." };
+}
+
+export async function testSmsAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await need("qt.cai_dat");
+  if (!u) return { error: "Không có quyền." };
+  const sdt = chuanSdt(str(fd, "sdt"));
+  if (!sdt) return { error: "Số điện thoại không hợp lệ." };
+  const c = await getSmsConfig(true);
+  if (!smsReady({ ...c, bat: true })) return { error: "Chưa nhập đủ khóa API của nhà cung cấp." };
+  const r = await sendSms(c, sdt, buildSmsText(c, "Tin nhan thu nghiem tu phan mem giao viec", null, null));
+  const sql = await db();
+  await sql`INSERT INTO sms_hang_doi (id_nguoi_nhan, sdt, noi_dung, loai, trang_thai, so_lan, loi, gui_luc) VALUES (${u.id}, ${sdt}, 'Tin thử nghiệm', 'thu_nghiem', ${r.ok ? "da_gui" : "loi"}, 1, ${r.error ?? null}, now())`;
+  return r.ok ? { ok: true, message: `Đã gửi tin thử tới ${sdt}.` } : { error: `Gửi không thành công: ${r.error}` };
 }

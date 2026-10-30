@@ -1,11 +1,11 @@
 import ExcelJS from "exceljs";
-import { getUser } from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { styleHeader, toResponse, borderAll } from "@/lib/excel";
 import { VAI_TRO } from "@/lib/const";
 
 export async function GET() {
-  const u = await getUser();
-  if (!u || u.vai_tro !== "quan_tri") return new Response("Không có quyền", { status: 403 });
+  const u = await apiUser("qt.nguoi_dung");
+  if (u instanceof Response) return u;
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Can bo");
   ws.columns = [

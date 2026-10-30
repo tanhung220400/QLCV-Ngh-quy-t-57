@@ -1,13 +1,13 @@
 import ExcelJS from "exceljs";
-import { getUser } from "@/lib/auth";
+import { apiUser } from "@/lib/auth";
 import { queryTasks } from "@/lib/taskQuery";
 import { styleHeader, toResponse, borderAll } from "@/lib/excel";
 import { fmtDue, fmtDate, workingDaysUntil } from "@/lib/time";
 import { getHolidays } from "@/lib/settings";
 
 export async function GET() {
-  const user = await getUser();
-  if (!user) return new Response("Chưa đăng nhập", { status: 401 });
+  const user = await apiUser("bc.xuat");
+  if (user instanceof Response) return user;
   const tasks = await queryTasks(user, { tab: "qua_han", con: "1" }, 5000);
   const hol = await getHolidays();
   const wb = new ExcelJS.Workbook();

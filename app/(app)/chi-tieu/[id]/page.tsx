@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canManageKpi, identities, allUnits, subtree } from "@/lib/perm";
+import { canSeeKpi, taskScope } from "@/lib/perm";
+import { kpiRights } from "@/lib/kpiRights";
 import { loadKpis, fmtNum, periodLabel, currentPeriod } from "@/lib/kpi";
 import { getSettings } from "@/lib/settings";
 import { KpiBar, KpiStatus } from "@/components/Charts";
@@ -30,7 +31,9 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
   const cfg = await getSettings();
   const [k] = await loadKpis(sql, sql`ct.id = ${id}`, cfg.nguong_nguy_co);
   if (!k) notFound();
+  if (!(await canSeeKpi(user, id))) return <div className="card">Bạn không được phân công xem chỉ tiêu này.</div>;
   const kids = await loadKpis(sql, sql`ct.id_cha = ${id}`, cfg.nguong_nguy_co);
+  const tasksScope = (await taskScope(sql, user)).q;
   const parent = k.id_cha ? (await sql`SELECT id, ten FROM chi_tieu WHERE id = ${k.id_cha}`)[0] : null;
   const data = await sql`
     SELECT s.*, a.ho_ten AS nguoi_nhap, b.ho_ten AS nguoi_xac_nhan,
@@ -39,15 +42,10 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
     WHERE s.id_chi_tieu = ${id} ORDER BY s.ky DESC, s.thoi_gian DESC`;
   const files = await sql`SELECT t.id, t.ten_tep, t.id_doi_tuong FROM tep_dinh_kem t JOIN chi_tieu_so_lieu s ON s.id = t.id_doi_tuong WHERE t.doi_tuong = 'so_lieu' AND s.id_chi_tieu = ${id}`;
   const plans = await sql`SELECT ky, gia_tri FROM chi_tieu_ke_hoach_ky WHERE id_chi_tieu = ${id}`;
-  const tasks = await sql`SELECT cv.id, cv.ten, cv.trang_thai, n.ho_ten FROM cong_viec_chi_tieu x JOIN cong_viec cv ON cv.id = x.id_cong_viec JOIN nguoi_dung n ON n.id = cv.id_chu_tri WHERE x.id_chi_tieu = ${id} ORDER BY cv.han`;
+  const tasks = await sql`SELECT cv.id, cv.ten, cv.trang_thai, n.ho_ten FROM cong_viec_chi_tieu x JOIN cong_viec cv ON cv.id = x.id_cong_viec JOIN nguoi_dung n ON n.id = cv.id_chu_tri WHERE x.id_chi_tieu = ${id} AND (${tasksScope}) ORDER BY cv.han`;
   const logs = await sql`SELECT k.*, n.ho_ten FROM nhat_ky k LEFT JOIN nguoi_dung n ON n.id = k.id_nguoi_dung WHERE k.doi_tuong = 'chi_tieu' AND k.id_doi_tuong = ${id} ORDER BY k.thoi_gian DESC LIMIT 100`;
 
-  const ids = (await identities(user)).map((i) => i.id);
-  const units = await allUnits();
-  const isHead = user.vai_tro === "truong_don_vi" && k.id_don_vi_phu_trach != null && subtree(units, user.id_don_vi).includes(k.id_don_vi_phu_trach);
-  const manage = canManageKpi(user);
-  const enter = manage || ids.includes(k.id_phu_trach ?? -1) || isHead;
-  const confirm = manage || isHead;
+  const { manage, enter, confirm } = await kpiRights(user, k);
   const opts = manage ? await kpiFormOptions() : null;
   const kyNow = currentPeriod(k.ky_cap_nhat);
   const kyList = k.ky_cap_nhat === "tuan" ? [kyNow] : periods(k.nam, k.ky_cap_nhat);
@@ -96,7 +94,7 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
         </div>
         <dl className="mt-4 grid gap-x-6 gap-y-1 text-[15px] sm:grid-cols-2">
           <div>
-            Loại: <b>{LOAI_CHI_TIEU[k.loai]}</b>, {k.chieu_tot === "thap" ? "càng thấp càng tốt" : "càng cao càng tốt"}
+            {k.linh_vuc && <>Lĩnh vực: <b>{k.linh_vuc}</b> · </>}Loại: <b>{LOAI_CHI_TIEU[k.loai]}</b>, {k.chieu_tot === "thap" ? "càng thấp càng tốt" : "càng cao càng tốt"}
             {k.gia_tri_dau_nam != null ? ` · đầu năm ${fmtNum(k.gia_tri_dau_nam)}` : ""}
           </div>
           <div>
