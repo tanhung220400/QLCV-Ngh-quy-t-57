@@ -249,7 +249,7 @@ const day = (n) => {
   ok("quản trị nhận yêu cầu cấp lại mật khẩu", tb.includes("Yêu cầu cấp lại mật khẩu"));
   // cv.kinhte2: mở rộng phạm vi sang cả Phòng Kinh tế, bỏ quyền xem chỉ tiêu
   await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=Ng%C3%B4");
-  await page.click("text=Sửa");
+  await page.locator('a:text-is("Sửa")').first().click();
   await page.waitForURL(/sua=\d+/, { waitUntil: "commit" });
   await page.waitForSelector('select[name="pham_vi"]');
   await page.selectOption('select[name="pham_vi"]', "don_vi");
