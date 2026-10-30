@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { getUser } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
-import { canCreateTask, canManageKpi } from "@/lib/perm";
+import { canCreateTask } from "@/lib/perm";
 import { Nav } from "@/components/Nav";
 import { runScan } from "@/lib/scan";
 import { OfflineSync } from "@/components/OfflineSync";
@@ -37,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/bao-cao", label: "Báo cáo", icon: "chart" },
     { href: "/thong-bao", label: "Thông báo", icon: "bell" },
     { href: "/tai-khoan", label: "Tài khoản", icon: "user" },
-    ...(user.vai_tro === "quan_tri" || canManageKpi(user) ? [{ href: "/quan-tri", label: "Quản trị", icon: "cog" }] : []),
+    ...(user.vai_tro === "quan_tri" ? [{ href: "/quan-tri", label: "Quản trị", icon: "cog" }] : []),
   ];
   const mobile = [
     { href: "/", label: "Tổng quan", icon: "home" },

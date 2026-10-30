@@ -138,3 +138,31 @@ export async function setupAction(_: ActionState, fd: FormData): Promise<ActionS
   await createSession(u.id, u.phien);
   return { redirect: "/" };
 }
+
+// ---------- Ủy quyền khi lãnh đạo đi công tác, nghỉ phép ----------
+export async function delegateAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getUser();
+  if (!user) return { redirect: "/dang-nhap" };
+  if (!["lanh_dao", "truong_don_vi"].includes(user.vai_tro)) return { error: "Chỉ lãnh đạo và trưởng đơn vị dùng chức năng ủy quyền." };
+  const den = Number(fd.get("id_nguoi_duoc"));
+  const tu = String(fd.get("tu_ngay") || "");
+  const toi = String(fd.get("den_ngay") || "");
+  if (!den || den === user.id) return { error: "Chọn người nhận ủy quyền." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tu) || !/^\d{4}-\d{2}-\d{2}$/.test(toi) || toi < tu) return { error: "Kiểm tra lại thời gian ủy quyền." };
+  const sql = await db();
+  const [r] = await sql`INSERT INTO uy_quyen (id_nguoi_uy_quyen, id_nguoi_duoc, tu_ngay, den_ngay, ghi_chu) VALUES (${user.id}, ${den}, ${tu}, ${toi}, ${String(fd.get("ghi_chu") || "") || null}) RETURNING id`;
+  await writeLog(sql, user.id, "uy_quyen", "nguoi_dung", den, null, { id: r.id, tu, den: toi });
+  const { notify } = await import("@/lib/log");
+  await notify(sql, [den], "uy_quyen", `${user.ho_ten} ủy quyền cho bạn xử lý công việc`, `Từ ${tu.split("-").reverse().join("/")} đến ${toi.split("-").reverse().join("/")}`, null, null);
+  return { ok: true, message: "Đã ủy quyền.", reset: true };
+}
+
+export async function cancelDelegateAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getUser();
+  if (!user) return { redirect: "/dang-nhap" };
+  const sql = await db();
+  const id = Number(fd.get("id"));
+  await sql`UPDATE uy_quyen SET huy = TRUE WHERE id = ${id} AND id_nguoi_uy_quyen = ${user.id}`;
+  await writeLog(sql, user.id, "huy_uy_quyen", "nguoi_dung", user.id, null, { id });
+  return { ok: true, message: "Đã thu hồi ủy quyền." };
+}

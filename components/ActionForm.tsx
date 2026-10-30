@@ -41,7 +41,7 @@ export function ActionForm({
     >
       {children}
       {state?.error && (
-        <p role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-red-800">
+        <p role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 whitespace-pre-line text-red-800">
           {state.error}
         </p>
       )}

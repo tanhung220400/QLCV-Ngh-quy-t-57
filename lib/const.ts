@@ -66,8 +66,11 @@ export const DANH_MUC_MAC_DINH: Record<string, string[]> = {
 
 export const CAI_DAT_MAC_DINH = {
   ten_don_vi: "UBND xã",
-  ten_cap_tren: "UBND TỈNH",
+  ten_cap_tren: "",
   dia_danh: "",
+  chuc_vu_ky: "CHỦ TỊCH",
+  nguoi_ky: "",
+  noi_nhan: "- Thường trực Đảng ủy;\n- Thường trực HĐND xã;\n- Lãnh đạo UBND xã;\n- Lưu: VT.",
   nguong_vang: 3, // số ngày làm việc
   nhac_truoc: [3, 1], // ngày làm việc trước hạn
   bao_cap_tren_sau: 3, // quá hạn bao nhiêu ngày làm việc thì báo người giao + lãnh đạo lĩnh vực

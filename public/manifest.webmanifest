@@ -1,0 +1,21 @@
+{
+  "name": "Giao việc & Theo dõi chỉ tiêu xã",
+  "short_name": "QLCV xã",
+  "description": "Phần mềm giao việc và theo dõi chỉ tiêu cấp xã",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f1f5f9",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Việc của tôi", "url": "/viec?tab=cua_toi" },
+    { "name": "Giao việc", "url": "/viec/moi" }
+  ]
+}
