@@ -11,6 +11,7 @@ declare global {
 function connString() {
   return (
     process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
     process.env.POSTGRES_URL ||
     process.env.POSTGRES_PRISMA_URL ||
     ""
@@ -21,12 +22,24 @@ export function hasDatabase() {
   return connString() !== "";
 }
 
+/**
+ * Schema riêng cho phần mềm. Mặc định dùng "qlcv" khi chạy trên Supabase để:
+ * - không lộ bảng qua Data API của Supabase (chỉ mở schema public),
+ * - không đụng tên bảng với ứng dụng khác dùng chung cơ sở dữ liệu.
+ */
+export function dbSchema(): string | null {
+  const s = process.env.DB_SCHEMA || (/supabase\.(co|com)/.test(connString()) ? "qlcv" : "");
+  return /^[a-z_][a-z0-9_]{0,40}$/.test(s) ? s : null;
+}
+
 function makeClient() {
   const url = connString();
   if (!url) throw new Error("CHUA_CO_CSDL");
   const local = /localhost|127\.0\.0\.1|host=\//.test(url);
+  const schema = dbSchema();
   return postgres(url, {
-    max: 5,
+    max: Number(process.env.DB_POOL_MAX) || 3,
+    ...(schema ? { connection: { search_path: schema } } : {}),
     idle_timeout: 20,
     connect_timeout: 15,
     prepare: false, // tương thích PgBouncer/Neon pooler
@@ -48,6 +61,11 @@ async function migrate() {
   const s = rawSql();
   await s.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(570057)`;
+    const schema = dbSchema();
+    if (schema) {
+      await tx.unsafe(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
+      await tx.unsafe(`SET LOCAL search_path TO "${schema}"`);
+    }
     await tx.unsafe(`CREATE TABLE IF NOT EXISTS cai_dat (khoa TEXT PRIMARY KEY, gia_tri JSONB NOT NULL)`);
     const r = await tx`SELECT gia_tri FROM cai_dat WHERE khoa = 'schema_version'`;
     const v = r.length ? Number(r[0].gia_tri) : 0;
@@ -58,9 +76,19 @@ async function migrate() {
   });
 }
 
+async function checkSearchPath() {
+  const schema = dbSchema();
+  if (!schema) return;
+  const r = await rawSql()`SELECT current_schema() AS s`;
+  if (r[0].s !== schema)
+    throw new Error(
+      `Kết nối không giữ được schema "${schema}" (đang là "${r[0].s}"). Trên Supabase hãy dùng chuỗi kết nối Session pooler (cổng 5432) hoặc Direct connection, không dùng Transaction pooler (cổng 6543).`,
+    );
+}
+
 export async function ensureSchema() {
   if (!global.__schemaReady) {
-    global.__schemaReady = migrate().catch((e) => {
+    global.__schemaReady = migrate().then(checkSearchPath).catch((e) => {
       global.__schemaReady = undefined;
       throw e;
     });

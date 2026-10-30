@@ -59,7 +59,11 @@ Next.js 15, PostgreSQL, Vercel Blob (tệp đính kèm), Vercel Cron.
 
 ## Cài đặt trên Vercel
 
-1. **Cơ sở dữ liệu:** trong dự án Vercel, vào **Storage → Create Database → Neon (Postgres)**, chọn vùng **Singapore**, rồi **Connect** vào dự án. Biến `DATABASE_URL` sẽ được tự thêm.
+1. **Cơ sở dữ liệu**, chọn một trong hai cách:
+   - **Neon:** trong dự án Vercel, vào **Storage → Create Database → Neon (Postgres)**, vùng **Singapore**, rồi **Connect**. Biến `DATABASE_URL` sẽ được tự thêm.
+   - **Supabase:** vào **Connect → Session pooler**, chép chuỗi kết nối (cổng **5432**, thay `[YOUR-PASSWORD]` bằng mật khẩu cơ sở dữ liệu), đặt vào biến `DATABASE_URL`. Không dùng Transaction pooler (cổng 6543).
+
+   Trên Supabase, bảng được tạo trong schema riêng `qlcv` (biến `DB_SCHEMA`). Schema này không bị lộ qua Data API, và không đụng bảng của ứng dụng khác.
 2. **Biến môi trường:**
 
    | Biến | Ý nghĩa |
