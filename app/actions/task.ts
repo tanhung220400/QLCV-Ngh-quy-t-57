@@ -43,9 +43,9 @@ export async function createTaskAction(_: ActionState, fd: FormData): Promise<Ac
   const sql = await db();
   let parent: (TaskRow & { linh_vuc: string; nguon_giao: string }) | null = null;
   if (idCha) {
-    parent = (await sql`SELECT * FROM cong_viec WHERE id = ${idCha}`)[0] as never;
+    parent = ((await sql`SELECT * FROM cong_viec WHERE id = ${idCha}`)[0] ?? null) as unknown as typeof parent;
     if (!parent) return { error: "Không tìm thấy việc cha." };
-    const p = await taskPerms(user, parent);
+    const p = await taskPerms(user, parent!);
     if (!p.viec_con) return { error: "Bạn không có quyền tạo việc con cho việc này." };
   } else if (!canCreateTask(user)) return { error: "Bạn không có quyền giao việc." };
 
