@@ -186,7 +186,7 @@ const day = (n) => {
   // Nhập số liệu chỉ tiêu BHYT
   await page.goto(BASE + "/chi-tieu");
   await page.click("text=Tỷ lệ người dân tham gia bảo hiểm y tế");
-  await page.waitForURL(/chi-tieu\/\d+/);
+  await page.waitForURL(/chi-tieu\/\d+/, { waitUntil: "commit" });
   const kpiUrl = page.url();
   await page.fill('#nhap input[name="gia_tri"]', "93,2");
   await page.click('#nhap button:has-text("Lưu số liệu")');
