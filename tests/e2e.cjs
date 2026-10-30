@@ -32,7 +32,7 @@ const day = (n) => {
     await page.fill('input[name="ten_dang_nhap"]', u);
     await page.fill('input[name="mat_khau"]', PW);
     await page.click('button[type="submit"]');
-    await page.waitForURL((url) => !url.pathname.startsWith("/dang-nhap"), { timeout: 15000 });
+    await page.waitForURL((url) => !url.pathname.startsWith("/dang-nhap"), { timeout: 15000, waitUntil: "commit" });
   };
 
   // 1. Khởi tạo
@@ -49,7 +49,7 @@ const day = (n) => {
   ok("từ chối mã khởi tạo sai", true);
   await page.fill('input[name="ma_khoi_tao"]', "khoitao");
   await page.click('button[type="submit"]');
-  await page.waitForURL(BASE + "/", { timeout: 60000 });
+  await page.waitForURL(BASE + "/", { timeout: 60000, waitUntil: "commit" });
   ok("khởi tạo + dữ liệu mẫu", true);
   for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", "/chi-tieu", "/bao-cao", "/quan-tri", "/quan-tri?muc=don_vi", "/quan-tri?muc=danh_muc", "/quan-tri?muc=ngay_nghi", "/quan-tri?muc=cai_dat", "/quan-tri?muc=nhat_ky", "/thong-bao", "/tai-khoan"])
     await check(page, p, "quản trị");
@@ -70,7 +70,7 @@ const day = (n) => {
   await page.fill('input[name="san_pham"]', "Báo cáo");
   await page.selectOption('select[name="linh_vuc"]', "Đất đai");
   await page.click('button[type="submit"]');
-  await page.waitForURL(/\/viec\/\d+\?moi=1/, { timeout: 15000 });
+  await page.waitForURL(/\/viec\/\d+\?moi=1/, { timeout: 15000, waitUntil: "commit" });
   const taskId = Number(page.url().match(/\/viec\/(\d+)/)[1]);
   ok("giao việc cho đơn vị", taskId > 0, `id ${taskId}`);
   await page.goto(BASE + "/viec/moi");
@@ -82,7 +82,7 @@ const day = (n) => {
   await page.selectOption('select[name="linh_vuc"]', "Nông nghiệp, môi trường");
   await page.click("text=Hỏa tốc");
   await page.click('button[type="submit"]');
-  await page.waitForURL(/tab=toi_giao&moi=2/, { timeout: 15000 });
+  await page.waitForURL(/tab=toi_giao&moi=2/, { timeout: 15000, waitUntil: "commit" });
   ok("giao nhiều đơn vị tự tách việc", true);
   await ctx.close();
 
@@ -190,7 +190,7 @@ const day = (n) => {
   const kpiUrl = page.url();
   await page.fill('#nhap input[name="gia_tri"]', "93,2");
   await page.click('#nhap button:has-text("Lưu số liệu")');
-  await page.waitForURL(/so_lieu=\d+/);
+  await page.waitForURL(/so_lieu=\d+/, { waitUntil: "commit" });
   ok("công chức nhập số liệu chỉ tiêu", (await page.locator("body").innerText()).includes("Chờ xác nhận"));
   await ctx.close();
   ({ ctx, page } = await newPage());
@@ -210,7 +210,7 @@ const day = (n) => {
   await page.fill('input[name="cuoc_hop"]', "Họp kiểm thử");
   await page.selectOption('select[name="nguoi_giao"]', { index: 2 });
   await page.click('button:has-text("Giao 2 việc")');
-  await page.waitForURL(/moi=2/, { timeout: 20000 });
+  await page.waitForURL(/moi=2/, { timeout: 20000, waitUntil: "commit" });
   ok("nhập nhanh 2 việc từ kết luận họp", true);
   await ctx.close();
 
