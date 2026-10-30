@@ -5,4 +5,6 @@ pkill -f "next-server" ; pkill -f "next start" ; sleep 1
 psql -h 127.0.0.1 -U postgres -c "drop database if exists qlcv" -c "create database qlcv" >/dev/null
 cd /vercel/app && (DATABASE_URL=postgres://postgres@127.0.0.1:5432/qlcv AUTH_SECRET=test-secret-0123456789abcdef SETUP_KEY=khoitao nohup npx next start -p 3000 > /tmp/app.log 2>&1 &)
 for i in $(seq 1 30); do curl -s -o /dev/null http://localhost:3000/dang-nhap && break; sleep 1; done
+pkill -f sms-mock ; rm -f /tmp/sms.log
+(nohup node -e "require('http').createServer((q,r)=>{let b='';q.on('data',d=>b+=d);q.on('end',()=>{require('fs').appendFileSync('/tmp/sms.log',b+'\\n');r.end('ok')})}).listen(4555)" sms-mock >/dev/null 2>&1 &)
 echo reset-done

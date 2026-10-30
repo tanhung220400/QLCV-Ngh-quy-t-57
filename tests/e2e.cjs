@@ -216,6 +216,121 @@ const day = (n) => {
   ok("nhập nhanh 2 việc từ kết luận họp", true);
   await ctx.close();
 
+  // 10. Đăng xuất, ghi nhớ tên đăng nhập, quên mật khẩu
+  ({ ctx, page } = await newPage());
+  await page.goto(BASE + "/dang-nhap");
+  await page.fill('input[name="ten_dang_nhap"]', "cv.kinhte2");
+  await page.check("text=Ghi nhớ tên đăng nhập");
+  await page.fill('input[name="mat_khau"]', PW);
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+  await page.waitForSelector("text=Đăng xuất");
+  ok("có nút Đăng xuất", (await page.locator('button:has-text("Đăng xuất")').count()) > 0);
+  await page.locator('aside button:has-text("Đăng xuất")').click();
+  await page.waitForURL(/dang-nhap/, { waitUntil: "commit" });
+  await page.waitForSelector('input[name="ten_dang_nhap"]');
+  await page.waitForTimeout(300);
+  ok("đăng xuất được và ghi nhớ tên đăng nhập", (await page.inputValue('input[name="ten_dang_nhap"]')) === "cv.kinhte2");
+  await page.click("text=Quên mật khẩu?");
+  await page.waitForURL(/quen-mat-khau/, { waitUntil: "commit" });
+  await page.click('button:has-text("Gửi mã xác nhận")');
+  await page.waitForURL(/b=2/, { waitUntil: "commit" });
+  ok("quên mật khẩu: chuyển bước nhập mã", (await page.locator("text=Mã xác nhận").count()) > 0);
+  await ctx.close();
+
+  // 11. Quản trị phân quyền chi tiết + SMS
+  ({ ctx, page } = await newPage());
+  await page.goto(BASE + "/dang-nhap");
+  await page.fill('input[name="ten_dang_nhap"]', "quantri");
+  await page.fill('input[name="mat_khau"]', "Quantri@2026");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+  const tb = await check(page, "/thong-bao", "quản trị");
+  ok("quản trị nhận yêu cầu cấp lại mật khẩu", tb.includes("Yêu cầu cấp lại mật khẩu"));
+  // cv.kinhte2: mở rộng phạm vi sang cả Phòng Kinh tế, bỏ quyền xem chỉ tiêu
+  await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=Ng%C3%B4");
+  await page.click("text=Sửa");
+  await page.waitForURL(/sua=\d+/, { waitUntil: "commit" });
+  await page.waitForSelector('select[name="pham_vi"]');
+  await page.selectOption('select[name="pham_vi"]', "don_vi");
+  await page.locator('input[name="pv_don_vi"]').first().waitFor();
+  await page.check('label:has-text("Phòng Kinh tế") input[name="pv_don_vi"]');
+  await page.uncheck('input[name="quyen"][value="ct.xem"]');
+  await page.check('input[name="quyen"][value="bc.dashboard"]');
+  await page.click('button:has-text("Lưu thay đổi")');
+  await page.waitForSelector("text=Đã lưu.");
+  ok("lưu phân quyền chi tiết", true);
+  // Bật SMS qua webhook thử
+  await page.goto(BASE + "/quan-tri?muc=sms");
+  await page.check('input[name="bat"]');
+  await page.selectOption('select[name="nha_cung_cap"]', "webhook");
+  await page.fill('input[name="webhook_url"]', "http://127.0.0.1:4555/sms");
+  await page.fill('input[name="im_lang_tu"]', "00:00");
+  await page.fill('input[name="im_lang_den"]', "00:00");
+  await page.click('button:has-text("Lưu cài đặt SMS")');
+  await page.waitForSelector("text=Đã lưu cài đặt SMS.");
+  ok("bật SMS (webhook)", true);
+  await page.fill('input[name="sdt"]', "0912345678");
+  await page.click('button:has-text("Gửi thử")');
+  await page.waitForSelector("text=Đã gửi tin thử");
+  ok("gửi SMS thử qua webhook", true);
+  await ctx.close();
+
+  ({ ctx, page } = await newPage());
+  await login(page, "cv.kinhte2");
+  const scopeTxt = await check(page, "/viec?tab=tat_ca", "công chức được mở phạm vi");
+  ok("phạm vi đơn vị: thấy việc của cả phòng", scopeTxt.includes("Rà soát, thống kê diện tích đất công"));
+  await page.goto(BASE + "/chi-tieu");
+  ok("bỏ quyền xem chỉ tiêu thì không vào được", page.url().includes("khong_quyen"));
+  const dashTxt = await page.locator("body").innerText();
+  ok("cấp thêm quyền dashboard", dashTxt.includes("Việc quá hạn cần can thiệp"));
+  await ctx.close();
+
+  // 12. Giao việc gửi SMS cho người chủ trì có số điện thoại
+  ({ ctx, page } = await newPage());
+  await login(page, "chutich");
+  await page.goto(BASE + "/viec/moi");
+  await page.fill('input[name="ten"]', "Kiểm thử SMS: Báo cáo nhanh");
+  await page.click('button:has-text("Cá nhân")');
+  await page.getByText("Ngô Văn Hùng", { exact: true }).click();
+  await page.fill('input[name="han_ngay"]', day(5));
+  await page.fill('input[name="san_pham"]', "Báo cáo");
+  await page.selectOption('select[name="linh_vuc"]', "Nông nghiệp, môi trường");
+  await page.click('button[type="submit"]');
+  await page.waitForURL(/\/viec\/\d+\?moi=1/, { waitUntil: "commit" });
+  await page.waitForTimeout(2500);
+  const smsLog = require("fs").existsSync("/tmp/sms.log") ? require("fs").readFileSync("/tmp/sms.log", "utf8") : "";
+  ok("SMS giao việc được gửi tới cán bộ", /Ban duoc giao|Viec moi/.test(smsLog), smsLog.split("\n").slice(-2).join(" / ").slice(0, 200));
+  // Thu gọn chỉ tiêu theo lĩnh vực
+  await page.goto(BASE + "/chi-tieu");
+  const ctTxt = await page.locator("body").innerText();
+  ok("chỉ tiêu thu gọn theo lĩnh vực", ctTxt.includes("Giáo dục, y tế") && !(await page.locator("text=Tỷ lệ người dân tham gia bảo hiểm y tế").isVisible()));
+  await page.click("summary:has-text('Giáo dục, y tế')");
+  ok("bấm lĩnh vực thì hiện chỉ tiêu", await page.locator("text=Tỷ lệ người dân tham gia bảo hiểm y tế").isVisible());
+  // Tra cứu
+  for (const [q, expect] of [
+    ["việc quá hạn của phòng kinh tế", "Phòng Kinh tế"],
+    ["tong hop viec hoan thanh nam nay theo tung don vi", "Tổng hợp theo từng đơn vị"],
+    ["chỉ tiêu có nguy cơ không đạt", "Có nguy cơ không đạt"],
+    ["việc về hộ nghèo", "ho ngheo"],
+  ]) {
+    const txt = await check(page, "/tra-cuu?q=" + encodeURIComponent(q), "tra cứu");
+    ok(`tra cứu hiểu “${q}”`, txt.includes(expect) && !/Không tìm thấy/.test(txt), txt.match(/Tổng số việc\s*\d+|Chỉ tiêu năm \d+\s*\d+/)?.[0] || "");
+  }
+  const xr = await page.request.get(BASE + "/api/tra-cuu/xuat?q=" + encodeURIComponent("việc quá hạn theo từng đơn vị"));
+  ok("xuất Excel kết quả tra cứu", xr.status() === 200 && (await xr.body()).length > 1000);
+  await ctx.close();
+
+  // PCT kinh tế không thấy chỉ tiêu lĩnh vực y tế
+  ({ ctx, page } = await newPage());
+  await login(page, "pct.kinhte");
+  await page.goto(BASE + "/chi-tieu?mo=tat_ca");
+  const pk = await page.locator("body").innerText();
+  ok("PCT kinh tế chỉ thấy chỉ tiêu lĩnh vực phụ trách", pk.includes("Tổng thu ngân sách") && !pk.includes("bảo hiểm y tế"));
+  const pkt = await check(page, "/tra-cuu?q=" + encodeURIComponent("chỉ tiêu"), "PCT tra cứu");
+  ok("tra cứu cũng giới hạn theo phân quyền", !pkt.includes("bảo hiểm y tế"));
+  await ctx.close();
+
   // 9. Giao diện điện thoại: không tràn ngang
   ({ ctx, page } = await newPage({ width: 390, height: 844 }));
   await login(page, "tp.kinhte");
