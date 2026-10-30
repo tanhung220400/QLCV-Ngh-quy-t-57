@@ -19,7 +19,7 @@ async function kpiRole(user: User, kpiId: number) {
   const sql = await db();
   const k = (await sql`SELECT * FROM chi_tieu WHERE id = ${kpiId}`)[0];
   if (!k || !(await canSeeKpi(user, kpiId))) return null;
-  const r = await kpiRights(user, k);
+  const r = await kpiRights(user, k as never);
   return { k, ...r };
 }
 
