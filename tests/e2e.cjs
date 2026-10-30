@@ -186,7 +186,7 @@ const day = (n) => {
   await page.goto(BASE + `/viec/${taskId}`);
   ok("chặn xem việc không thuộc trách nhiệm", (await page.locator("body").innerText()).includes("không có quyền"));
   // Nhập số liệu chỉ tiêu BHYT
-  await page.goto(BASE + "/chi-tieu");
+  await page.goto(BASE + "/chi-tieu?mo=tat_ca");
   await page.click("text=Tỷ lệ người dân tham gia bảo hiểm y tế");
   await page.waitForURL(/chi-tieu\/\d+/, { waitUntil: "commit" });
   const kpiUrl = page.url();
