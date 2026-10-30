@@ -31,7 +31,7 @@ export function KpiForm({
   return (
     <ActionForm action={saveKpiAction} className="space-y-4">
       {k && <input type="hidden" name="id" value={String(k.id)} />}
-      {(parent || k?.id_cha) && <input type="hidden" name="id_cha" value={String(parent?.id ?? k?.id_cha)} />}
+      {!!(parent || k?.id_cha) && <input type="hidden" name="id_cha" value={String(parent?.id ?? k?.id_cha)} />}
       <div>
         <label className="label req">Tên chỉ tiêu</label>
         <input name="ten" className="input" defaultValue={k ? String(k.ten) : parent ? `${parent.ten} - ` : ""} required />

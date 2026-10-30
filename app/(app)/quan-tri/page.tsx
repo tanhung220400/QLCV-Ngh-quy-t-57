@@ -63,7 +63,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
                     <td>
                       <details>
                         <summary className="cursor-pointer text-brand-700">Sửa</summary>
-                        <UnitForm u={u} units={units as never} />
+                        <UnitForm u={u as never} units={units as never} />
                       </details>
                     </td>
                   </tr>

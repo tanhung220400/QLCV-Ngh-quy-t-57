@@ -41,9 +41,10 @@ export async function createTaskAction(_: ActionState, fd: FormData): Promise<Ac
   if (!user) return { redirect: "/dang-nhap" };
   const idCha = Number(str(fd, "id_cha")) || null;
   const sql = await db();
-  let parent: (TaskRow & { linh_vuc: string; nguon_giao: string }) | null = null;
+  type Parent = TaskRow & { linh_vuc: string; nguon_giao: string };
+  let parent: Parent | null = null;
   if (idCha) {
-    parent = ((await sql`SELECT * FROM cong_viec WHERE id = ${idCha}`)[0] ?? null) as unknown as typeof parent;
+    parent = ((await sql`SELECT * FROM cong_viec WHERE id = ${idCha}`)[0] ?? null) as unknown as Parent | null;
     if (!parent) return { error: "Không tìm thấy việc cha." };
     const p = await taskPerms(user, parent!);
     if (!p.viec_con) return { error: "Bạn không có quyền tạo việc con cho việc này." };

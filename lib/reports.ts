@@ -40,7 +40,7 @@ export async function weeklyData(user: User, tu: string, den: string) {
     onTime,
     overdue: overdue.map((d) => ({ ...d, so_ngay: daysLate(d.han) })),
     upcoming,
-  } as {
+  } as unknown as {
     tu: string; den: string; giaoMoi: number; dangLam: number; onTime: number;
     done: { id: number; ten: string; han: Date; han_co_gio: boolean; chu_tri: string; don_vi: string; ngay_hoan_thanh: Date; dung_han: boolean }[];
     overdue: { id: number; ten: string; han: Date; han_co_gio: boolean; chu_tri: string; don_vi: string; so_ngay: number; phan_tram: number }[];
