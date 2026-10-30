@@ -146,6 +146,7 @@ const day = (n) => {
   ok("duyệt gia hạn", true);
   await page.click('button:has-text("Đồng ý hoàn thành")');
   await page.waitForSelector("text=Đã duyệt hoàn thành.");
+  await page.waitForSelector("text=Đúng hạn");
   const det = await page.locator("body").innerText();
   ok("việc chuyển Hoàn thành + đúng hạn", /Hoàn thành/.test(det) && /đúng hạn/i.test(det));
   ok("lịch sử gia hạn ghi nhận", /Lịch sử gia hạn \(1\)/.test(det));
@@ -221,7 +222,8 @@ const day = (n) => {
   for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", `/viec/${taskId}`, "/viec/moi", "/chi-tieu", "/bao-cao", "/thong-bao", "/tai-khoan"]) {
     await page.goto(BASE + p, { waitUntil: "networkidle" });
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    ok(`điện thoại không tràn ngang ${p}`, over <= 1, `dư ${over}px`);
+    const wide = over > 1 ? await page.evaluate(() => [...document.querySelectorAll("body *")].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1).slice(-3).map((e) => e.tagName + "." + String(e.className).slice(0, 60)).join(" | ")) : "";
+    ok(`điện thoại không tràn ngang ${p}`, over <= 1, `dư ${over}px ${wide}`);
   }
   await page.goto(BASE + "/");
   await page.screenshot({ path: "/tmp/shot-mobile-home.jpg", type: "jpeg", quality: 45 });

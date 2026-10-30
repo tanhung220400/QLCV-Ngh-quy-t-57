@@ -115,7 +115,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
           <DueChip t={t as never} holidays={holidays} nguong={cfg.nguong_vang} />
           {t.dinh_ky && <span className="chip border-slate-300 bg-white">{DINH_KY[t.dinh_ky]}</span>}
         </div>
-        <h1 className="mt-2 text-2xl leading-snug font-bold">{t.ten}</h1>
+        <h1 className="mt-2 text-2xl leading-snug font-bold break-words">{t.ten}</h1>
         {t.mo_ta && <p className="mt-2 whitespace-pre-line text-slate-700">{t.mo_ta}</p>}
         <dl className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2">
           <Info k="Người chủ trì" v={`${t.ten_chu_tri}${t.cv_chu_tri ? ` (${t.cv_chu_tri})` : ""}`} />
@@ -531,7 +531,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
               <div className="text-sm text-slate-500">
                 <b className="text-slate-800">{b.ho_ten}</b> · {fmtDateTime(b.thoi_gian)}
               </div>
-              <div className={`mt-0.5 whitespace-pre-line ${b.loai === "he_thong" ? "text-slate-600 italic" : ""}`}>{b.noi_dung}</div>
+              <div className={`mt-0.5 break-words whitespace-pre-line ${b.loai === "he_thong" ? "text-slate-600 italic" : ""}`}>{b.noi_dung}</div>
             </li>
           ))}
           {comments.length === 0 && <li className="text-slate-500">Chưa có trao đổi.</li>}
@@ -547,7 +547,8 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
       {exts.length > 0 && (
         <div className="card">
           <h2 className="h2">Lịch sử gia hạn ({exts.length})</h2>
-          <table className="tbl mt-2">
+          <div className="mt-2 overflow-x-auto">
+          <table className="tbl min-w-[520px]">
             <thead>
               <tr>
                 <th>Ngày xin</th>
@@ -569,6 +570,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
       <details className="card">
