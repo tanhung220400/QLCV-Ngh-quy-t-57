@@ -36,9 +36,12 @@ export const seesAll = (i: Identity) =>
   i.vai_tro === "quan_tri" || i.vai_tro === "tong_hop" || (i.vai_tro === "lanh_dao" && i.linh_vuc_phu_trach.length === 0);
 
 /** Điều kiện SQL giới hạn các công việc người dùng được xem (bảng alias cv) */
-export async function taskScope(sql: postgres.Sql, user: User): Promise<postgres.PendingQuery<postgres.Row[]>> {
+export type Scope = { q: postgres.PendingQuery<postgres.Row[]> };
+
+/** Trả về { q } (bọc trong object vì fragment của postgres.js là "thenable", await trực tiếp sẽ bị chạy như truy vấn) */
+export async function taskScope(sql: postgres.Sql, user: User): Promise<Scope> {
   const ids = await identities(user);
-  if (ids.some(seesAll)) return sql`TRUE`;
+  if (ids.some(seesAll)) return { q: sql`TRUE` };
   const units = await allUnits();
   const parts: postgres.PendingQuery<postgres.Row[]>[] = [];
   const personIds = ids.map((i) => i.id);
@@ -51,17 +54,17 @@ export async function taskScope(sql: postgres.Sql, user: User): Promise<postgres
       parts.push(sql`cv.id_don_vi_chu_tri IN ${sql(st)}`);
     }
   }
-  return parts.reduce((a, b) => sql`${a} OR ${b}`);
+  return { q: parts.reduce((a, b) => sql`${a} OR ${b}`) };
 }
 
-export async function kpiScope(sql: postgres.Sql, user: User): Promise<postgres.PendingQuery<postgres.Row[]>> {
+export async function kpiScope(sql: postgres.Sql, user: User): Promise<Scope> {
   const ids = await identities(user);
-  if (ids.some(seesAll) || ids.some((i) => i.vai_tro === "lanh_dao")) return sql`TRUE`;
+  if (ids.some(seesAll) || ids.some((i) => i.vai_tro === "lanh_dao")) return { q: sql`TRUE` };
   const units = await allUnits();
   const personIds = ids.map((i) => i.id);
   const unitIds = ids.flatMap((i) => (i.vai_tro === "truong_don_vi" ? subtree(units, i.id_don_vi) : []));
-  if (unitIds.length) return sql`(ct.id_phu_trach IN ${sql(personIds)} OR ct.id_don_vi_phu_trach IN ${sql(unitIds)})`;
-  return sql`ct.id_phu_trach IN ${sql(personIds)}`;
+  if (unitIds.length) return { q: sql`(ct.id_phu_trach IN ${sql(personIds)} OR ct.id_don_vi_phu_trach IN ${sql(unitIds)})` };
+  return { q: sql`ct.id_phu_trach IN ${sql(personIds)}` };
 }
 
 export const canCreateTask = (u: User) => ["lanh_dao", "truong_don_vi", "tong_hop"].includes(u.vai_tro) || u.uy_quyen_tu.length > 0;

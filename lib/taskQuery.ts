@@ -30,7 +30,7 @@ export const TABS: { key: string; label: string }[] = [
 
 export async function queryTasks(user: User, f: TaskFilter, limit = 300): Promise<TaskListItem[]> {
   const sql = await db();
-  const scope = await taskScope(sql, user);
+  const scope = (await taskScope(sql, user)).q;
   const ids = (await identities(user)).map((i) => i.id);
   const conds = [scope];
   const tab = f.tab || "cua_toi";

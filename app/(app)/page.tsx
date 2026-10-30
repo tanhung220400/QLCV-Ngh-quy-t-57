@@ -20,9 +20,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const sql = await db();
   const ids = await identities(user);
   const leader = ids.some((i) => seesAll(i) || i.vai_tro === "lanh_dao" || i.vai_tro === "truong_don_vi");
-  const scope = await taskScope(sql, user);
+  const scope = (await taskScope(sql, user)).q;
   const [cfg, holidays, h] = await Promise.all([getSettings(), getHolidays(), headline(sql, scope)]);
-  const kpis = (await loadKpis(sql, await kpiScope(sql, user), cfg.nguong_nguy_co, Number(vnDate().slice(0, 4)))).filter((k) => !k.id_cha);
+  const kpis = (await loadKpis(sql, (await kpiScope(sql, user)).q, cfg.nguong_nguy_co, Number(vnDate().slice(0, 4)))).filter((k) => !k.id_cha);
   const risky = kpis.filter((k) => k.nguy_co).length;
   const hello = new Date().getUTCHours() + 7 < 11 ? "Chào buổi sáng" : new Date().getUTCHours() + 7 < 18 ? "Chào buổi chiều" : "Chào buổi tối";
 
