@@ -57,7 +57,8 @@ export async function saveUserAction(_: ActionState, fd: FormData): Promise<Acti
     vai_tro: VAI_TRO[str(fd, "vai_tro")] ? str(fd, "vai_tro") : "cong_chuc",
     linh_vuc_phu_trach: fd.getAll("linh_vuc_phu_trach").map(String).filter(Boolean),
     trang_thai: str(fd, "trang_thai") === "khoa" ? "khoa" : "hoat_dong",
-  } as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as Record<string, any>;
   let logQuyen: unknown = undefined;
   // Phân quyền chi tiết: so sánh quyền được chọn với mặc định của vai trò
   if (fd.get("co_phan_quyen") === "1") {
