@@ -1,4 +1,4 @@
 {
-  "regions": ["sin1"],
+  "regions": ["dub1"],
   "crons": [{ "path": "/api/cron", "schedule": "30 0 * * *" }]
 }

@@ -100,7 +100,7 @@ Hướng dẫn chạy nằm ở đầu tệp.
 
 ## Lưu ý trước khi dùng chính thức
 
-- Vercel và Neon đặt máy chủ ở Singapore. Đặc tả mục 7 yêu cầu máy chủ tại Việt Nam, nên trước khi dùng chính thức cần xin ý kiến Sở Khoa học và Công nghệ. Mã nguồn chạy được trên mọi máy chủ Node.js và PostgreSQL, kể cả trung tâm dữ liệu của tỉnh.
+- Máy chủ hiện đặt ở nước ngoài (Supabase eu-west-1 Ireland, Vercel Dublin). Đặc tả mục 7 yêu cầu máy chủ tại Việt Nam, nên trước khi dùng chính thức cần xin ý kiến Sở Khoa học và Công nghệ. Mã nguồn chạy được trên mọi máy chủ Node.js và PostgreSQL, kể cả trung tâm dữ liệu của tỉnh.
 - Cần thống nhất với Văn phòng cách tính % cho chỉ tiêu "càng thấp càng tốt". Hiện phần mềm tính theo mức giảm so với đầu năm nếu có giá trị đầu năm, nếu không thì lấy kế hoạch ÷ thực hiện.
 - Kiểm tra lại danh sách ngày nghỉ lễ hằng năm trong mục Quản trị.
 - Gửi nhắc qua Zalo OA hoặc SMS và biểu đồ Gantt thuộc giai đoạn 3, chưa có trong bản này.
