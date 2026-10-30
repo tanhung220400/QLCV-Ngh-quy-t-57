@@ -28,12 +28,28 @@ Chạy trên điện thoại, máy tính bảng và máy tính (web cài đượ
   - 7 giờ 30 mỗi ngày làm việc gửi tin tóm tắt.
 
 **Chỉ tiêu** (mục 5)
+- Chỉ tiêu thu gọn theo lĩnh vực: bấm vào lĩnh vực để xem danh sách, bấm vào chỉ tiêu để xem chi tiết.
 - Nhập chỉ tiêu từ Excel theo mẫu.
 - Phân rã xuống đơn vị, thôn, có kiểm tra tổng các phần. Lập kế hoạch theo tháng hoặc quý.
 - Cập nhật số liệu kèm minh chứng. Trưởng đơn vị xác nhận trước khi số liệu lên báo cáo.
 - Tự tính % hoàn thành và % lẽ ra phải đạt, cảnh báo nguy cơ khi chậm quá 10 điểm %.
 - Hỗ trợ loại cộng dồn, tỷ lệ, đạt/không đạt, cả chiều "càng thấp càng tốt".
 - Lưu lịch sử mọi lần sửa số liệu.
+
+**Thông báo SMS**
+- Gửi SMS khi được giao việc, giao chỉ tiêu, sắp đến hạn, đến hạn, quá hạn. Quản trị chọn sự kiện nào được gửi.
+- Nhà cung cấp: eSMS.vn, SpeedSMS.vn, Twilio, hoặc webhook riêng (cổng SMS/Zalo của tỉnh). Cấu hình ở Quản trị → Tin nhắn SMS.
+- Không gửi trong giờ nghỉ (mặc định 21:00–06:30). Có nhật ký gửi tin.
+
+**Đăng nhập**
+- Ghi nhớ tên đăng nhập.
+- Quên mật khẩu: nhận mã qua SMS, hoặc gửi yêu cầu cho quản trị nếu chưa có SMS.
+- Nút Đăng xuất ở thanh bên và trong menu điện thoại.
+
+**Tra cứu, tổng hợp theo yêu cầu**
+- Gõ hoặc nói câu hỏi tiếng Việt, ví dụ: “việc quá hạn của phòng kinh tế tháng này”, “tổng hợp việc hoàn thành quý 3 theo từng đơn vị”, “chỉ tiêu có nguy cơ không đạt”.
+- Hiểu câu có dấu hoặc không dấu, từ đồng nghĩa và cách nói thông dụng (trễ deadline, lố hạn, tồn đọng...), tên đơn vị, lĩnh vực, cán bộ, mốc thời gian.
+- Xử lý ngay trên máy chủ của phần mềm, không gửi dữ liệu ra ngoài. Kết quả giới hạn theo phân quyền, xuất được Excel.
 
 **Dashboard và báo cáo** (mục 6)
 - Bốn con số đầu trang, danh sách việc quá hạn có nút Nhắc, biểu đồ theo đơn vị, xu hướng tỷ lệ đúng hạn, bảng chỉ tiêu.
@@ -46,7 +62,9 @@ Chạy trên điện thoại, máy tính bảng và máy tính (web cài đượ
 - Quản trị sửa được tên cơ quan, địa danh, người ký và nơi nhận trên mẫu Word.
 
 **Phân quyền và bảo mật** (mục 2, 7)
-- Sáu vai trò. Phân quyền theo chức vụ và đơn vị. Phó Chủ tịch chỉ thấy lĩnh vực mình phụ trách.
+- Sáu vai trò, mỗi vai trò có bộ quyền mặc định. Quản trị bật/tắt được từng quyền cho từng tài khoản: công việc, chỉ tiêu, báo cáo, tra cứu, quản trị.
+- Phạm vi dữ liệu: toàn xã, theo lĩnh vực, theo đơn vị hoặc chỉ việc của bản thân. Áp dụng cho cả công việc, chỉ tiêu, báo cáo và tra cứu.
+- Phó Chủ tịch chỉ thấy công việc và chỉ tiêu thuộc lĩnh vực mình phụ trách.
 - Có ủy quyền khi đi công tác.
 - Xác thực hai lớp OTP (Google hoặc Microsoft Authenticator), quản trị có thể bắt buộc. Khóa đăng nhập tạm khi sai mật khẩu nhiều lần.
 - Nhật ký thao tác được khóa ở mức cơ sở dữ liệu, không ai sửa hoặc xóa được.

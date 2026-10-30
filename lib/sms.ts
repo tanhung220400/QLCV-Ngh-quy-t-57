@@ -77,11 +77,14 @@ export function smsReady(c: SmsConfig): boolean {
 /** Bỏ dấu tiếng Việt: tin không dấu rẻ hơn và không bị cắt nội dung */
 export function khongDau(s: string): string {
   return s
+    .replace(/[·•–—]/g, "-")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D")
-    .replace(/[^\x20-\x7E]/g, "");
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function chuanSdt(sdt: string | null | undefined): string | null {
