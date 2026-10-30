@@ -1,3 +1,4 @@
+import type postgres from "postgres";
 import { db } from "./db";
 import { hashPassword } from "./auth";
 import { seedCatalogs, NGAY_NGHI_MAC_DINH, saveSettings } from "./settings";
@@ -21,7 +22,7 @@ export async function seedAll(o: { ten_xa: string; ho_ten: string; username: str
   await saveSettings({ ten_don_vi: o.ten_xa.toUpperCase().startsWith("UBND") ? o.ten_xa : `UBND ${o.ten_xa}` });
 }
 
-type Tx = Parameters<Parameters<Awaited<ReturnType<typeof db>>["begin"]>[0]>[0];
+type Tx = postgres.TransactionSql;
 
 async function seedDemo(tx: Tx, ld: number, vp: number) {
   const pw = await hashPassword(DEMO_PASSWORD);

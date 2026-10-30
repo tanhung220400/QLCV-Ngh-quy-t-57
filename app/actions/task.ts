@@ -1,4 +1,5 @@
 "use server";
+import type postgres from "postgres";
 import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
 import { getUser, type User } from "@/lib/auth";
@@ -9,7 +10,7 @@ import { recomputePercent } from "@/lib/tasks";
 import { TRANG_THAI } from "@/lib/const";
 import type { ActionState } from "@/components/ActionForm";
 
-type Tx = Parameters<Parameters<Awaited<ReturnType<typeof db>>["begin"]>[0]>[0];
+type Tx = postgres.TransactionSql;
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
