@@ -292,7 +292,8 @@ const day = (n) => {
   await page.goto(BASE + "/viec/moi");
   await page.fill('input[name="ten"]', "Kiểm thử SMS: Báo cáo nhanh");
   await page.click('button:has-text("Cá nhân")');
-  await page.getByText("Ngô Văn Hùng", { exact: true }).click();
+  await page.fill('input[placeholder="Tìm..."]', "Ngô");
+  await page.locator('label:has-text("Ngô Văn Hùng") input[type="checkbox"]').first().check();
   await page.fill('input[name="han_ngay"]', day(5));
   await page.fill('input[name="san_pham"]', "Báo cáo");
   await page.selectOption('select[name="linh_vuc"]', "Nông nghiệp, môi trường");
