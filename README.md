@@ -71,6 +71,19 @@ Chạy trên điện thoại, máy tính bảng và máy tính (web cài đượ
 - Khi mất mạng vẫn xem được danh sách việc đã mở. Cập nhật tiến độ lúc mất mạng sẽ tự gửi khi có mạng lại.
 - API chỉ đọc để liên thông với hệ thống khác: `/api/v1/cong-viec`, `/api/v1/chi-tieu` (gửi kèm header `x-api-key`).
 
+### Phiên bản 3: module tự tạo, quản trị dữ liệu, Nghị quyết 57
+
+- **Module & menu do quản trị tự thiết kế** (Quản trị → Module & menu), giống phần mềm quản lý địa bàn:
+  - Tạo nhóm menu, module nhập liệu, liên kết; module con nằm trong module lớn; sắp xếp, ẩn/hiện, đổi tên, biểu tượng, màu; giới hạn vai trò được xem / được nhập.
+  - Mỗi module nhập liệu có trường tự định nghĩa (14 kiểu: văn bản, số, ngày, chọn một/nhiều, có/không, điện thoại, email, đơn vị/thôn, cán bộ, lĩnh vực, GPS, đường dẫn…).
+  - Trang module: danh sách (bảng trên máy tính, thẻ trên điện thoại), tìm không dấu, lọc, thống kê nhanh, thêm/sửa/xóa, đính kèm ảnh, xuất Excel, nhập từ Excel theo tệp mẫu.
+  - Mẫu có sẵn theo NQ57: Tổ công nghệ số cộng đồng, Bình dân học vụ số, Hạ tầng số tại thôn, Sáng kiến đổi mới sáng tạo, Sản phẩm lên sàn TMĐT; Phản ánh kiến nghị (Quản lý địa bàn).
+- **Quản trị dữ liệu (quyền `qt.du_lieu`)**: sửa toàn bộ thông tin công việc (kể cả trạng thái, người giao, chủ trì), xóa công việc, chỉ tiêu, số liệu, trao đổi, bản ghi, module.
+- **Thùng rác**: mọi nội dung xóa được lưu đủ (kèm việc con, số liệu, tệp) để khôi phục hoặc xóa hẳn.
+- **Danh mục từng mục**: thêm, đổi tên, xóa, sắp xếp; đổi tên tự cập nhật công việc, chỉ tiêu, phân công cán bộ, bản ghi đang dùng. Bổ sung 16 lĩnh vực (chuyển đổi số, dữ liệu số / Đề án 06, kinh tế số, xã hội số, đổi mới sáng tạo, tư pháp hộ tịch…).
+- **Giao diện mới**: phông Be Vietnam Pro, nền sáng dịu, thanh bên nhóm theo module, thanh trên có tra cứu nhanh, chuông, tài khoản; menu dạng ô trên điện thoại; trang chủ có “Truy cập nhanh”.
+- **Dữ liệu mẫu NQ57**: 20 công việc, 10 chỉ tiêu có số liệu theo tháng, bản ghi cho 6 module. Nạp / xóa tại Quản trị → Thùng rác, dữ liệu; hoặc `POST /api/quan-tri/nap-mau` với tiêu đề `x-setup-key: <SETUP_KEY>` (`?op=them` nạp thêm, `?op=xoa` xóa).
+
 ## Công nghệ
 
 Next.js 15, PostgreSQL, Vercel Blob (tệp đính kèm), Vercel Cron.
