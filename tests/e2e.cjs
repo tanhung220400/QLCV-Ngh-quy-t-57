@@ -293,7 +293,7 @@ const day = (n) => {
   await login(page, "cv.kinhte1");
   await page.goto(BASE + "/bieu-do");
   ok("công chức chưa được phân quyền thì không xem được biểu đồ", page.url().includes("khong_quyen"));
-  ok("menu không hiện biểu đồ khi chưa có quyền", !(await page.locator("aside").innerText()).includes("Biểu đồ tiến độ"));
+  ok("menu không hiện biểu đồ khi chưa có quyền", !(await page.locator("aside").textContent()).includes("Biểu đồ tiến độ"));
   await ctx.close();
 
   ({ ctx, page } = await newPage());
@@ -360,7 +360,22 @@ const day = (n) => {
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
   const side = await page.locator("aside").innerText();
   ok("menu nhóm theo module (NQ57, địa bàn)", side.includes("NGHỊ QUYẾT 57") || side.includes("Nghị quyết 57"), side.replace(/\n/g, " | ").slice(0, 200));
-  ok("menu có module nhập liệu", side.includes("Tổ công nghệ số cộng đồng") && side.includes("Phản ánh, kiến nghị"));
+  const sideAll = await page.locator("aside").textContent();
+  ok("menu có module nhập liệu", sideAll.includes("Tổ công nghệ số cộng đồng") && sideAll.includes("Phản ánh, kiến nghị"));
+  // module chính có mũi tên mở/đóng module con; con lùi vào, cùng cỡ chữ
+  const nut = page.locator('aside button[aria-label="Mở Nghị quyết 57"]');
+  ok("module con thu gọn, có mũi tên xổ xuống", (await nut.count()) === 1 && !side.includes("Tổ công nghệ số cộng đồng"));
+  await nut.click();
+  const con = page.locator('aside a[title="Tổ công nghệ số cộng đồng"]');
+  await con.waitFor({ state: "visible" });
+  const cha = page.locator('aside a[title="Nghị quyết 57"]');
+  const [fc, fp] = await Promise.all([con.evaluate((e) => getComputedStyle(e).fontSize), cha.evaluate((e) => getComputedStyle(e).fontSize)]);
+  const [xc, xp] = await Promise.all([con.boundingBox(), cha.boundingBox()]);
+  ok("module con cùng cỡ chữ, lùi đầu dòng", fc === fp && xc.x > xp.x + 15, `${fc}/${fp} ${xc.x}/${xp.x}`);
+  await page.reload({ waitUntil: "networkidle" });
+  ok("nhớ trạng thái mở module", await page.locator('aside a[title="Tổ công nghệ số cộng đồng"]').isVisible());
+  await page.click('aside button[aria-label="Thu gọn Nghị quyết 57"]');
+  ok("thu gọn module con", !(await page.locator('aside a[title="Tổ công nghệ số cộng đồng"]').isVisible()));
   const tcn = await check(page, "/m/to-cong-nghe-so", "module");
   ok("dữ liệu mẫu NQ57 trong module", (tcn.match(/Tổ công nghệ số cộng đồng Thôn/g) || []).length >= 2);
   const home = await check(page, "/", "trang chủ");
@@ -399,7 +414,7 @@ const day = (n) => {
   const recUrl = page.url().split("?")[0].replace(BASE, "");
   const rec = await page.locator("main").innerText();
   ok("nhập bản ghi vào module mới", rec.includes("Quán cơm Bình Dân") && rec.includes("Ăn uống"));
-  ok("module mới hiện trên menu", (await page.locator("aside").innerText()).includes("Hộ kinh doanh cá thể"));
+  ok("module mới hiện trên menu", (await page.locator("aside").textContent()).includes("Hộ kinh doanh cá thể"));
   // Nhập Excel
   const ExcelJS = require("/vercel/app/node_modules/exceljs");
   const wb = new ExcelJS.Workbook();
@@ -547,7 +562,7 @@ const day = (n) => {
   require("child_process").execSync(`psql -h 127.0.0.1 -U postgres -d qlcv -c "UPDATE cong_viec SET tao_luc = make_timestamptz(${curY - 1}, 11, 20, 8, 0, 0, 'Asia/Ho_Chi_Minh') WHERE ten = 'Tổng hợp số liệu thu ngân sách quý III'"`);
   const curList = await check(page, "/viec?tab=tat_ca&trang_thai=hoan_thanh", "năm nay");
   ok("danh sách năm nay không còn việc năm cũ", !curList.includes("Tổng hợp số liệu thu ngân sách quý III"));
-  ok("menu có mục Công việc năm cũ", (await page.locator("aside").innerText()).includes(`Công việc năm ${curY - 1}`));
+  ok("menu có mục Công việc năm cũ", (await page.locator("aside").textContent()).includes(`Công việc năm ${curY - 1}`));
   const oldList = await check(page, `/viec?tab=tat_ca&nam=${curY - 1}`, "năm cũ");
   ok("mục Công việc năm cũ chứa việc năm cũ", oldList.includes("Tổng hợp số liệu thu ngân sách quý III") && oldList.includes(`Công việc năm ${curY - 1}`));
   // Nút sửa/xóa nổi bật ở trang chi tiết
@@ -600,7 +615,7 @@ const day = (n) => {
   // 15. Biểu đồ so sánh tiến độ giữa các đơn vị (lãnh đạo)
   ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
   await login(page, "chutich");
-  ok("menu có Biểu đồ tiến độ đơn vị", (await page.locator("aside").innerText()).includes("Biểu đồ tiến độ đơn vị"));
+  ok("menu có Biểu đồ tiến độ đơn vị", (await page.locator("aside").textContent()).includes("Biểu đồ tiến độ đơn vị"));
   // Trang tổng quan lãnh đạo: biểu đồ đơn vị ngang toàn chiều rộng + % đúng hạn trong cột; chỉ tiêu theo nhóm
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
   const home2 = await page.locator("main").innerText();
@@ -643,7 +658,7 @@ const day = (n) => {
   await page.fill('input[name="mat_khau"]', "Quantri@2026");
   await page.click('button[type="submit"]');
   await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
-  ok("menu có Đánh giá KPI", (await page.locator("aside").innerText()).includes("Đánh giá KPI"));
+  ok("menu có Đánh giá KPI", (await page.locator("aside").textContent()).includes("Đánh giá KPI"));
   const kq = await check(page, "/danh-gia-kpi", "KPI toàn phường");
   ok("KPI toàn phường theo đơn vị", kq.includes("Phạm vi: toàn phường") && kq.includes("Phòng Kinh tế") && kq.includes("Phòng Văn hóa - Xã hội") && /Hoàn thành|Chưa hoàn thành|Chưa đủ dữ liệu/.test(kq));
   ok("KPI có các chỉ số vượt tiến độ, trễ hạn, quá hạn, tồn", ["Vượt tiến độ", "Trễ hạn", "Đang quá hạn", "Tồn việc", "Điểm KPI"].every((t) => kq.includes(t)));
@@ -861,12 +876,12 @@ const day = (n) => {
     await page.goto(BASE + bdId);
     await page.click('button:has-text("Xóa module")');
     await page.waitForURL(/muc=mo_dun&xoa=1/, { waitUntil: "commit" });
-    ok("xóa được chức năng hệ thống khỏi menu", !(await page.locator("aside").innerText()).includes("Biểu đồ tiến độ đơn vị"));
+    ok("xóa được chức năng hệ thống khỏi menu", !(await page.locator("aside").textContent()).includes("Biểu đồ tiến độ đơn vị"));
     await page.goto(BASE + "/quan-tri?muc=thung_rac");
     await page.locator('tr:has-text("Biểu đồ tiến độ đơn vị") button:has-text("Khôi phục")').first().click();
     await page.waitForTimeout(1500);
     await page.goto(BASE + "/quan-tri?muc=mo_dun");
-    ok("khôi phục chức năng hệ thống từ Thùng rác", (await page.locator("aside").innerText()).includes("Biểu đồ tiến độ đơn vị"));
+    ok("khôi phục chức năng hệ thống từ Thùng rác", (await page.locator("aside").textContent()).includes("Biểu đồ tiến độ đơn vị"));
     await ctx.close();
   }
   const nguoiChon = async (u) => {

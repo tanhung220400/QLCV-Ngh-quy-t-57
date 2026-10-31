@@ -49,10 +49,36 @@ const TONE: Record<string, { dark: string; light: string }> = {
 };
 const tone = (mau: string, dark: boolean) => (TONE[mau] || TONE.blue)[dark ? "dark" : "light"];
 
+const MO_KEY = "qlcv_menu_mo";
+function readMo(): Record<string, boolean> {
+  try {
+    return JSON.parse(localStorage.getItem(MO_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
 function NavLink({ n, depth, unread, onClick, dark }: { n: NavNode; depth: number; unread: number; onClick?: () => void; dark?: boolean }) {
   const active = useActive();
   const on = active(n.href);
   const ext = n.href.startsWith("http");
+  const kids = depth < 2 ? n.con : [];
+  const hasActive = (x: NavNode): boolean => x.con.some((c) => active(c.href) || hasActive(c));
+  const childOn = kids.length > 0 && hasActive(n);
+  // mở/đóng module con: nhớ lựa chọn trên máy; đang ở trang con thì luôn mở
+  const [mo, setMo] = useState(childOn);
+  useEffect(() => {
+    const v = readMo()[n.id];
+    if (childOn) setMo(true);
+    else if (v !== undefined) setMo(v);
+  }, [n.id, childOn]);
+  const toggle = () => {
+    const v = !mo;
+    setMo(v);
+    try {
+      localStorage.setItem(MO_KEY, JSON.stringify({ ...readMo(), [n.id]: v }));
+    } catch {}
+  };
   const cls = dark
     ? on
       ? "bg-white text-brand-800 shadow-lift"
@@ -61,31 +87,41 @@ function NavLink({ n, depth, unread, onClick, dark }: { n: NavNode; depth: numbe
       ? "bg-brand-50 text-brand-700"
       : "text-slate-700 hover:bg-slate-50 hover:text-slate-900";
   return (
-    <>
-      <Link
-        href={n.href}
-        onClick={onClick}
-        target={ext ? "_blank" : undefined}
-        title={n.ten}
-        className={`group flex items-center gap-3 rounded-xl py-2 pr-2 font-semibold transition ${depth ? "pl-8 text-[15px] font-medium" : "pl-2.5"} ${cls}`}
-      >
-        {depth ? (
-          <Icon name={n.icon} className={`h-[18px] w-[18px] shrink-0 ${tone(n.mau, !!dark && !on)}`} />
-        ) : (
-          <Icon name={n.icon} className={`h-[22px] w-[22px] shrink-0 ${tone(n.mau, !!dark && !on)}`} strokeWidth={2} />
+    <div>
+      <div className={`group flex items-center rounded-xl transition ${cls} ${childOn && !on ? (dark ? "bg-white/8" : "bg-slate-50") : ""}`}>
+        <Link
+          href={n.href}
+          onClick={onClick}
+          target={ext ? "_blank" : undefined}
+          title={n.ten}
+          className={`flex min-w-0 flex-1 items-center gap-3 py-2 pl-2.5 pr-2 ${depth ? "font-medium" : "font-semibold"}`}
+        >
+          <Icon name={n.icon} className={`h-[22px] w-[22px] shrink-0 ${tone(n.mau, !!dark && !on)}`} strokeWidth={depth ? 1.8 : 2} />
+          <span className={`line-clamp-2 min-w-0 flex-1 leading-snug ${dark && !on ? "[text-shadow:0_1px_2px_rgb(0_0_0/0.35)]" : ""}`}>{n.ten}</span>
+          {n.href === "/thong-bao" && unread > 0 && <span className="rounded-full bg-red-500 px-2 text-xs leading-5 font-semibold text-white">{unread}</span>}
+          {ext && <Icon name="link" className={`h-4 w-4 ${dark && !on ? "text-white/60" : "text-slate-400"}`} />}
+        </Link>
+        {kids.length > 0 && (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={mo}
+            aria-label={mo ? `Thu gọn ${n.ten}` : `Mở ${n.ten}`}
+            title={mo ? "Thu gọn" : `Xem ${kids.length} mục con`}
+            className={`mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${dark && !on ? "text-white/80 hover:bg-white/15" : "text-slate-500 hover:bg-slate-200/70"}`}
+          >
+            <Icon name="chevron" className={`h-[18px] w-[18px] transition-transform ${mo ? "rotate-90" : ""}`} />
+          </button>
         )}
-        <span className={`line-clamp-2 min-w-0 flex-1 leading-snug ${dark && !on ? "[text-shadow:0_1px_2px_rgb(0_0_0/0.35)]" : ""}`}>{n.ten}</span>
-        {n.href === "/thong-bao" && unread > 0 && <span className="rounded-full bg-red-500 px-2 text-xs leading-5 font-semibold text-white">{unread}</span>}
-        {ext && <Icon name="link" className={`h-4 w-4 ${dark && !on ? "text-white/60" : "text-slate-400"}`} />}
-      </Link>
-      {n.con.length > 0 && depth < 2 && (
-        <div className="space-y-0.5">
-          {n.con.map((c) => (
+      </div>
+      {kids.length > 0 && (
+        <div hidden={!mo} className={`mt-0.5 ml-[21px] space-y-0.5 border-l-2 pl-2 ${dark ? "border-white/25" : "border-slate-200"}`}>
+          {kids.map((c) => (
             <NavLink key={c.id} n={c} depth={depth + 1} unread={unread} onClick={onClick} dark={dark} />
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
