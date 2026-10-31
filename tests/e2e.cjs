@@ -588,6 +588,15 @@ const day = (n) => {
   ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
   await login(page, "chutich");
   ok("menu có Biểu đồ tiến độ đơn vị", (await page.locator("aside").innerText()).includes("Biểu đồ tiến độ đơn vị"));
+  // Trang tổng quan lãnh đạo: biểu đồ đơn vị ngang toàn chiều rộng + % đúng hạn trong cột; chỉ tiêu theo nhóm
+  await page.goto(BASE + "/", { waitUntil: "networkidle" });
+  const home2 = await page.locator("main").innerText();
+  ok("biểu đồ đơn vị gộp tỷ lệ đúng hạn theo tháng", home2.includes("Tỷ lệ hoàn thành đúng hạn theo tháng") && /\d+%\s*đúng hạn/.test(home2));
+  const unitCard = page.locator("section:has(h2:has-text('Theo đơn vị'))");
+  const cw = (await unitCard.boundingBox()).width;
+  const mw = (await page.locator("main").boundingBox()).width;
+  ok("biểu đồ đơn vị phủ hết chiều ngang", cw > mw - 60, `${cw}/${mw}`);
+  ok("chỉ tiêu xếp theo nhóm tiến độ", (await page.locator("details[id^='nhom-']").count()) >= 2 && home2.includes("Nguy cơ không đạt"));
   const bd = await check(page, "/bieu-do", "biểu đồ");
   ok("đơn vị khác không thấy việc con của Phòng Kinh tế", !bd.includes("Kiểm đếm tài sản") && (await page.locator("svg[data-bieu-do-con]").count()) === 0);
   ok("biểu đồ chính chỉ tính việc lớn", bd.includes("không tính việc con"));

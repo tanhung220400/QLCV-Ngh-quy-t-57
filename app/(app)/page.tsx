@@ -6,7 +6,7 @@ import { headline, byUnit, trend, periodRange } from "@/lib/stats";
 import { loadKpis, fmtNum } from "@/lib/kpi";
 import { getHolidays, getSettings } from "@/lib/settings";
 import { queryTasks } from "@/lib/taskQuery";
-import { UnitBars, TrendLine, KpiBar, KpiStatus } from "@/components/Charts";
+import { UnitRateBars, KpiBar } from "@/components/Charts";
 import { TaskCard } from "@/components/TaskCard";
 import { ActionForm, Submit } from "@/components/ActionForm";
 import { taskAction } from "@/app/actions/task";
@@ -102,6 +102,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     );
   }
 
+  // Nhóm chỉ tiêu theo tiến độ, việc cần chú ý lên trước
+  const done = (k: (typeof kpis)[number]) => k.pct != null && k.pct >= 100;
+  const kpiGroups = [
+    { key: "nguy_co", label: "Nguy cơ không đạt", icon: "▲", note: "Chậm nhiều so với mức lẽ ra phải đạt", open: true, chip: "border-red-200 bg-red-50 text-red-800", box: "border-red-200 bg-red-50/60", bar: "bg-red-500", items: kpis.filter((k) => k.mau === "do") },
+    { key: "cham", label: "Chậm nhẹ", icon: "!", note: "Cần đôn đốc", open: true, chip: "border-amber-200 bg-amber-50 text-amber-800", box: "border-amber-200 bg-amber-50/60", bar: "bg-amber-400", items: kpis.filter((k) => k.mau === "vang") },
+    { key: "dung", label: "Đúng tiến độ", icon: "✓", note: "Bằng hoặc vượt mức lẽ ra phải đạt", open: false, chip: "border-emerald-200 bg-emerald-50 text-emerald-800", box: "border-emerald-200 bg-emerald-50/50", bar: "bg-emerald-500", items: kpis.filter((k) => k.mau === "xanh" && !done(k)) },
+    { key: "xong", label: "Đã đạt kế hoạch năm", icon: "★", note: "Đạt từ 100% kế hoạch", open: false, chip: "border-sky-200 bg-sky-50 text-sky-800", box: "border-sky-200 bg-sky-50/50", bar: "bg-sky-500", items: kpis.filter((k) => k.mau === "xanh" && done(k)) },
+    { key: "chua", label: "Chưa có số liệu", icon: "–", note: "Chưa đến kỳ báo cáo hoặc chưa nhập", open: false, chip: "border-slate-200 bg-slate-50 text-slate-700", box: "border-slate-200 bg-slate-50/60", bar: "bg-slate-400", items: kpis.filter((k) => k.mau === "xam") },
+  ].map((g) => ({ ...g, items: [...g.items].sort((a, b) => (a.chenh ?? 0) - (b.chenh ?? 0)) }));
+
   const ky = ["thang", "quy", "nam"].includes(sp.ky) ? sp.ky : "nam";
   const range = periodRange(ky);
   const [units, tr] = await Promise.all([byUnit(sql, scope, range.from), trend(sql, scope, 6)]);
@@ -191,34 +201,25 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         )}
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="card">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="h2">Theo đơn vị · {range.label}</h2>
-            <div className="flex gap-1 text-sm">
-              {[
-                ["thang", "Tháng"],
-                ["quy", "Quý"],
-                ["nam", "Năm"],
-              ].map(([k, l]) => (
-                <Link key={k} href={`/?ky=${k}`} className={`rounded-full border px-3 py-1 ${ky === k ? "border-slate-800 bg-slate-800 text-white" : "border-slate-300"}`}>
-                  {l}
-                </Link>
-              ))}
-            </div>
+      <section className="card">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="h2">Theo đơn vị · {range.label}</h2>
+          <div className="flex gap-1 text-sm">
+            {[
+              ["thang", "Tháng"],
+              ["quy", "Quý"],
+              ["nam", "Năm"],
+            ].map(([k, l]) => (
+              <Link key={k} href={`/?ky=${k}`} className={`rounded-full border px-3 py-1 ${ky === k ? "border-slate-800 bg-slate-800 text-white" : "border-slate-300"}`}>
+                {l}
+              </Link>
+            ))}
           </div>
-          <div className="mt-3">
-            <UnitBars rows={units} />
-          </div>
-        </section>
-        <section className="card">
-          <h2 className="h2">Tỷ lệ hoàn thành đúng hạn theo tháng</h2>
-          <p className="text-sm text-slate-500">Trong số việc có hạn rơi vào tháng, bao nhiêu việc xong trước hạn.</p>
-          <div className="mt-2">
-            <TrendLine points={tr} />
-          </div>
-        </section>
-      </div>
+        </div>
+        <div className="mt-3">
+          <UnitRateBars rows={units} months={tr} />
+        </div>
+      </section>
 
       <section className="card">
         <div className="flex items-center justify-between">
@@ -227,23 +228,48 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
             Chi tiết
           </Link>
         </div>
-        <p className="text-sm text-slate-500">Vạch đen là mức lẽ ra phải đạt đến kỳ này.</p>
-        <div className="mt-3 divide-y divide-slate-100">
-          {kpis.map((k) => (
-            <Link key={k.id} href={`/chi-tieu/${k.id}`} className="grid gap-1 py-2.5 sm:grid-cols-[1fr_220px_160px] sm:items-center sm:gap-4">
-              <div>
-                <div className="font-medium">{k.ten}</div>
-                <div className="text-sm text-slate-600">
-                  {fmtNum(k.thuc_hien)} / {fmtNum(k.ke_hoach_nam)} {k.don_vi_tinh} · {k.ten_don_vi || k.ten_phu_trach}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <KpiBar pct={k.pct} leRa={k.pct_le_ra} mau={k.mau} />
-                <span className="w-12 text-right text-sm font-semibold tabular-nums">{k.pct == null ? "–" : `${Math.round(k.pct)}%`}</span>
-              </div>
-              <KpiStatus mau={k.mau} />
-            </Link>
+        <p className="text-sm text-slate-500">Chỉ tiêu được xếp thành nhóm theo tiến độ so với mức lẽ ra phải đạt đến kỳ này (vạch đen trên thanh).</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {kpiGroups.map((g) => (
+            <a key={g.key} href={`#nhom-${g.key}`} className={`chip ${g.items.length ? g.chip : "border-slate-200 bg-white text-slate-400"}`}>
+              {g.icon} {g.label}: <b className="ml-1">{g.items.length}</b>
+            </a>
           ))}
+        </div>
+        <div className="mt-3 space-y-3">
+          {kpiGroups
+            .filter((g) => g.items.length)
+            .map((g) => (
+              <details key={g.key} id={`nhom-${g.key}`} open={g.open} className={`scroll-mt-20 rounded-xl border ${g.box}`}>
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
+                  <span className={`h-6 w-1.5 rounded-full ${g.bar}`} />
+                  <span className="font-bold text-slate-900">
+                    {g.icon} {g.label}
+                  </span>
+                  <span className="chip border-slate-200 bg-white text-slate-700">{g.items.length} chỉ tiêu</span>
+                  <span className="ml-auto text-sm text-slate-500">{g.note}</span>
+                </summary>
+                <div className="divide-y divide-slate-100 border-t border-slate-100 bg-white px-3">
+                  {g.items.map((k) => (
+                    <Link key={k.id} href={`/chi-tieu/${k.id}`} className="grid gap-1 py-2.5 sm:grid-cols-[1fr_240px_170px] sm:items-center sm:gap-4">
+                      <div>
+                        <div className="font-medium">{k.ten}</div>
+                        <div className="text-sm text-slate-600">
+                          {fmtNum(k.thuc_hien)} / {fmtNum(k.ke_hoach_nam)} {k.don_vi_tinh} · {k.ten_don_vi || k.ten_phu_trach}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <KpiBar pct={k.pct} leRa={k.pct_le_ra} mau={k.mau} />
+                        <span className="w-12 text-right text-sm font-semibold tabular-nums">{k.pct == null ? "–" : `${Math.round(k.pct)}%`}</span>
+                      </div>
+                      <span className="text-sm text-slate-600 sm:text-right">
+                        {k.chenh == null ? "Chưa có số liệu" : k.chenh >= 0 ? `Vượt ${Math.round(k.chenh)} điểm %` : `Chậm ${Math.round(-k.chenh)} điểm %`}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </details>
+            ))}
           {kpis.length === 0 && <p className="py-2 text-slate-500">Chưa có chỉ tiêu.</p>}
         </div>
       </section>

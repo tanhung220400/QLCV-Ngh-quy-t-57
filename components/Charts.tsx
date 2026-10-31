@@ -177,3 +177,113 @@ export function KpiCount({ mau, n }: { mau: string; n: number }) {
     </span>
   );
 }
+
+type UnitRateRow = UnitRow;
+type MonthPoint = { thang: string; ty_le: number | null; den_han: number; dung_han: number };
+
+/**
+ * Biểu đồ cột ngang theo đơn vị (toàn chiều rộng): cột chia theo trạng thái,
+ * số % trong cột là tỷ lệ hoàn thành đúng hạn của đơn vị (trên số việc đã đến hạn).
+ * Dải phía trên: tỷ lệ đúng hạn từng tháng của cả phạm vi đang xem.
+ */
+export function UnitRateBars({ rows, months }: { rows: UnitRateRow[]; months: MonthPoint[] }) {
+  const seg = [
+    { k: "dung_han", label: "Xong đúng hạn", color: STATUS.good },
+    { k: "tre_han", label: "Xong trễ hạn", color: STATUS.serious },
+    { k: "qua_han", label: "Đang quá hạn", color: STATUS.critical },
+    { k: "dang_lam", label: "Đang làm, còn hạn", color: "#c3c2b7" },
+  ] as const;
+  const total = (r: UnitRateRow) => r.dung_han + r.tre_han + r.qua_han + r.dang_lam;
+  const max = Math.max(1, ...rows.map(total));
+  const rate = (r: UnitRateRow) => {
+    const due = r.dung_han + r.tre_han + r.qua_han;
+    return due ? Math.round((r.dung_han / due) * 100) : null;
+  };
+  return (
+    <div>
+      {months.length > 0 && (
+        <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+          <div className="text-sm font-semibold text-slate-700">Tỷ lệ hoàn thành đúng hạn theo tháng (toàn bộ phạm vi đang xem)</div>
+          <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {months.map((m) => {
+              const v = m.ty_le == null ? null : Math.round(m.ty_le);
+              return (
+                <div key={m.thang} className="rounded-lg bg-white px-2.5 py-2 shadow-soft" title={`${m.dung_han}/${m.den_han} việc đến hạn xong đúng hạn`}>
+                  <div className="text-xs text-slate-500">Tháng {Number(m.thang.slice(5))}/{m.thang.slice(2, 4)}</div>
+                  <div className="text-lg leading-tight font-bold text-slate-900">{v == null ? "–" : `${v}%`}</div>
+                  <div className="mt-1 h-1.5 rounded-full bg-slate-200">
+                    <div className="h-full rounded-full" style={{ width: `${v ?? 0}%`, background: v == null ? "transparent" : v >= 80 ? STATUS.good : v >= 60 ? STATUS.warning : STATUS.critical }} />
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">
+                    {m.dung_han}/{m.den_han} việc
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
+        {seg.map((s) => (
+          <span key={s.k} className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: s.color }} />
+            {s.label}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block rounded-full border border-slate-300 bg-white px-1.5 text-[11px] font-bold text-slate-800">%</span>
+          Tỷ lệ xong đúng hạn của đơn vị (trên số việc đã đến hạn)
+        </span>
+      </div>
+      {!rows.length ? (
+        <p className="muted">Chưa có dữ liệu.</p>
+      ) : (
+        <div className="space-y-2.5">
+          {rows.map((r) => {
+            const t = total(r);
+            const share = t / max;
+            const p = rate(r);
+            const pill = (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white px-2 py-0.5 text-[13px] leading-5 font-bold whitespace-nowrap text-slate-900 shadow-soft"
+                title={p == null ? "Chưa có việc đến hạn" : `${r.dung_han} việc xong đúng hạn / ${r.dung_han + r.tre_han + r.qua_han} việc đã đến hạn`}
+              >
+                {p == null ? "–" : `${p}%`}
+                <span className="hidden font-medium text-slate-500 sm:inline">đúng hạn</span>
+              </span>
+            );
+            return (
+              <div key={r.ten} className="grid items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(9rem,15rem)_1fr_7.5rem]">
+                <a href={r.id ? `/viec?tab=tat_ca&don_vi=${r.id}` : "/viec?tab=tat_ca"} className="truncate font-medium text-slate-800 hover:underline" title={r.ten}>
+                  {r.ten}
+                </a>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex h-7 gap-[2px]" style={{ width: `${Math.max(3, share * 100)}%` }}>
+                    {seg.map((s, i) => {
+                      const v = r[s.k];
+                      if (!v) return null;
+                      const last = seg.slice(i + 1).every((x) => !r[x.k]);
+                      return (
+                        <div
+                          key={s.k}
+                          style={{ flexGrow: v, flexBasis: 0, background: s.color }}
+                          className={`h-full min-w-[3px] ${last ? "rounded-r-[4px]" : ""}`}
+                          title={`${s.label}: ${v}`}
+                        />
+                      );
+                    })}
+                    {share >= 0.3 && <span className="absolute top-1/2 right-1.5 -translate-y-1/2">{pill}</span>}
+                  </div>
+                  {share < 0.3 && pill}
+                </div>
+                <div className="text-sm text-slate-600 tabular-nums sm:text-right">
+                  {t} việc{r.qua_han > 0 && <b className="ml-1 text-slate-900">· {r.qua_han} quá hạn</b>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
