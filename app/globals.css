@@ -19,6 +19,10 @@
   --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.05), 0 8px 24px rgb(15 23 42 / 0.08);
 }
 
+:root {
+  --side-w: 288px;
+}
+
 /* Chữ to, dễ đọc cho người lớn tuổi */
 html {
   font-size: 16.5px;

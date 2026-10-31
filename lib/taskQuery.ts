@@ -17,7 +17,19 @@ export type TaskFilter = {
   han_tu?: string;
   han_den?: string;
   con?: string; // '1' = gồm cả việc con
+  /** năm cũ đã đóng gói: chỉ xem việc giao trong năm đó */
+  nam?: string;
 };
+
+/** Năm giao việc (theo giờ Việt Nam) */
+export const NAM_GIAO = "extract(year FROM cv.tao_luc AT TIME ZONE 'Asia/Ho_Chi_Minh')::int";
+
+/** Các năm cũ có công việc (để đóng gói thành mục “Công việc năm …”) */
+export async function oldYears(): Promise<number[]> {
+  const sql = await db();
+  const cur = Number(vnDate().slice(0, 4));
+  return (await sql`SELECT DISTINCT ${sql.unsafe(NAM_GIAO)} AS y FROM cong_viec cv WHERE ${sql.unsafe(NAM_GIAO)} < ${cur} ORDER BY 1 DESC`).map((r) => r.y as number);
+}
 
 export const TABS: { key: string; label: string }[] = [
   { key: "cua_toi", label: "Việc của tôi" },
@@ -67,6 +79,11 @@ export async function queryTasks(user: User, f: TaskFilter, limit = 300): Promis
   if (f.han_tu) conds.push(sql`cv.han >= ${fromVN(f.han_tu, "00:00")}`);
   if (f.han_den) conds.push(sql`cv.han <= ${fromVN(f.han_den, "23:59")}`);
   if (f.con !== "1" && tab !== "cua_toi") conds.push(sql`cv.id_cha IS NULL`);
+  // Đóng gói theo năm: mặc định chỉ hiện việc năm nay và việc năm cũ còn đang làm dở
+  const cur = Number(vnDate().slice(0, 4));
+  const nam = Number(f.nam);
+  if (nam && nam < cur) conds.push(sql`${sql.unsafe(NAM_GIAO)} = ${nam}`);
+  else conds.push(sql`(${sql.unsafe(NAM_GIAO)} >= ${cur} OR ${OPEN})`);
   const where = conds.reduce((a, b) => sql`${a} AND ${b}`);
   const rows = await sql`
     SELECT ${sql.unsafe(TASK_LIST_SELECT)} FROM ${sql.unsafe(TASK_LIST_FROM)}

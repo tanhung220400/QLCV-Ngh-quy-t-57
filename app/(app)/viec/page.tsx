@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { queryTasks, TABS, type TaskFilter } from "@/lib/taskQuery";
+import { queryTasks, oldYears, TABS, type TaskFilter } from "@/lib/taskQuery";
+import { ActionForm, Submit } from "@/components/ActionForm";
+import { bulkDeleteTasksAction } from "@/app/actions/task";
 import { getCatalog, getHolidays, getSettings } from "@/lib/settings";
 import { TaskCard } from "@/components/TaskCard";
 import { TRANG_THAI, UU_TIEN, KANBAN_COT } from "@/lib/const";
@@ -34,6 +36,10 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
     getCatalog("nguon_giao"),
   ]);
   const sql = await db();
+  const years = await oldYears();
+  const nam = years.includes(Number(sp.nam)) ? Number(sp.nam) : 0;
+  const admin = user.quyen.includes("qt.du_lieu");
+  const chon = admin && sp.chon === "1" && view === "ds";
   const units = await sql`SELECT id, ten FROM don_vi WHERE hoat_dong ORDER BY thu_tu, ten`;
   const people = await sql`SELECT id, ho_ten FROM nguoi_dung WHERE trang_thai = 'hoat_dong' AND vai_tro <> 'quan_tri' ORDER BY ho_ten`;
 
@@ -53,7 +59,7 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="h1">Công việc</h1>
+        <h1 className="h1">{nam ? `Công việc năm ${nam}` : "Công việc"}</h1>
         <div className="flex gap-2">
           {canCreateTask(user) && (
             <>
@@ -71,6 +77,25 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
       </div>
       {sp.moi && <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-emerald-800">Đã giao {sp.moi} việc.</p>}
       {sp.xoa && <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-emerald-800">Đã xóa công việc vào Thùng rác.</p>}
+
+      {nam > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+          <span>📦 Đang xem các công việc giao trong năm {nam} (đã đóng gói). Việc chưa xong vẫn hiện ở danh sách năm nay để tiếp tục theo dõi.</span>
+          <Link href={qs({ nam: "" })} className="font-semibold underline">
+            Về công việc năm nay
+          </Link>
+        </div>
+      )}
+      {years.length > 0 && !nam && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-slate-500">Lưu trữ:</span>
+          {years.map((y) => (
+            <Link key={y} href={qs({ nam: String(y) })} className="chip border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100">
+              📦 Công việc năm {y}
+            </Link>
+          ))}
+        </div>
+      )}
 
       <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1">
         {TABS.map((t) => (
@@ -97,6 +122,11 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
           {counts.do > 0 && <span className="ml-2 font-semibold text-red-700">· {counts.do} quá hạn</span>}
           {counts.vang > 0 && <span className="ml-2 font-semibold text-amber-700">· {counts.vang} sắp đến hạn</span>}
         </span>
+        {admin && view === "ds" && (
+          <Link href={qs({ chon: chon ? "" : "1" })} className={`btn btn-sm ${chon ? "btn-danger-soft" : "btn-outline"}`}>
+            {chon ? "Thôi chọn" : "Chọn nhiều để xóa"}
+          </Link>
+        )}
         {user.quyen.includes("cv.xuat") && (
           <a href={`/api/xuat/viec?${new URLSearchParams({ ...sp, tab }).toString()}`} className="btn btn-outline btn-sm ml-auto">
             Xuất Excel
@@ -109,6 +139,7 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
         <form className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" action="/viec">
           <input type="hidden" name="tab" value={tab} />
           <input type="hidden" name="xem" value={view} />
+          {nam > 0 && <input type="hidden" name="nam" value={nam} />}
           <input name="q" defaultValue={sp.q} placeholder="Tên việc, số hiệu văn bản, cuộc họp" className="input sm:col-span-2" />
           <select name="trang_thai" defaultValue={sp.trang_thai || ""} className="input">
             <option value="">Mọi trạng thái (trừ Hủy)</option>
@@ -188,6 +219,25 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
         />
       ) : tasks.length === 0 ? (
         <div className="card text-center text-slate-500">Không có công việc nào.</div>
+      ) : chon ? (
+        <ActionForm action={bulkDeleteTasksAction} confirm="Xóa các công việc đã chọn (kèm việc con)? Có thể khôi phục trong Thùng rác." className="space-y-3">
+          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-red-800">Đánh dấu ô vuông ở góc các việc cần xóa (việc giao sai, không cần thực hiện nữa), rồi bấm “Xóa các việc đã chọn” ở cuối trang.</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            {tasks.map((t) => (
+              <div key={t.id} className="relative">
+                <TaskCard t={t} holidays={holidays} nguong={cfg.nguong_vang} />
+                <label className="absolute top-2 right-2 flex cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-white/95 px-2 py-1 text-sm font-semibold text-red-700 shadow-soft">
+                  <input type="checkbox" name="chon" value={t.id} className="h-5 w-5 accent-red-600" aria-label={`Chọn xóa: ${t.ten}`} />
+                  Xóa
+                </label>
+              </div>
+            ))}
+          </div>
+          <div className="sticky bottom-20 z-10 flex flex-wrap gap-2 rounded-2xl border border-red-200 bg-white p-3 shadow-lift lg:bottom-4">
+            <input name="ly_do" className="input max-w-sm flex-1" placeholder="Lý do xóa (không bắt buộc)" />
+            <Submit className="btn btn-danger">Xóa các việc đã chọn</Submit>
+          </div>
+        </ActionForm>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {tasks.map((t) => (

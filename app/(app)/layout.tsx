@@ -11,6 +11,7 @@ import { menuTree, type MenuNode } from "@/lib/modules";
 import { getSettings } from "@/lib/settings";
 import { getTheme, themeImageUrl } from "@/lib/theme";
 import { Welcome } from "@/components/Welcome";
+import { oldYears } from "@/lib/taskQuery";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     getTheme(sql),
   ]);
   const unread = unreadRow[0].n as number;
+  // Công việc các năm cũ được đóng gói thành mục con của “Công việc”
+  const years = await oldYears();
+  const nav = tree.map(slim);
+  if (years.length) {
+    const find = (ns: NavNode[]): NavNode | undefined => ns.map((n) => (n.href === "/viec" ? n : find(n.con))).find(Boolean);
+    const cv = find(nav);
+    if (cv) cv.con.push(...years.map((y) => ({ id: -y, ten: `Công việc năm ${y}`, href: `/viec?nam=${y}`, icon: "folder", mau: "amber", loai: "lien_ket", con: [] })));
+  }
 
   after(async () => {
     try {
@@ -58,8 +67,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-dvh">
       <Welcome img={themeImageUrl("chao", theme.chao_v)} tenXa={cfg.ten_don_vi || "UBND xã"} hoTen={user.ho_ten} bat={theme.chao_bat} />
-      <Nav tree={tree.map(slim)} unread={unread} me={me} />
-      <div className="lg:pl-72">
+      <Nav tree={nav} unread={unread} me={me} />
+      <div className="lg:pl-(--side-w)">
         <main className="mx-auto max-w-6xl px-3 pt-5 pb-28 sm:px-5 lg:pb-12">
           {user.uy_quyen_tu.length > 0 && (
             <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-indigo-900">Bạn đang được ủy quyền xử lý công việc thay cho {user.uy_quyen_tu.length} người.</div>

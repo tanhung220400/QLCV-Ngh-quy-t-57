@@ -34,11 +34,26 @@ function Tile({ icon, mau, size = "sm" }: { icon: string; mau: string; size?: "s
   );
 }
 
+/** Màu ký hiệu module (không nền): sáng trên nền menu tối, đậm trên nền trắng */
+const TONE: Record<string, { dark: string; light: string }> = {
+  blue: { dark: "text-sky-300", light: "text-blue-600" },
+  sky: { dark: "text-sky-300", light: "text-sky-600" },
+  teal: { dark: "text-teal-300", light: "text-teal-600" },
+  emerald: { dark: "text-emerald-300", light: "text-emerald-600" },
+  amber: { dark: "text-amber-300", light: "text-amber-600" },
+  orange: { dark: "text-orange-300", light: "text-orange-600" },
+  rose: { dark: "text-rose-300", light: "text-rose-600" },
+  violet: { dark: "text-violet-300", light: "text-violet-600" },
+  indigo: { dark: "text-indigo-300", light: "text-indigo-600" },
+  slate: { dark: "text-slate-200", light: "text-slate-600" },
+};
+const tone = (mau: string, dark: boolean) => (TONE[mau] || TONE.blue)[dark ? "dark" : "light"];
+
 function NavLink({ n, depth, unread, onClick, dark }: { n: NavNode; depth: number; unread: number; onClick?: () => void; dark?: boolean }) {
   const active = useActive();
   const on = active(n.href);
   const ext = n.href.startsWith("http");
-  const tone = dark
+  const cls = dark
     ? on
       ? "bg-white text-brand-800 shadow-lift"
       : "text-white hover:bg-white/12"
@@ -51,10 +66,15 @@ function NavLink({ n, depth, unread, onClick, dark }: { n: NavNode; depth: numbe
         href={n.href}
         onClick={onClick}
         target={ext ? "_blank" : undefined}
-        className={`group flex items-center gap-3 rounded-xl py-1.5 pr-2 font-semibold transition ${depth ? "pl-7 text-[15px] font-medium" : "pl-2"} ${tone}`}
+        title={n.ten}
+        className={`group flex items-center gap-3 rounded-xl py-2 pr-2 font-semibold transition ${depth ? "pl-8 text-[15px] font-medium" : "pl-2.5"} ${cls}`}
       >
-        {depth ? <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${on ? "bg-brand-600" : dark ? "bg-white/60" : "bg-slate-300"}`} /> : <Tile icon={n.icon} mau={n.mau} />}
-        <span className={`min-w-0 flex-1 truncate ${dark && !on ? "[text-shadow:0_1px_2px_rgb(0_0_0/0.35)]" : ""}`}>{n.ten}</span>
+        {depth ? (
+          <Icon name={n.icon} className={`h-[18px] w-[18px] shrink-0 ${tone(n.mau, !!dark && !on)}`} />
+        ) : (
+          <Icon name={n.icon} className={`h-[22px] w-[22px] shrink-0 ${tone(n.mau, !!dark && !on)}`} strokeWidth={2} />
+        )}
+        <span className={`line-clamp-2 min-w-0 flex-1 leading-snug ${dark && !on ? "[text-shadow:0_1px_2px_rgb(0_0_0/0.35)]" : ""}`}>{n.ten}</span>
         {n.href === "/thong-bao" && unread > 0 && <span className="rounded-full bg-red-500 px-2 text-xs leading-5 font-semibold text-white">{unread}</span>}
         {ext && <Icon name="link" className={`h-4 w-4 ${dark && !on ? "text-white/60" : "text-slate-400"}`} />}
       </Link>
@@ -125,6 +145,70 @@ function MenuList({ tree, unread, onClick, dark }: { tree: NavNode[]; unread: nu
   );
 }
 
+const SIDE_KEY = "qlcv_side_w";
+const SIDE_MIN = 220;
+const SIDE_MAX = 440;
+const SIDE_DEF = 288;
+const setSide = (w: number) => document.documentElement.style.setProperty("--side-w", `${w}px`);
+
+/** Thanh kéo ở mép phải cột menu: kéo để đổi độ rộng, bấm đúp để về mặc định */
+function Resizer() {
+  const [w, setW] = useState(SIDE_DEF);
+  const [drag, setDrag] = useState(false);
+  useEffect(() => {
+    try {
+      const v = Number(localStorage.getItem(SIDE_KEY));
+      if (v >= SIDE_MIN && v <= SIDE_MAX) {
+        setW(v);
+        setSide(v);
+      }
+    } catch {}
+  }, []);
+  const apply = (v: number, save = true) => {
+    const x = Math.round(Math.min(SIDE_MAX, Math.max(SIDE_MIN, v)));
+    setW(x);
+    setSide(x);
+    if (save)
+      try {
+        localStorage.setItem(SIDE_KEY, String(x));
+      } catch {}
+  };
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Kéo để đổi độ rộng cột menu"
+      aria-valuemin={SIDE_MIN}
+      aria-valuemax={SIDE_MAX}
+      aria-valuenow={w}
+      tabIndex={0}
+      title="Kéo để đổi độ rộng cột menu (bấm đúp để về mặc định)"
+      data-resizer
+      className={`group absolute inset-y-0 right-0 z-20 w-2 cursor-col-resize touch-none outline-none ${drag ? "bg-amber-300/60" : "hover:bg-white/25 focus-visible:bg-amber-300/60"}`}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        setDrag(true);
+        document.body.style.userSelect = "none";
+      }}
+      onPointerMove={(e) => drag && apply(e.clientX, false)}
+      onPointerUp={(e) => {
+        if (!drag) return;
+        setDrag(false);
+        document.body.style.userSelect = "";
+        apply(e.clientX);
+      }}
+      onDoubleClick={() => apply(SIDE_DEF)}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft") apply(w - 16);
+        if (e.key === "ArrowRight") apply(w + 16);
+      }}
+    >
+      <span className="pointer-events-none absolute top-1/2 right-0.5 h-10 w-1 -translate-y-1/2 rounded-full bg-white/40 opacity-0 transition group-hover:opacity-100" />
+    </div>
+  );
+}
+
 /** Số trang đã đi qua trong phiên (để biết có trang trước trong phần mềm hay không) */
 let visited = 0;
 
@@ -168,7 +252,8 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
   return (
     <>
       {/* Thanh bên trên máy tính: ảnh nền + lớp phủ màu để tên module luôn rõ */}
-      <aside className="side-bg no-print fixed inset-y-0 left-0 z-30 hidden w-72 flex-col overflow-hidden text-white lg:flex">
+      <aside className="side-bg no-print fixed inset-y-0 left-0 z-30 hidden w-(--side-w) flex-col overflow-hidden text-white lg:flex">
+        <script dangerouslySetInnerHTML={{ __html: `try{var w=+localStorage.getItem("${SIDE_KEY}");if(w>=${SIDE_MIN}&&w<=${SIDE_MAX})document.documentElement.style.setProperty("--side-w",w+"px")}catch(e){}` }} />
         {me.menuImg && <div className="side-bg-img" style={{ backgroundImage: `url(${me.menuImg})` }} />}
         <div className="side-shade" style={{ ["--phu" as string]: me.menuImg ? me.phu : 0.15 }} />
         <Link href="/" className="relative flex items-center gap-3 border-b border-white/10 px-5 pt-5 pb-4">
@@ -185,22 +270,23 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
         </nav>
         <div className="relative space-y-0.5 border-t border-white/10 bg-black/10 p-3">
           {me.admin && (
-            <Link href="/quan-tri" className={`flex items-center gap-3 rounded-xl px-2 py-1.5 font-semibold ${active("/quan-tri") ? "bg-white text-brand-800" : "text-white hover:bg-white/12"}`}>
-              <Tile icon="cog" mau="slate" />
+            <Link href="/quan-tri" className={`flex items-center gap-3 rounded-xl px-2.5 py-2 font-semibold ${active("/quan-tri") ? "bg-white text-brand-800" : "text-white hover:bg-white/12"}`}>
+              <Icon name="cog" className="h-[22px] w-[22px]" />
               Quản trị hệ thống
             </Link>
           )}
           <form action={logoutAction}>
-            <button className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 font-semibold text-white hover:bg-red-500/25">
-              <Tile icon="logout" mau="rose" />
+            <button className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 font-semibold text-white hover:bg-red-500/25">
+              <Icon name="logout" className="h-[22px] w-[22px] text-rose-300" />
               Đăng xuất
             </button>
           </form>
         </div>
+        <Resizer />
       </aside>
 
       {/* Thanh trên cùng */}
-      <header className="no-print sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur lg:ml-72">
+      <header className="no-print sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur lg:ml-(--side-w)">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-5">
           <BackButton />
           <Link href="/" className={`items-center gap-2 lg:hidden ${path === "/" ? "flex" : "hidden sm:flex"}`}>

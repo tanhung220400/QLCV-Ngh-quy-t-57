@@ -493,6 +493,49 @@ const day = (n) => {
   ok("nút Quay lại về trang trước", true);
   await page.goto(BASE + "/m/to-cong-nghe-so/moi", { waitUntil: "networkidle" });
   ok("có nút Quay lại ở trang con", (await page.locator('button:has-text("Quay lại")').count()) === 1);
+  // Ký hiệu module không có nền ô
+  ok("ký hiệu module trong menu không có nền", (await page.locator("aside nav a span.ring-1").count()) === 0);
+  // Kéo đổi độ rộng cột menu
+  const rz = page.locator("aside [data-resizer]");
+  const bb = await rz.boundingBox();
+  await page.mouse.move(bb.x + 3, bb.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(bb.x + 60, bb.y + 300, { steps: 5 });
+  await page.mouse.move(bb.x + 95, bb.y + 300, { steps: 5 });
+  await page.mouse.up();
+  const w1 = (await page.locator("aside").boundingBox()).width;
+  ok("kéo đổi độ rộng cột menu", w1 > 360 && w1 < 400, `rộng ${w1}`);
+  const mainX = (await page.locator("main").boundingBox()).x;
+  ok("nội dung dịch theo cột menu", mainX >= w1 - 1, `main x ${mainX}`);
+  await page.reload({ waitUntil: "networkidle" });
+  ok("nhớ độ rộng cột menu", Math.abs((await page.locator("aside").boundingBox()).width - w1) < 2);
+  await page.dblclick("aside [data-resizer]");
+  ok("bấm đúp về độ rộng mặc định", Math.abs((await page.locator("aside").boundingBox()).width - 288) < 2);
+  // Admin xóa nhiều việc giao sai
+  await page.goto(BASE + "/viec?tab=tat_ca&chon=1&q=" + encodeURIComponent("Kiểm thử nhập nhanh"), { waitUntil: "networkidle" });
+  const boxes = page.locator('input[name="chon"]');
+  ok("chế độ chọn nhiều để xóa", (await boxes.count()) === 2, `${await boxes.count()} ô`);
+  await boxes.nth(0).check();
+  await boxes.nth(1).check();
+  await page.click('button:has-text("Xóa các việc đã chọn")');
+  await page.waitForSelector("text=Đã xóa 2 công việc vào Thùng rác.");
+  const after = await check(page, "/viec?tab=tat_ca&q=" + encodeURIComponent("Kiểm thử nhập nhanh"), "sau xóa nhiều");
+  ok("admin xóa nhiều công việc", !after.includes("Kiểm thử nhập nhanh việc A"));
+  // Đóng gói công việc năm cũ
+  const curY = Number(day(0).slice(0, 4));
+  require("child_process").execSync(`psql -h 127.0.0.1 -U postgres -d qlcv -c "UPDATE cong_viec SET tao_luc = make_timestamptz(${curY - 1}, 11, 20, 8, 0, 0, 'Asia/Ho_Chi_Minh') WHERE ten = 'Tổng hợp số liệu thu ngân sách quý III'"`);
+  const curList = await check(page, "/viec?tab=tat_ca&trang_thai=hoan_thanh", "năm nay");
+  ok("danh sách năm nay không còn việc năm cũ", !curList.includes("Tổng hợp số liệu thu ngân sách quý III"));
+  ok("menu có mục Công việc năm cũ", (await page.locator("aside").innerText()).includes(`Công việc năm ${curY - 1}`));
+  const oldList = await check(page, `/viec?tab=tat_ca&nam=${curY - 1}`, "năm cũ");
+  ok("mục Công việc năm cũ chứa việc năm cũ", oldList.includes("Tổng hợp số liệu thu ngân sách quý III") && oldList.includes(`Công việc năm ${curY - 1}`));
+  // Nút sửa/xóa nổi bật ở trang chi tiết
+  await page.goto(BASE + "/viec?tab=tat_ca", { waitUntil: "networkidle" });
+  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại thôn");
+  await page.waitForURL(/\/viec\/\d+$/, { waitUntil: "commit" });
+  await page.click('a:has-text("✎ Sửa")');
+  await page.waitForSelector('button:has-text("Lưu (quản trị)")', { state: "visible" });
+  ok("nút Sửa mở ngay khung sửa toàn bộ", true);
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
   ok("trang chủ không có nút Quay lại", (await page.locator('button:has-text("Quay lại")').count()) === 0);
   await ctx.close();

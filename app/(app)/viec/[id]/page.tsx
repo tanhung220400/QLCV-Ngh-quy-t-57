@@ -121,6 +121,16 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
           <StatusChip s={t.trang_thai} />
           <DueChip t={t as never} holidays={holidays} nguong={cfg.nguong_vang} />
           {t.dinh_ky && <span className="chip border-slate-300 bg-white">{DINH_KY[t.dinh_ky]}</span>}
+          {p.admin && (
+            <span className="no-print ml-auto flex gap-2">
+              <a href="?qt=sua#quan-tri" className="btn btn-soft btn-sm">
+                ✎ Sửa
+              </a>
+              <a href="?qt=xoa#quan-tri" className="btn btn-danger-soft btn-sm">
+                🗑 Xóa
+              </a>
+            </span>
+          )}
         </div>
         <h1 className="mt-2 text-2xl leading-snug font-bold break-words">{t.ten}</h1>
         {t.mo_ta && <p className="mt-2 whitespace-pre-line text-slate-700">{t.mo_ta}</p>}
@@ -293,7 +303,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
         )}
 
         {p.admin && adminData && (
-          <details className="card border-violet-200">
+          <details id="quan-tri" className="card scroll-mt-20 border-violet-200" open={!!sp.qt}>
             <summary className="h2 cursor-pointer text-violet-800">Quản trị dữ liệu: sửa toàn bộ, xóa</summary>
             <p className="mt-1 text-sm text-slate-500">Dành cho tài khoản có quyền quản trị dữ liệu. Mọi thay đổi được ghi nhật ký.</p>
             <ActionForm action={taskAction} className="mt-3 space-y-3">

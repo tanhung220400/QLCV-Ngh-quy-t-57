@@ -551,3 +551,24 @@ export async function markNotificationsRead(ids?: number[]) {
   if (ids?.length) await sql`UPDATE thong_bao SET da_doc = TRUE WHERE id_nguoi_nhan = ${user.id} AND id IN ${sql(ids)}`;
   else await sql`UPDATE thong_bao SET da_doc = TRUE WHERE id_nguoi_nhan = ${user.id}`;
 }
+
+/** Quản trị dữ liệu: xóa nhiều công việc cùng lúc (vào thùng rác, kèm việc con) */
+export async function bulkDeleteTasksAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getUser();
+  if (!user || !user.quyen.includes("qt.du_lieu")) return { error: "Chỉ quản trị dữ liệu mới xóa được công việc." };
+  const ids = [...new Set(fd.getAll("chon").map(Number).filter(Boolean))];
+  if (!ids.length) return { error: "Chưa chọn công việc nào." };
+  const ly_do = str(fd, "ly_do") || null;
+  const sql = await db();
+  let n = 0;
+  await sql.begin(async (tx) => {
+    for (const id of ids) {
+      const t = (await tx`SELECT id_cha FROM cong_viec WHERE id = ${id}`)[0];
+      if (!t) continue; // đã bị xóa theo việc cha
+      await trashTask(tx, id, user.id, ly_do);
+      if (t.id_cha && !ids.includes(t.id_cha)) await recomputePercent(tx, t.id_cha);
+      n++;
+    }
+  });
+  return { ok: true, message: `Đã xóa ${n} công việc vào Thùng rác.` };
+}
