@@ -57,7 +57,7 @@ export default async function ModuleEdit({ params, searchParams }: { params: Pro
               <h2 className="h2">Trường dữ liệu ({fields.length})</h2>
               <p className="mb-2 text-sm text-slate-500">Bấm vào trường để sửa. Trường đầu tiên được dùng làm tiêu đề bản ghi.</p>
               <FieldList fields={fields} idMoDun={id} />
-              <details className="mt-3 rounded-xl border border-dashed border-brand-200 p-3" open={fields.length === 0}>
+              <details className="mt-3 rounded-xl border border-dashed border-brand-200 p-3" open={fields.length === 0 || !!sp.moi}>
                 <summary className="cursor-pointer font-semibold text-brand-700">+ Thêm trường</summary>
                 <div className="mt-2">
                   <FieldForm idMoDun={id} />
