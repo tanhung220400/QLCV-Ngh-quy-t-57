@@ -39,6 +39,8 @@ export function ActionForm({
       id={id}
       ref={ref}
       className={className}
+      // Gửi được cả khi trang chưa tải xong JavaScript (điện thoại mạng chậm)
+      action={formAction}
       onSubmit={(e) => {
         e.preventDefault();
         if (pending) return;
