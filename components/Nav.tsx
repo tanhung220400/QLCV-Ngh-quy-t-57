@@ -58,6 +58,24 @@ function readMo(): Record<string, boolean> {
   }
 }
 
+/** Trạng thái mở/đóng mục con: nhớ trên máy; đang ở trang con thì luôn mở */
+function useMo(id: number, childOn: boolean): [boolean, () => void] {
+  const [mo, setMo] = useState(childOn);
+  useEffect(() => {
+    const v = readMo()[id];
+    if (childOn) setMo(true);
+    else if (v !== undefined) setMo(v);
+  }, [id, childOn]);
+  const toggle = () =>
+    setMo((cu) => {
+      try {
+        localStorage.setItem(MO_KEY, JSON.stringify({ ...readMo(), [id]: !cu }));
+      } catch {}
+      return !cu;
+    });
+  return [mo, toggle];
+}
+
 function NavLink({ n, depth, unread, onClick, dark }: { n: NavNode; depth: number; unread: number; onClick?: () => void; dark?: boolean }) {
   const active = useActive();
   const on = active(n.href);
@@ -65,20 +83,7 @@ function NavLink({ n, depth, unread, onClick, dark }: { n: NavNode; depth: numbe
   const kids = depth < 2 ? n.con : [];
   const hasActive = (x: NavNode): boolean => x.con.some((c) => active(c.href) || hasActive(c));
   const childOn = kids.length > 0 && hasActive(n);
-  // mở/đóng module con: nhớ lựa chọn trên máy; đang ở trang con thì luôn mở
-  const [mo, setMo] = useState(childOn);
-  useEffect(() => {
-    const v = readMo()[n.id];
-    if (childOn) setMo(true);
-    else if (v !== undefined) setMo(v);
-  }, [n.id, childOn]);
-  const toggle = () => {
-    const v = !mo;
-    setMo(v);
-    try {
-      localStorage.setItem(MO_KEY, JSON.stringify({ ...readMo(), [n.id]: v }));
-    } catch {}
-  };
+  const [mo, toggle] = useMo(n.id, childOn);
   const cls = dark
     ? on
       ? "bg-white text-brand-800 shadow-lift"
@@ -139,21 +144,32 @@ const NHAN: Record<string, { bar: string; text: string; soft: string }> = {
   slate: { bar: "bg-slate-300", text: "text-slate-700", soft: "bg-slate-50 border-slate-200" },
 };
 
-function GroupTitle({ n, dark }: { n: NavNode; dark?: boolean }) {
+/** Nhóm menu: tiêu đề bấm được, mũi tên mở/đóng các mục bên trong */
+function NavGroup({ n, unread, onClick, dark }: { n: NavNode; unread: number; onClick?: () => void; dark?: boolean }) {
+  const active = useActive();
+  const hasActive = (x: NavNode): boolean => x.con.some((c) => active(c.href) || hasActive(c));
+  const [mo, toggle] = useMo(n.id, hasActive(n));
   const c = NHAN[n.mau] || NHAN.blue;
-  if (dark)
-    return (
-      <div className="mb-1.5 flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-2.5 py-2 backdrop-blur-sm">
-        <span className={`h-6 w-1.5 shrink-0 rounded-full ${c.bar}`} />
-        <Icon name={n.icon} className="h-5 w-5 shrink-0 text-white" />
-        <span className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide text-white uppercase [text-shadow:0_1px_3px_rgb(0_0_0/0.45)]">{n.ten}</span>
-      </div>
-    );
   return (
-    <div className={`mb-1.5 flex items-center gap-2.5 rounded-xl border px-2.5 py-2 ${c.soft}`}>
-      <span className={`h-6 w-1.5 shrink-0 rounded-full ${c.bar}`} />
-      <Icon name={n.icon} className={`h-5 w-5 shrink-0 ${c.text}`} />
-      <span className={`min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide uppercase ${c.text}`}>{n.ten}</span>
+    <div>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={mo}
+        aria-label={mo ? `Thu gọn ${n.ten}` : `Mở ${n.ten}`}
+        title={mo ? "Thu gọn" : `Xem ${n.con.length} mục`}
+        className={`mb-1.5 flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${dark ? "border-white/15 bg-white/10 backdrop-blur-sm hover:bg-white/18" : `${c.soft} hover:brightness-[0.98]`}`}
+      >
+        <span className={`h-6 w-1.5 shrink-0 rounded-full ${c.bar}`} />
+        <Icon name={n.icon} className={`h-5 w-5 shrink-0 ${dark ? "text-white" : c.text}`} />
+        <span className={`min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide uppercase ${dark ? "text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.45)]" : c.text}`}>{n.ten}</span>
+        <Icon name="chevron" className={`h-[18px] w-[18px] shrink-0 transition-transform ${mo ? "rotate-90" : ""} ${dark ? "text-white/85" : c.text}`} />
+      </button>
+      <div hidden={!mo} className="space-y-0.5">
+        {n.con.map((x) => (
+          <NavLink key={x.id} n={x} depth={0} unread={unread} onClick={onClick} dark={dark} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -163,14 +179,7 @@ function MenuList({ tree, unread, onClick, dark }: { tree: NavNode[]; unread: nu
     <div className="space-y-5">
       {tree.map((n) =>
         n.loai === "nhom" ? (
-          <div key={n.id}>
-            <GroupTitle n={n} dark={dark} />
-            <div className="space-y-0.5">
-              {n.con.map((c) => (
-                <NavLink key={c.id} n={c} depth={0} unread={unread} onClick={onClick} dark={dark} />
-              ))}
-            </div>
-          </div>
+          <NavGroup key={n.id} n={n} unread={unread} onClick={onClick} dark={dark} />
         ) : (
           <div key={n.id} className="space-y-0.5">
             <NavLink n={n} depth={0} unread={unread} onClick={onClick} dark={dark} />

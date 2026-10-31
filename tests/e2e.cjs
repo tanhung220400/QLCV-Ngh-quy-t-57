@@ -846,6 +846,15 @@ const day = (n) => {
     await page.locator('#them form button:has-text("Tạo module")').click();
     await page.waitForURL(/quan-tri\/mo-dun\/\d+\?moi=1/, { waitUntil: "commit" });
     await page.goto(BASE + "/", { waitUntil: "networkidle" });
+    // nhóm menu: nhóm đang xem mở sẵn, nhóm khác thu gọn, bấm tiêu đề để mở
+    ok("nhóm Điều hành mở sẵn khi ở Tổng quan", await page.locator('aside a[title="Tổng quan"]').isVisible() && (await page.locator('aside button[aria-label="Thu gọn Điều hành"]').count()) === 1);
+    const ctbc = page.locator('aside a[title="Đánh giá KPI"]');
+    ok("nhóm Chỉ tiêu & báo cáo thu gọn, có mũi tên", !(await ctbc.isVisible()) && (await page.locator('aside button[aria-label="Mở Chỉ tiêu & báo cáo"]').count()) === 1);
+    await page.click('aside button[aria-label="Mở Chỉ tiêu & báo cáo"]');
+    ok("bấm tiêu đề nhóm để xổ xuống", await ctbc.isVisible());
+    await page.click('aside button[aria-label="Mở Quản lý địa bàn"]');
+    ok("nhóm Quản lý địa bàn xổ xuống", await page.locator('aside a[title="Hộ kinh doanh cá thể"]').isVisible());
+    await page.click('aside button[aria-label="Mở Nhóm kiểm thử chính"]');
     const nut = page.locator('aside button[aria-label="Mở Con A kiểm thử"]');
     const chau = page.locator('aside a[title="Cháu kiểm thử"]');
     ok("module con thu gọn, có mũi tên xổ xuống", (await nut.count()) === 1 && !(await chau.isVisible()));
