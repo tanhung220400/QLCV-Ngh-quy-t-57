@@ -768,9 +768,9 @@ const day = (n) => {
   ok("công chức không có mục Giao việc", !(await (async () => {
     ({ ctx, page } = await newPage({ width: 1280, height: 800 }));
     await login(page, "cv.kinhte1");
-    const a = await page.locator("aside").innerText();
+    const a = await page.locator('aside a[href="/viec/moi"]').count();
     await ctx.close();
-    return a.includes("Giao việc mới");
+    return a > 0;
   })()));
   // chủ tịch giao cho trưởng phòng; trưởng phòng không giao ngược lại cho chủ tịch qua việc con
   ({ ctx, page } = await newPage({ width: 1280, height: 800 }));
