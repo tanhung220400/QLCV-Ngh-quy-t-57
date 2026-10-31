@@ -707,6 +707,84 @@ const day = (n) => {
   ok("tác vụ quét hạn", cron.status() === 200, await cron.text());
   await ctx.close();
 
+  // 17. Cán bộ: chức vụ Đảng, chính quyền, kiêm nhiệm, BCĐ, Tổ giúp việc; giao việc cấp 1 / cấp 2
+  {
+    const ExcelJS = require("/vercel/app/node_modules/exceljs");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("x");
+    ws.addRow(["Họ và tên", "Chức vụ trong Đảng", "Chức vụ chính quyền", "Đơn vị chính", "Chức vụ kiêm nhiệm", "Đơn vị kiêm nhiệm", "Chức danh Ban chỉ đạo", "Chức danh Tổ giúp việc", "Số điện thoại"]);
+    ws.addRow(["Kiểm Thử Trưởng", "ĐUV", "Trưởng phòng", "Phòng Kinh tế", null, null, null, "Tổ phó", null]);
+    ws.addRow(["Kiểm Thử Phó", null, "Phó Trường Phòng", "Phòng Kinh tế", null, null, null, null, null]);
+    ws.addRow(["Kiểm Thử Viên", null, "Chuyên viên", "Phòng Kinh tế", "Bí thư", "Đoàn phường", "Ủy viên", "Thành viên", "0912 000 111"]);
+    ws.addRow(["Hoàng Văn Khánh", "UV BTVĐU", "Trưởng phòng", "Phòng Kinh tế", null, null, null, null, null]);
+    await wb.xlsx.writeFile("/tmp/can-bo.xlsx");
+  }
+  ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
+  await page.goto(BASE + "/dang-nhap");
+  await page.fill('input[name="ten_dang_nhap"]', "quantri");
+  await page.fill('input[name="mat_khau"]', "Quantri@2026");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+  await page.goto(BASE + "/quan-tri?muc=nguoi_dung");
+  await page.setInputFiles('form:has(button:has-text("Nhập")) input[name="file"]', "/tmp/can-bo.xlsx");
+  await page.click('form:has(input[name="file"]) button:has-text("Nhập")');
+  await page.waitForSelector("text=Đã tạo 3 tài khoản", { timeout: 20000 });
+  const msg = await page.locator("main").innerText();
+  ok("nhập danh sách cán bộ theo mẫu mới", /cập nhật 1 tài khoản/.test(msg) && /thêm 1 đơn vị \(Đoàn phường\)/.test(msg), msg.slice(0, 300));
+  await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=" + encodeURIComponent("Kiểm Thử"));
+  const ds = await page.locator("main table").innerText();
+  ok("danh sách cán bộ có kiêm nhiệm, Đảng, BCĐ, Tổ giúp việc", ds.includes("Kiêm nhiệm: Bí thư · Đoàn phường") && ds.includes("Đảng ủy viên") && ds.includes("BCĐ: Ủy viên") && ds.includes("Tổ giúp việc: Thành viên"), ds.slice(0, 400));
+  ok("chuẩn hóa chức vụ viết tắt / sai chính tả", ds.includes("Phó Trưởng phòng"));
+  ok("vai trò, quyền giao việc theo chức vụ", /Kiểm Thử Trưởng[\s\S]*Trưởng đơn vị[\s\S]*Giao việc cấp 2/.test(ds));
+  // sửa cán bộ có đủ ô chọn
+  await page.click("tr:has-text('Kiểm Thử Viên') a:has-text('Sửa')");
+  await page.waitForSelector('select[name="chuc_vu_kiem_nhiem"]');
+  const kn = await page.locator('select[name="chuc_vu_kiem_nhiem"]').inputValue();
+  const bcd = await page.locator('select[name="chuc_danh_bcd"]').inputValue();
+  ok("biểu mẫu cán bộ có chức vụ kiêm nhiệm, BCĐ", kn === "Bí thư" && bcd === "Ủy viên", `${kn} / ${bcd}`);
+  await page.selectOption('select[name="chuc_danh_tgv"]', "Tổ phó");
+  await page.click('button:has-text("Lưu thay đổi")');
+  await page.waitForSelector("text=Đã lưu.");
+  await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=" + encodeURIComponent("Kiểm Thử Viên"));
+  ok("lưu chức danh Tổ giúp việc", (await page.locator("main table").innerText()).includes("Tổ giúp việc: Tổ phó"));
+  await page.goto(BASE + "/quan-tri?muc=danh_muc&loai=chuc_vu");
+  ok("danh mục chức vụ, chức danh", (await page.locator("main").innerText()).includes("Chức danh Tổ giúp việc"));
+  await ctx.close();
+  const nguoiChon = async (u) => {
+    ({ ctx, page } = await newPage({ width: 1280, height: 800 }));
+    await login(page, u);
+    await page.goto(BASE + "/viec/moi");
+    const t = await page.locator('select[name="phoi_hop"] option').allInnerTexts();
+    await ctx.close();
+    return t.join(" | ");
+  };
+  const tp = await nguoiChon("tp.kinhte");
+  ok("cấp 2: giao cho cán bộ trong đơn vị", tp.includes("Vũ Thị Lan") && tp.includes("Kiểm Thử Phó"), tp);
+  ok("cấp 2: không giao lên chủ tịch, phó chủ tịch, đơn vị khác", !tp.includes("Trần Thị Châu") && !tp.includes("Lê Văn Phúc") && !tp.includes("Bùi Thị Mai"), tp);
+  const pct = await nguoiChon("pct.kinhte");
+  ok("cấp 1: phó chủ tịch không giao lên chủ tịch, bí thư", !pct.includes("Trần Thị Châu") && !pct.includes("Nguyễn Văn Bình") && pct.includes("Hoàng Văn Khánh"), pct);
+  const ct = await nguoiChon("chutich");
+  ok("cấp 1: chủ tịch giao được cho phó chủ tịch, trưởng phòng", ct.includes("Lê Văn Phúc") && ct.includes("Hoàng Văn Khánh") && !ct.includes("Nguyễn Văn Bình"), ct);
+  ok("công chức không có mục Giao việc", !(await (async () => {
+    ({ ctx, page } = await newPage({ width: 1280, height: 800 }));
+    await login(page, "cv.kinhte1");
+    const a = await page.locator("aside").innerText();
+    await ctx.close();
+    return a.includes("Giao việc mới");
+  })()));
+  // chủ tịch giao cho trưởng phòng; trưởng phòng không giao ngược lại cho chủ tịch qua việc con
+  ({ ctx, page } = await newPage({ width: 1280, height: 800 }));
+  await login(page, "tp.kinhte");
+  await page.goto(BASE + "/viec?tab=tat_ca&q=" + encodeURIComponent("Lập kế hoạch giải phóng mặt bằng"));
+  await page.click("a:has-text('Lập kế hoạch giải phóng mặt bằng')");
+  await page.waitForURL(/\/viec\/\d+/);
+  const sub = await page.locator('details:has(summary:has-text("Thêm việc con")) select[name="phoi_hop"] option').allInnerTexts();
+  ok("việc con: không giao ngược cho người đã giao (chủ tịch)", sub.length > 0 && !sub.join("|").includes("Trần Thị Châu") && sub.join("|").includes("Vũ Thị Lan"), sub.join(" | "));
+  // giao lại: chỉ cán bộ cấp dưới trong đơn vị
+  const gl = await page.locator('form:has(input[name="op"][value="giao_lai"]) select option').allInnerTexts();
+  ok("giao lại cho cán bộ cấp dưới", gl.join("|").includes("Vũ Thị Lan") && !gl.join("|").includes("Kiểm Thử Trưởng"), gl.join(" | "));
+  await ctx.close();
+
   await browser.close();
   console.log(results.join("\n"));
   console.log(`\n${results.filter((r) => r.startsWith("PASS")).length}/${results.length} PASS`);

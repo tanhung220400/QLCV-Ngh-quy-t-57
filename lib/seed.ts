@@ -53,6 +53,10 @@ async function seedDemo(tx: Tx, ld: number, vp: number) {
   const t1 = await user("Mai Văn Quang", "thon.dong", th1, "Trưởng khu phố", "truong_thon");
   await user("Cao Thị Sen", "thon.tay", th2, "Trưởng khu phố", "truong_thon");
   void bt;
+  // chức vụ Đảng của lãnh đạo (dùng cho quy tắc giao việc cấp 1)
+  for (const [id, cv] of [[bt, "Bí thư Đảng ủy"], [ctx, "Phó Bí thư Đảng ủy"], [pkt, "Ủy viên Ban Thường vụ Đảng ủy"], [pvx, "Đảng ủy viên"], [tkt, "Đảng ủy viên"]] as [number, string][])
+    await tx`UPDATE nguoi_dung SET chuc_vu_dang = ${cv} WHERE id = ${id}`;
+  await tx`UPDATE nguoi_dung SET chuc_danh_tgv = 'Tổ trưởng' WHERE id = ${pkt}`;
 
   const today = vnDate();
   const H = new Set<string>();

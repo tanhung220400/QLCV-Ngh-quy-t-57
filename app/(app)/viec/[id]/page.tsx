@@ -13,6 +13,7 @@ import { ProgressUpdate } from "@/components/ProgressUpdate";
 import { FileUpload } from "@/components/FileUpload";
 import { TaskForm } from "@/components/TaskForm";
 import { taskFormOptions } from "@/lib/options";
+import { nguoiDuocGiao } from "@/lib/giaoViec";
 import { dueColor, onTime } from "@/lib/tasks";
 
 export const dynamic = "force-dynamic";
@@ -81,11 +82,12 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
   const kpis = await sql`SELECT ct.id, ct.ten FROM cong_viec_chi_tieu x JOIN chi_tieu ct ON ct.id = x.id_chi_tieu WHERE x.id_cong_viec = ${id}`;
   const logs = await sql`SELECT k.*, n.ho_ten FROM nhat_ky k LEFT JOIN nguoi_dung n ON n.id = k.id_nguoi_dung WHERE k.doi_tuong = 'cong_viec' AND k.id_doi_tuong = ${id} ORDER BY k.thoi_gian DESC LIMIT 100`;
   const pendingExt = exts.find((e) => e.trang_thai_duyet === "cho_duyet");
+  const duocGiao = p.giao_lai ? await nguoiDuocGiao(sql, user, id) : new Set<number>();
   const unitPeople = p.giao_lai
-    ? await sql`SELECT id, ho_ten FROM nguoi_dung WHERE trang_thai = 'hoat_dong' AND id_don_vi = ${t.id_don_vi_chu_tri ?? -1} AND id <> ${t.id_chu_tri} ORDER BY ho_ten`
+    ? (await sql`SELECT id, ho_ten FROM nguoi_dung WHERE trang_thai = 'hoat_dong' AND (id_don_vi = ${t.id_don_vi_chu_tri ?? -1} OR id_don_vi_kiem_nhiem = ${t.id_don_vi_chu_tri ?? -1}) AND id <> ${t.id_chu_tri} ORDER BY ho_ten`).filter((x) => duocGiao.has(x.id))
     : [];
   const needOpts = p.viec_con || p.quan_ly;
-  const opts = needOpts ? await taskFormOptions(user) : null;
+  const opts = needOpts ? await taskFormOptions(user, id) : null;
   const linhVuc = await getCatalog("linh_vuc");
   const adminData = p.admin
     ? {
@@ -544,7 +546,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
                   idCha={id}
                   compact
                   units={opts.units}
-                  people={opts.allPeople}
+                  people={opts.people}
                   linhVuc={opts.linhVuc}
                   nguon={opts.nguon}
                   sanPham={opts.sanPham}

@@ -30,7 +30,7 @@ export async function identities(user: User): Promise<Identity[]> {
   const me: Identity = { id: user.id, vai_tro: user.vai_tro, id_don_vi: user.id_don_vi, linh_vuc_phu_trach: user.linh_vuc_phu_trach, pham_vi: user.pham_vi };
   if (!user.uy_quyen_tu.length) return [me];
   const sql = await db();
-  const rows = await sql`SELECT id, vai_tro, id_don_vi, linh_vuc_phu_trach, pham_vi FROM nguoi_dung WHERE id IN ${sql(user.uy_quyen_tu)}`;
+  const rows = await sql`SELECT id, vai_tro, id_don_vi, id_don_vi_kiem_nhiem, linh_vuc_phu_trach, pham_vi FROM nguoi_dung WHERE id IN ${sql(user.uy_quyen_tu)}`;
   return [
     me,
     ...rows.map((r) => ({
@@ -38,7 +38,7 @@ export async function identities(user: User): Promise<Identity[]> {
       vai_tro: r.vai_tro,
       id_don_vi: r.id_don_vi,
       linh_vuc_phu_trach: r.linh_vuc_phu_trach || [],
-      pham_vi: tinhPhamVi(r.vai_tro, r.id_don_vi, r.linh_vuc_phu_trach || [], r.pham_vi),
+      pham_vi: tinhPhamVi(r.vai_tro, r.id_don_vi, r.linh_vuc_phu_trach || [], r.pham_vi, r.id_don_vi_kiem_nhiem),
     })),
   ];
 }
@@ -100,7 +100,7 @@ export async function canSeeKpi(user: User, id: number): Promise<boolean> {
   return (await sql`SELECT 1 FROM chi_tieu ct WHERE ct.id = ${id} AND (${s})`).length > 0;
 }
 
-export const canCreateTask = (u: User) => u.quyen.includes("cv.giao");
+export const canCreateTask = (u: User) => u.quyen.includes("cv.giao_cap1") || u.quyen.includes("cv.giao_cap2");
 export const isAdmin = (u: User) => u.quyen.some((q) => q.startsWith("qt."));
 export const isLeader = (u: User) => u.vai_tro === "lanh_dao";
 export const canManageKpi = (u: User) => u.quyen.includes("ct.quan_ly");
@@ -152,7 +152,7 @@ export async function taskPerms(user: User, t: TaskRow): Promise<TaskPerms> {
     xem,
     nhan: s === "moi_giao" && (isOwner || unitHead),
     tra_lai: (s === "moi_giao" || s === "da_nhan") && (isOwner || unitHead),
-    giao_lai: open && s !== "cho_duyet" && s !== "tra_lai" && (isOwner || unitHead) && q.has("cv.giao"),
+    giao_lai: open && s !== "cho_duyet" && s !== "tra_lai" && (isOwner || unitHead) && (q.has("cv.giao_cap1") || q.has("cv.giao_cap2")),
     cap_nhat: working && (isOwner || isDoer),
     bao_cao: working && (isOwner || isDoer),
     xin_gia_han: open && s !== "tra_lai" && s !== "tam_dung" && (isOwner || isDoer),
@@ -168,6 +168,6 @@ export async function assignableUnits(user: User): Promise<number[] | null> {
   const ids = await identities(user);
   if (ids.some((i) => i.pham_vi.loai === "toan_xa" || i.pham_vi.loai === "linh_vuc")) return null;
   const { donVi, units } = await scopeSets(ids);
-  const own = ids.flatMap((i) => subtree(units, i.id_don_vi));
+  const own = [...ids.flatMap((i) => subtree(units, i.id_don_vi)), ...subtree(units, user.id_don_vi_kiem_nhiem)];
   return [...new Set([...donVi, ...own])];
 }

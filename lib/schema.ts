@@ -1,5 +1,5 @@
 // Mô hình dữ liệu theo mục 8 của đặc tả. Chạy lại nhiều lần không sao (IF NOT EXISTS).
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS don_vi (
@@ -367,4 +367,12 @@ INSERT INTO danh_muc (loai, ten, thu_tu) VALUES
   ('linh_vuc', 'Thi đua, khen thưởng', 34),
   ('linh_vuc', 'Công tác Đảng, đoàn thể', 35)
 ON CONFLICT (loai, ten) DO NOTHING;
+
+-- ===== Phiên bản 7: chức vụ Đảng, chính quyền, kiêm nhiệm, chức danh Ban chỉ đạo, Tổ giúp việc =====
+ALTER TABLE nguoi_dung ADD COLUMN IF NOT EXISTS chuc_vu_dang TEXT;
+ALTER TABLE nguoi_dung ADD COLUMN IF NOT EXISTS chuc_vu_kiem_nhiem TEXT;
+ALTER TABLE nguoi_dung ADD COLUMN IF NOT EXISTS id_don_vi_kiem_nhiem INT REFERENCES don_vi(id);
+ALTER TABLE nguoi_dung ADD COLUMN IF NOT EXISTS chuc_danh_bcd TEXT;
+ALTER TABLE nguoi_dung ADD COLUMN IF NOT EXISTS chuc_danh_tgv TEXT;
+CREATE INDEX IF NOT EXISTS nguoi_dung_kiem_nhiem ON nguoi_dung (id_don_vi_kiem_nhiem);
 `;

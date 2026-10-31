@@ -25,6 +25,9 @@ export type User = {
   id_don_vi: number | null;
   ten_don_vi: string | null;
   chuc_vu: string | null;
+  chuc_vu_dang: string | null;
+  id_don_vi_kiem_nhiem: number | null;
+  chuc_vu_kiem_nhiem: string | null;
   vai_tro: string;
   linh_vuc_phu_trach: string[];
   otp_bat: boolean;
@@ -96,7 +99,7 @@ export async function getUser(): Promise<User | null> {
   const sql = await db();
   const rows = await sql`
     SELECT u.id, u.ho_ten, u.ten_dang_nhap, u.sdt, u.email, u.id_don_vi, d.ten AS ten_don_vi, u.chuc_vu, u.vai_tro,
-           u.linh_vuc_phu_trach, u.otp_bat, u.doi_mat_khau, u.phien, u.trang_thai, u.quyen, u.pham_vi
+           u.chuc_vu_dang, u.id_don_vi_kiem_nhiem, u.chuc_vu_kiem_nhiem, u.linh_vuc_phu_trach, u.otp_bat, u.doi_mat_khau, u.phien, u.trang_thai, u.quyen, u.pham_vi
     FROM nguoi_dung u LEFT JOIN don_vi d ON d.id = u.id_don_vi
     WHERE u.id = ${uid}`;
   const u = rows[0];
@@ -118,14 +121,17 @@ export async function getUser(): Promise<User | null> {
     email: u.email,
     id_don_vi: u.id_don_vi,
     ten_don_vi: u.ten_don_vi,
-    chuc_vu: u.chuc_vu,
+    chuc_vu: u.chuc_vu || u.chuc_vu_dang,
+    chuc_vu_dang: u.chuc_vu_dang,
+    id_don_vi_kiem_nhiem: u.id_don_vi_kiem_nhiem,
+    chuc_vu_kiem_nhiem: u.chuc_vu_kiem_nhiem,
     vai_tro: u.vai_tro,
     linh_vuc_phu_trach: u.linh_vuc_phu_trach || [],
     otp_bat: u.otp_bat,
     doi_mat_khau: u.doi_mat_khau,
     uy_quyen_tu: uq.map((r) => r.id_nguoi_uy_quyen as number),
     quyen: [...quyen],
-    pham_vi: tinhPhamVi(u.vai_tro, u.id_don_vi, u.linh_vuc_phu_trach || [], u.pham_vi),
+    pham_vi: tinhPhamVi(u.vai_tro, u.id_don_vi, u.linh_vuc_phu_trach || [], u.pham_vi, u.id_don_vi_kiem_nhiem),
   };
 }
 

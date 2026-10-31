@@ -5,7 +5,8 @@ export const NHOM_QUYEN: { nhom: string; quyen: [string, string][] }[] = [
   {
     nhom: "Công việc",
     quyen: [
-      ["cv.giao", "Giao việc mới"],
+      ["cv.giao_cap1", "Giao việc cấp 1: giao cho đơn vị, trưởng/phó đơn vị trong phạm vi (người nhận không giao ngược lại cho mình)"],
+      ["cv.giao_cap2", "Giao việc cấp 2: giao lại, giao việc cho cán bộ thuộc đơn vị mình phụ trách (không giao cho cấp trên)"],
       ["cv.nhap_nhanh", "Giao nhanh từ kết luận họp"],
       ["cv.duyet", "Duyệt kết quả, duyệt gia hạn (trong phạm vi được xem)"],
       ["cv.quan_ly", "Sửa, đổi hạn, tạm dừng, hủy việc (trong phạm vi được xem)"],
@@ -50,13 +51,13 @@ export const NHOM_QUYEN: { nhom: string; quyen: [string, string][] }[] = [
 export const TAT_CA_QUYEN = NHOM_QUYEN.flatMap((n) => n.quyen.map((q) => q[0]));
 
 export const QUYEN_MAC_DINH: Record<string, string[]> = {
-  lanh_dao: ["cv.giao", "cv.nhap_nhanh", "cv.duyet", "cv.quan_ly", "cv.xuat", "ct.xem", "ct.quan_ly", "ct.xac_nhan", "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "bc.bieu_do"],
-  tong_hop: ["cv.giao", "cv.nhap_nhanh", "cv.xuat", "ct.xem", "ct.quan_ly", "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "bc.bieu_do", "qt.nhat_ky"],
-  truong_don_vi: ["cv.giao", "cv.duyet", "cv.quan_ly", "cv.xuat", "ct.xem", "ct.nhap_so_lieu", "ct.xac_nhan", "bc.xem", "bc.xuat", "bc.tra_cuu", "bc.dashboard", "bc.kpi_don_vi"],
+  lanh_dao: ["cv.giao_cap1", "cv.nhap_nhanh", "cv.duyet", "cv.quan_ly", "cv.xuat", "ct.xem", "ct.quan_ly", "ct.xac_nhan", "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "bc.bieu_do"],
+  tong_hop: ["cv.giao_cap1", "cv.nhap_nhanh", "cv.xuat", "ct.xem", "ct.quan_ly", "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "bc.bieu_do", "qt.nhat_ky"],
+  truong_don_vi: ["cv.giao_cap2", "cv.duyet", "cv.quan_ly", "cv.xuat", "ct.xem", "ct.nhap_so_lieu", "ct.xac_nhan", "bc.xem", "bc.xuat", "bc.tra_cuu", "bc.dashboard", "bc.kpi_don_vi"],
   cong_chuc: ["ct.xem", "ct.nhap_so_lieu", "bc.xem", "bc.tra_cuu"],
   truong_thon: ["ct.xem", "ct.nhap_so_lieu"],
   quan_tri: [
-    "cv.giao", "cv.nhap_nhanh", "cv.duyet", "cv.quan_ly", "cv.xuat",
+    "cv.giao_cap1", "cv.giao_cap2", "cv.nhap_nhanh", "cv.duyet", "cv.quan_ly", "cv.xuat",
     "ct.xem", "ct.quan_ly", "ct.nhap_so_lieu", "ct.xac_nhan",
     "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "bc.bieu_do", "bc.kpi", "bc.kpi_don_vi",
     "qt.du_lieu", "qt.mo_dun", "qt.nguoi_dung", "qt.co_cau", "qt.cai_dat", "qt.nhat_ky",
@@ -73,21 +74,25 @@ export const LOAI_PHAM_VI: Record<PhamVi["loai"], string> = {
 };
 
 /** Phạm vi mặc định theo vai trò (chức vụ + đơn vị) */
-export function phamViMacDinh(vai_tro: string, id_don_vi: number | null, linh_vuc: string[]): PhamVi {
+export function phamViMacDinh(vai_tro: string, id_don_vi: number | null, linh_vuc: string[], id_kiem_nhiem: number | null = null): PhamVi {
   if (vai_tro === "tong_hop" || vai_tro === "quan_tri") return { loai: "toan_xa", linh_vuc: [], don_vi: [] };
   if (vai_tro === "lanh_dao") return linh_vuc.length ? { loai: "linh_vuc", linh_vuc, don_vi: [] } : { loai: "toan_xa", linh_vuc: [], don_vi: [] };
-  if (vai_tro === "truong_don_vi" && id_don_vi) return { loai: "don_vi", linh_vuc: [], don_vi: [id_don_vi] };
+  const dv = [id_don_vi, id_kiem_nhiem].filter((x): x is number => !!x);
+  if (vai_tro === "truong_don_vi" && dv.length) return { loai: "don_vi", linh_vuc: [], don_vi: [...new Set(dv)] };
   return { loai: "ca_nhan", linh_vuc: [], don_vi: [] };
 }
 
+/** Quyền cũ "cv.giao" (trước khi tách 2 cấp) */
+const QUYEN_CU: Record<string, string[]> = { "cv.giao": ["cv.giao_cap1"] };
+
 export function tinhQuyen(vai_tro: string, ghi_de: { them?: string[]; bo?: string[] } | null | undefined): Set<string> {
   const s = new Set(QUYEN_MAC_DINH[vai_tro] || []);
-  for (const q of ghi_de?.them || []) if (TAT_CA_QUYEN.includes(q)) s.add(q);
-  for (const q of ghi_de?.bo || []) s.delete(q);
+  for (const q of ghi_de?.them || []) for (const x of QUYEN_CU[q] || [q]) if (TAT_CA_QUYEN.includes(x)) s.add(x);
+  for (const q of ghi_de?.bo || []) for (const x of q === "cv.giao" ? ["cv.giao_cap1", "cv.giao_cap2"] : [q]) s.delete(x);
   return s;
 }
 
-export function tinhPhamVi(vai_tro: string, id_don_vi: number | null, linh_vuc: string[], ghi_de: Partial<PhamVi> | null | undefined): PhamVi {
+export function tinhPhamVi(vai_tro: string, id_don_vi: number | null, linh_vuc: string[], ghi_de: Partial<PhamVi> | null | undefined, id_kiem_nhiem: number | null = null): PhamVi {
   if (ghi_de?.loai && LOAI_PHAM_VI[ghi_de.loai]) {
     return {
       loai: ghi_de.loai,
@@ -95,5 +100,5 @@ export function tinhPhamVi(vai_tro: string, id_don_vi: number | null, linh_vuc: 
       don_vi: ghi_de.loai === "don_vi" ? (ghi_de.don_vi?.length ? ghi_de.don_vi.map(Number) : id_don_vi ? [id_don_vi] : []) : [],
     };
   }
-  return phamViMacDinh(vai_tro, id_don_vi, linh_vuc);
+  return phamViMacDinh(vai_tro, id_don_vi, linh_vuc, id_kiem_nhiem);
 }

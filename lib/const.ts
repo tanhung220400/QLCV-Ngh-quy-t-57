@@ -32,6 +32,9 @@ export const LOAI_DON_VI: Record<string, string> = {
   lanh_dao: "Lãnh đạo",
   phong: "Phòng",
   trung_tam: "Trung tâm",
+  khoi_dang: "Cơ quan Đảng",
+  doan_the: "Mặt trận, đoàn thể",
+  luc_luong: "Công an, quân sự",
   thon: "Khu phố",
 };
 
@@ -78,6 +81,22 @@ export const DANH_MUC_MAC_DINH: Record<string, string[]> = {
   nhom_chi_tieu: ["Kinh tế", "Văn hóa - xã hội", "Quốc phòng - an ninh", "Xây dựng chính quyền"],
   don_vi_tinh: ["%", "hộ", "người", "triệu đồng", "km", "ha", "công trình", "tiêu chí"],
   nguon_chi_tieu: ["Nghị quyết HĐND xã", "Chỉ tiêu tỉnh giao", "Kế hoạch UBND xã"],
+  chuc_vu_dang: ["Bí thư Đảng ủy", "Phó Bí thư thường trực Đảng ủy", "Phó Bí thư Đảng ủy", "Ủy viên Ban Thường vụ Đảng ủy", "Đảng ủy viên", "Bí thư chi bộ", "Phó Bí thư chi bộ", "Chi ủy viên"],
+  chuc_vu: [
+    "Chủ tịch", "Phó Chủ tịch thường trực", "Phó Chủ tịch",
+    "Bí thư", "Phó Bí thư",
+    "Trưởng Công an phường", "Phó Trưởng Công an phường",
+    "Chỉ huy trưởng", "Chỉ huy phó",
+    "Trưởng ban", "Phó Trưởng ban", "Phó Trưởng ban chuyên trách",
+    "Chủ nhiệm", "Phó Chủ nhiệm",
+    "Chánh văn phòng", "Phó Chánh văn phòng",
+    "Giám đốc", "Phó Giám đốc",
+    "Trưởng phòng", "Phó Trưởng phòng",
+    "Trưởng khu phố", "Phó Trưởng khu phố",
+    "Chuyên viên", "Công chức", "Viên chức", "Nhân viên",
+  ],
+  chuc_danh_bcd: ["Trưởng ban", "Phó Trưởng ban thường trực", "Phó Trưởng ban", "Ủy viên"],
+  chuc_danh_tgv: ["Tổ trưởng", "Tổ phó", "Thành viên"],
 };
 
 export const CAI_DAT_MAC_DINH = {

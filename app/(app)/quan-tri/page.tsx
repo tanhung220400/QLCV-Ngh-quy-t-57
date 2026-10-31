@@ -15,6 +15,7 @@ import type { MoDun } from "@/lib/modules";
 import { saveUnitAction, saveUserAction, resetPasswordAction, importUsersAction, saveHolidaysAction, saveSettingsAction, saveSmsAction, testSmsAction } from "@/app/actions/admin";
 import { VAI_TRO, LOAI_DON_VI } from "@/lib/const";
 import { fmtDate, fmtDateTime } from "@/lib/time";
+import { capGiao } from "@/lib/canBo";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,12 @@ const MUC: [string, string, string][] = [
   ["thung_rac", "Thùng rác, dữ liệu", "qt.du_lieu"],
   ["nhat_ky", "Nhật ký thao tác", "qt.nhat_ky"],
 ];
-const DM: Record<string, string> = { linh_vuc: "Lĩnh vực", nguon_giao: "Nguồn giao việc", san_pham: "Sản phẩm đầu ra", nhom_chi_tieu: "Nhóm chỉ tiêu", don_vi_tinh: "Đơn vị tính", nguon_chi_tieu: "Nguồn chỉ tiêu" };
+const DM: Record<string, string> = {
+  chuc_vu_dang: "Chức vụ trong Đảng",
+  chuc_vu: "Chức vụ chính quyền, kiêm nhiệm",
+  chuc_danh_bcd: "Chức danh Ban chỉ đạo",
+  chuc_danh_tgv: "Chức danh Tổ giúp việc",
+  linh_vuc: "Lĩnh vực", nguon_giao: "Nguồn giao việc", san_pham: "Sản phẩm đầu ra", nhom_chi_tieu: "Nhóm chỉ tiêu", don_vi_tinh: "Đơn vị tính", nguon_chi_tieu: "Nguồn chỉ tiêu" };
 
 export default async function Admin({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
@@ -140,27 +146,74 @@ function UnitForm({ u, units }: { u?: Record<string, never>; units: { id: number
 
 async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: string }[]; linhVuc: string[]; edit: number; q: string }) {
   const sql = await db();
-  const users = await sql`SELECT n.*, d.ten AS ten_don_vi FROM nguoi_dung n LEFT JOIN don_vi d ON d.id = n.id_don_vi
-    WHERE ${q ? sql`(n.ho_ten ILIKE ${"%" + q + "%"} OR n.ten_dang_nhap ILIKE ${"%" + q + "%"})` : sql`TRUE`}
-    ORDER BY d.thu_tu NULLS LAST, n.ho_ten`;
+  const users = await sql`SELECT n.*, d.ten AS ten_don_vi, k.ten AS ten_don_vi_kn FROM nguoi_dung n LEFT JOIN don_vi d ON d.id = n.id_don_vi LEFT JOIN don_vi k ON k.id = n.id_don_vi_kiem_nhiem
+    WHERE ${q ? sql`(n.ho_ten ILIKE ${"%" + q + "%"} OR n.ten_dang_nhap ILIKE ${"%" + q + "%"} OR n.chuc_vu ILIKE ${"%" + q + "%"} OR d.ten ILIKE ${"%" + q + "%"})` : sql`TRUE`}
+    ORDER BY d.thu_tu NULLS LAST, d.ten NULLS LAST, n.ho_ten`;
+  const [cvDang, cvCq, cdBcd, cdTgv] = await Promise.all(["chuc_vu_dang", "chuc_vu", "chuc_danh_bcd", "chuc_danh_tgv"].map((k) => getCatalog(k)));
+  const unitSel = (name: string, v: unknown, empty: string) => (
+    <select name={name} className="input" defaultValue={(v as number | null) ?? ""} aria-label={empty}>
+      <option value="">— {empty} —</option>
+      {units.map((x) => (
+        <option key={x.id} value={x.id}>
+          {x.ten}
+        </option>
+      ))}
+    </select>
+  );
+  const catSel = (name: string, list: string[], v: unknown, empty: string) => {
+    const cur = (v as string | null) || "";
+    const opts = cur && !list.includes(cur) ? [...list, cur] : list;
+    return (
+      <select name={name} className="input" defaultValue={cur} aria-label={empty}>
+        <option value="">— {empty} —</option>
+        {opts.map((x) => (
+          <option key={x} value={x}>
+            {x}
+          </option>
+        ))}
+      </select>
+    );
+  };
   const cur = edit ? users.find((u) => u.id === edit) : null;
   const form = (u?: Record<string, never> | null) => (
     <ActionForm key={u?.id ?? "moi"} action={saveUserAction} className="grid gap-2 sm:grid-cols-2">
       {u && <input type="hidden" name="id" value={u.id} />}
       <input name="ho_ten" className="input" placeholder="Họ tên" defaultValue={u?.ho_ten} required />
       <input name="ten_dang_nhap" className="input" placeholder="Tên đăng nhập (không dấu)" defaultValue={u?.ten_dang_nhap} autoCapitalize="none" required />
-      <select name="id_don_vi" className="input" defaultValue={u?.id_don_vi ?? ""}>
-        <option value="">— Đơn vị —</option>
-        {units.map((x) => (
-          <option key={x.id} value={x.id}>
-            {x.ten}
-          </option>
-        ))}
-      </select>
-      <input name="chuc_vu" className="input" placeholder="Chức vụ" defaultValue={u?.chuc_vu ?? ""} />
-      <input name="sdt" className="input" inputMode="tel" placeholder="Số điện thoại (nhận SMS nhắc việc)" defaultValue={u?.sdt ?? ""} />
+      <label className="block sm:col-span-2">
+        <span className="label">Chức vụ trong Đảng</span>
+        {catSel("chuc_vu_dang", cvDang, u?.chuc_vu_dang, "Không")}
+      </label>
+      <label className="block">
+        <span className="label">Chức vụ chính quyền</span>
+        {catSel("chuc_vu", cvCq, u?.chuc_vu, "Chọn chức vụ")}
+      </label>
+      <label className="block">
+        <span className="label">Đơn vị chính</span>
+        {unitSel("id_don_vi", u?.id_don_vi, "Đơn vị")}
+      </label>
+      <label className="block">
+        <span className="label">Chức vụ kiêm nhiệm</span>
+        {catSel("chuc_vu_kiem_nhiem", cvCq, u?.chuc_vu_kiem_nhiem, "Không kiêm nhiệm")}
+      </label>
+      <label className="block">
+        <span className="label">Đơn vị kiêm nhiệm</span>
+        {unitSel("id_don_vi_kiem_nhiem", u?.id_don_vi_kiem_nhiem, "Không kiêm nhiệm")}
+      </label>
+      <label className="block">
+        <span className="label">Chức danh Ban chỉ đạo</span>
+        {catSel("chuc_danh_bcd", cdBcd, u?.chuc_danh_bcd, "Không")}
+      </label>
+      <label className="block">
+        <span className="label">Chức danh Tổ giúp việc</span>
+        {catSel("chuc_danh_tgv", cdTgv, u?.chuc_danh_tgv, "Không")}
+      </label>
+      <label className="block sm:col-span-2">
+        <span className="label">Số điện thoại (nhận SMS nhắc việc)</span>
+        <input name="sdt" className="input" inputMode="tel" defaultValue={u?.sdt ?? ""} />
+      </label>
       <div className="sm:col-span-2">
-        <label className="label">Lĩnh vực phụ trách (với lãnh đạo; để trống = toàn xã)</label>
+        <label className="label">Lĩnh vực phụ trách (với lãnh đạo: để trống = toàn phường; với cán bộ: lĩnh vực theo dõi)</label>
         <div className="flex flex-wrap gap-2">
           {linhVuc.map((l) => (
             <label key={l} className="chip cursor-pointer border-slate-300 bg-white py-1">
@@ -204,7 +257,7 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
         <div className="card">
           <h2 className="h2">Nhập danh sách cán bộ từ Excel</h2>
           <p className="text-sm text-slate-500">
-            Tải <a href="/api/mau/can-bo" className="text-brand-700 underline">tệp mẫu</a>. Đơn vị chưa có sẽ tự tạo. Mỗi tài khoản nhận mật khẩu tạm, phải đổi khi đăng nhập lần đầu.
+            Tải <a href="/api/mau/can-bo" className="text-brand-700 underline">tệp mẫu</a>. Các cột: Họ và tên, Chức vụ trong Đảng, Chức vụ chính quyền, Đơn vị chính, Chức vụ kiêm nhiệm, Đơn vị kiêm nhiệm, Chức danh Ban chỉ đạo, Chức danh Tổ giúp việc, Số điện thoại (thứ tự tùy ý). Đơn vị chưa có sẽ tự tạo. Cán bộ đã có tài khoản (trùng họ tên hoặc tên đăng nhập) được cập nhật chức vụ, đơn vị, giữ nguyên mật khẩu và quyền. Tài khoản mới nhận mật khẩu tạm, phải đổi khi đăng nhập lần đầu.
           </p>
           <ActionForm action={importUsersAction} className="mt-2 space-y-2">
             <input type="file" name="file" accept=".xlsx" className="input" required />
@@ -218,13 +271,14 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
           <input name="q" defaultValue={q} placeholder="Tìm theo tên" className="input max-w-xs" />
           <button className="btn btn-outline">Tìm</button>
         </form>
-        <table className="tbl min-w-[720px]">
+        <table className="tbl min-w-[900px]">
           <thead>
             <tr>
               <th>Họ tên</th>
               <th>Tên đăng nhập</th>
               <th>Đơn vị · Chức vụ</th>
-              <th>Vai trò</th>
+              <th>Đảng · BCĐ · Tổ giúp việc</th>
+              <th>Vai trò · Giao việc</th>
               <th>OTP</th>
               <th></th>
             </tr>
@@ -240,9 +294,23 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
                 <td>
                   {u.ten_don_vi}
                   {u.chuc_vu ? ` · ${u.chuc_vu}` : ""}
+                  {u.id_don_vi_kiem_nhiem || u.chuc_vu_kiem_nhiem ? (
+                    <span className="block text-xs text-slate-500">
+                      Kiêm nhiệm: {[u.chuc_vu_kiem_nhiem, u.ten_don_vi_kn].filter(Boolean).join(" · ")}
+                    </span>
+                  ) : null}
+                </td>
+                <td className="text-sm">
+                  {u.chuc_vu_dang && <span className="block">{u.chuc_vu_dang}</span>}
+                  {u.chuc_danh_bcd && <span className="block text-slate-600">BCĐ: {u.chuc_danh_bcd}</span>}
+                  {u.chuc_danh_tgv && <span className="block text-slate-600">Tổ giúp việc: {u.chuc_danh_tgv}</span>}
                 </td>
                 <td>
                   {VAI_TRO[u.vai_tro]}
+                  {(() => {
+                    const c = capGiao(tinhQuyen(u.vai_tro, u.quyen));
+                    return c ? <span className={`ml-1 chip py-0 text-xs ${c === 1 ? "border-violet-200 bg-violet-50 text-violet-700" : "border-sky-200 bg-sky-50 text-sky-700"}`}>Giao việc cấp {c}</span> : null;
+                  })()}
                   {u.linh_vuc_phu_trach?.length ? <span className="block text-xs text-slate-500">{u.linh_vuc_phu_trach.join(", ")}</span> : null}
                   {u.pham_vi?.loai && <span className="block text-xs text-indigo-700">Phạm vi: {LOAI_PHAM_VI[u.pham_vi.loai as keyof typeof LOAI_PHAM_VI]}</span>}
                   {u.quyen && (u.quyen.them?.length || u.quyen.bo?.length) ? (
@@ -555,6 +623,10 @@ async function Catalogs({ open }: { open: string }) {
               nhom_chi_tieu: [["chi_tieu", "nhom"]],
               don_vi_tinh: [["chi_tieu", "don_vi_tinh"]],
               nguon_chi_tieu: [["chi_tieu", "nguon"]],
+              chuc_vu_dang: [["nguoi_dung", "chuc_vu_dang"]],
+              chuc_vu: [["nguoi_dung", "chuc_vu"], ["nguoi_dung", "chuc_vu_kiem_nhiem"]],
+              chuc_danh_bcd: [["nguoi_dung", "chuc_danh_bcd"]],
+              chuc_danh_tgv: [["nguoi_dung", "chuc_danh_tgv"]],
             };
             for (const [t, c] of col[k]) for (const r of await sql`SELECT ${sql(c)} AS v, count(*)::int AS n FROM ${sql(t)} GROUP BY 1`) used.set(r.v, (used.get(r.v) || 0) + r.n);
             const list = rows.length ? rows : (await getCatalog(k)).map((ten, i) => ({ id: -i - 1, ten }));

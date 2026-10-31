@@ -54,6 +54,11 @@ export async function saveUserAction(_: ActionState, fd: FormData): Promise<Acti
     email: str(fd, "email") || null,
     id_don_vi: Number(str(fd, "id_don_vi")) || null,
     chuc_vu: str(fd, "chuc_vu") || null,
+    chuc_vu_dang: str(fd, "chuc_vu_dang") || null,
+    chuc_vu_kiem_nhiem: str(fd, "chuc_vu_kiem_nhiem") || null,
+    id_don_vi_kiem_nhiem: Number(str(fd, "id_don_vi_kiem_nhiem")) || null,
+    chuc_danh_bcd: str(fd, "chuc_danh_bcd") || null,
+    chuc_danh_tgv: str(fd, "chuc_danh_tgv") || null,
     vai_tro: VAI_TRO[str(fd, "vai_tro")] ? str(fd, "vai_tro") : "cong_chuc",
     linh_vuc_phu_trach: fd.getAll("linh_vuc_phu_trach").map(String).filter(Boolean),
     trang_thai: str(fd, "trang_thai") === "khoa" ? "khoa" : "hoat_dong",
@@ -111,6 +116,8 @@ export async function importUsersAction(_: ActionState, fd: FormData): Promise<A
   if (!(f instanceof File) || !f.size) return { error: "Chọn tệp Excel." };
   const ExcelJS = (await import("exceljs")).default;
   const { cellText } = await import("@/lib/excel");
+  const { docBang, nhapCanBo } = await import("@/lib/nhapCanBo");
+  const { getCatalog } = await import("@/lib/settings");
   const wb = new ExcelJS.Workbook();
   try {
     await wb.xlsx.load(Buffer.from(await f.arrayBuffer()) as never);
@@ -118,48 +125,29 @@ export async function importUsersAction(_: ActionState, fd: FormData): Promise<A
     return { error: "Không đọc được tệp .xlsx." };
   }
   const ws = wb.worksheets[0];
+  const rows: string[][] = [];
+  ws.eachRow((row) => {
+    const r: string[] = [];
+    for (let i = 1; i <= Math.max(ws.columnCount, 15); i++) r.push(cellText(row.getCell(i).value));
+    rows.push(r);
+  });
+  const { dong, loi } = docBang(rows);
+  if (loi.length) return { error: loi.join("\n") };
+  if (!dong.length) return { error: "Không có cán bộ nào trong tệp." };
   const sql = await db();
-  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/\s+/g, " ").trim();
-  const units = (await sql`SELECT id, ten FROM don_vi`) as unknown as { id: number; ten: string }[];
-  const roleBy: Record<string, string> = {};
-  for (const [k, v] of Object.entries(VAI_TRO)) roleBy[norm(v)] = k;
-  const out: string[] = [];
-  const errs: string[] = [];
-  const rows: { n: number; v: Record<string, unknown> }[] = [];
-  ws.eachRow((row, n) => {
-    if (n === 1) return;
-    const c = (i: number) => cellText(row.getCell(i).value);
-    if (!c(1)) return;
-    const username = c(2).toLowerCase();
-    const unitName = c(3);
-    let unit = units.find((x) => norm(x.ten) === norm(unitName));
-    if (!unit && unitName) unit = { id: -1, ten: unitName };
-    const role = roleBy[norm(c(5))] || (Object.keys(VAI_TRO).includes(c(5)) ? c(5) : "cong_chuc");
-    if (!/^[a-z0-9._-]{3,40}$/.test(username)) errs.push(`Dòng ${n}: tên đăng nhập “${c(2)}” không hợp lệ.`);
-    rows.push({ n, v: { ho_ten: c(1), ten_dang_nhap: username, don_vi: unit, chuc_vu: c(4) || null, vai_tro: role, sdt: c(6) || null, linh_vuc_phu_trach: c(7) ? c(7).split(/[;,]/).map((s) => s.trim()).filter(Boolean) : [] } });
-  });
-  if (errs.length) return { error: errs.slice(0, 15).join("\n") };
-  await sql.begin(async (tx) => {
-    for (const { v } of rows) {
-      const ex = await tx`SELECT id FROM nguoi_dung WHERE ten_dang_nhap = ${v.ten_dang_nhap as string}`;
-      if (ex.length) {
-        out.push(`${v.ten_dang_nhap}: đã có, bỏ qua`);
-        continue;
-      }
-      let dv = v.don_vi as { id: number; ten: string } | undefined;
-      if (dv && dv.id === -1) {
-        const [nu] = await tx`INSERT INTO don_vi (ten, loai) VALUES (${dv.ten}, ${/thon|to dan pho/.test(norm(dv.ten)) ? "thon" : "phong"}) RETURNING id`;
-        dv = { id: nu.id, ten: dv.ten };
-        units.push(dv);
-      }
-      const pw = tempPassword();
-      await tx`INSERT INTO nguoi_dung (ho_ten, ten_dang_nhap, mat_khau, id_don_vi, chuc_vu, vai_tro, sdt, linh_vuc_phu_trach, doi_mat_khau)
-        VALUES (${v.ho_ten as string}, ${v.ten_dang_nhap as string}, ${await hashPassword(pw)}, ${dv?.id ?? null}, ${v.chuc_vu as string}, ${v.vai_tro as string}, ${v.sdt as string}, ${v.linh_vuc_phu_trach as string[]}, TRUE)`;
-      out.push(`${v.ho_ten}\t${v.ten_dang_nhap}\t${pw}`);
-    }
-    await writeLog(tx, u.id, "nhap_nguoi_dung_excel", "nguoi_dung", null, null, { so_dong: rows.length });
-  });
-  return { ok: true, message: `Kết quả (Họ tên — Tên đăng nhập — Mật khẩu tạm). Hãy lưu lại để phát cho cán bộ:\n${out.join("\n")}` };
+  const linhVucCo = await getCatalog("linh_vuc");
+  const r = (await sql.begin(async (tx) => {
+    const k = await nhapCanBo(tx, dong, { hash: hashPassword, matKhau: tempPassword, linhVucCo });
+    await writeLog(tx, u.id, "nhap_nguoi_dung_excel", "nguoi_dung", null, null, { so_dong: dong.length, tao: k.tao.length, cap_nhat: k.capNhat.length });
+    return k;
+  })) as unknown as Awaited<ReturnType<typeof nhapCanBo>>;
+  const parts = [
+    `Đã tạo ${r.tao.length} tài khoản, cập nhật ${r.capNhat.length} tài khoản đã có${r.donViMoi.length ? `, thêm ${r.donViMoi.length} đơn vị (${r.donViMoi.join("; ")})` : ""}.`,
+    r.tao.length ? `Tài khoản mới (Họ tên — Tên đăng nhập — Mật khẩu tạm). Hãy lưu lại để phát cho cán bộ:\n${r.tao.map((x) => `${x.ho_ten}\t${x.ten_dang_nhap}\t${x.mat_khau}`).join("\n")}` : "",
+    r.capNhat.length ? `Cập nhật chức vụ, đơn vị (giữ mật khẩu, vai trò, quyền): ${r.capNhat.map((x) => x.ho_ten).join(", ")}` : "",
+    r.loi.length ? `Lưu ý:\n${r.loi.join("\n")}` : "",
+  ];
+  return { ok: true, message: parts.filter(Boolean).join("\n\n") };
 }
 
 export async function saveCatalogAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -284,6 +272,10 @@ const DUNG_DANH_MUC: Record<string, [string, string][]> = {
   nhom_chi_tieu: [["chi_tieu", "nhom"]],
   don_vi_tinh: [["chi_tieu", "don_vi_tinh"]],
   nguon_chi_tieu: [["chi_tieu", "nguon"]],
+  chuc_vu_dang: [["nguoi_dung", "chuc_vu_dang"]],
+  chuc_vu: [["nguoi_dung", "chuc_vu"], ["nguoi_dung", "chuc_vu_kiem_nhiem"]],
+  chuc_danh_bcd: [["nguoi_dung", "chuc_danh_bcd"]],
+  chuc_danh_tgv: [["nguoi_dung", "chuc_danh_tgv"]],
 };
 
 export async function catalogItemAction(_: ActionState, fd: FormData): Promise<ActionState> {

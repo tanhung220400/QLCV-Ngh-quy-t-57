@@ -67,7 +67,7 @@ export const MAU_MODULE: Record<string, { bg: string; fg: string; ring: string; 
 export const QUYEN_HE_THONG: Record<string, string | string[] | null> = {
   tong_quan: null,
   cong_viec: null,
-  giao_viec: "cv.giao",
+  giao_viec: ["cv.giao_cap1", "cv.giao_cap2"],
   chi_tieu: "ct.xem",
   bao_cao: "bc.xem",
   tra_cuu: "bc.tra_cuu",

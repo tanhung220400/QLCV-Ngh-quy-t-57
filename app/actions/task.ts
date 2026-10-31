@@ -11,6 +11,7 @@ import { fromVN, fmtDue } from "@/lib/time";
 import { recomputePercent } from "@/lib/tasks";
 import { TRANG_THAI, UU_TIEN } from "@/lib/const";
 import { trashTask, trashSimple } from "@/lib/trash";
+import { kiemTraGiao } from "@/lib/giaoViec";
 import type { ActionState } from "@/components/ActionForm";
 
 type Tx = postgres.TransactionSql;
@@ -32,9 +33,13 @@ async function allowedAssignees(user: User): Promise<{ all: boolean; units: numb
   return u === null ? { all: true, units: [] } : { all: false, units: u };
 }
 
+/** Người đứng đầu đơn vị: cấp trưởng (đơn vị chính hoặc kiêm nhiệm), rồi cấp phó, theo vai trò */
 async function unitHead(sql: Tx, dv: number): Promise<number | null> {
-  const r = await sql`SELECT id FROM nguoi_dung WHERE id_don_vi = ${dv} AND trang_thai = 'hoat_dong'
-    ORDER BY CASE vai_tro WHEN 'truong_don_vi' THEN 0 WHEN 'truong_thon' THEN 1 WHEN 'lanh_dao' THEN 2 ELSE 3 END, id LIMIT 1`;
+  const r = await sql`SELECT id, CASE WHEN id_don_vi = ${dv} THEN chuc_vu ELSE chuc_vu_kiem_nhiem END AS cv, vai_tro FROM nguoi_dung
+    WHERE (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv}) AND trang_thai = 'hoat_dong'`;
+  const { bacChucVu } = await import("@/lib/canBo");
+  const role: Record<string, number> = { truong_don_vi: 0, truong_thon: 1, lanh_dao: 2 };
+  r.sort((a, b) => bacChucVu(a.cv) - bacChucVu(b.cv) || (role[a.vai_tro] ?? 3) - (role[b.vai_tro] ?? 3) || a.id - b.id);
   return r[0]?.id ?? null;
 }
 
@@ -115,8 +120,13 @@ export async function createTaskAction(_: ActionState, fd: FormData): Promise<Ac
         chu = u.id;
         dv = u.id_don_vi;
       }
-      if (!allowed.all && !isOwnerOfParent && !(dv && allowed.units.includes(dv))) {
+      if (!allowed.all && !isOwnerOfParent && !(dv && allowed.units.includes(dv)) && chu !== user.id) {
         err = "Bạn chỉ được giao việc cho cán bộ trong đơn vị mình.";
+        return;
+      }
+      const lyDo = await kiemTraGiao(tx, user, chu!, idCha);
+      if (lyDo) {
+        err = lyDo;
         return;
       }
       const [r] = await tx`
@@ -230,6 +240,8 @@ export async function taskAction(_: ActionState, fd: FormData): Promise<ActionSt
         if (!u) return void (error = "Chọn công chức nhận việc.");
         const allowed = await allowedAssignees(user);
         if (!allowed.all && !(u.id_don_vi && allowed.units.includes(u.id_don_vi))) return void (error = "Chỉ giao lại cho công chức trong đơn vị.");
+        const lyDo = await kiemTraGiao(tx, user, nguoi, id);
+        if (lyDo) return void (error = lyDo);
         await tx`UPDATE cong_viec SET id_nguoi_thuc_hien = ${nguoi}, cap_nhat_luc = now(),
                  trang_thai = CASE WHEN trang_thai = 'moi_giao' THEN 'da_nhan' ELSE trang_thai END,
                  ngay_nhan = COALESCE(ngay_nhan, now()) WHERE id = ${id}`;
@@ -353,6 +365,10 @@ export async function taskAction(_: ActionState, fd: FormData): Promise<ActionSt
           dv = u?.id_don_vi ?? null;
         }
         if (!chu) return void (error = "Chọn người hoặc đơn vị chủ trì hợp lệ.");
+        if (!p.admin) {
+          const lyDo = await kiemTraGiao(tx, user, chu, t.id_cha);
+          if (lyDo) return void (error = lyDo);
+        }
         await tx`UPDATE cong_viec SET id_chu_tri = ${chu}, id_don_vi_chu_tri = ${dv}, id_nguoi_thuc_hien = NULL, trang_thai = 'moi_giao',
                  ngay_nhan = NULL, ly_do_tra_lai = NULL, tao_luc = now(), cap_nhat_luc = now() WHERE id = ${id}`;
         await writeLog(tx, user.id, "doi_chu_tri", "cong_viec", id, { chu_tri: t.id_chu_tri, trang_thai: t.trang_thai }, { chu_tri: chu, trang_thai: "moi_giao" });

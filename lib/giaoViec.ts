@@ -1,0 +1,49 @@
+import type { User } from "./auth";
+import type postgres from "postgres";
+import { lyDoKhongGiao, type NguoiGiaoViec } from "./canBo";
+
+type Q = postgres.Sql | postgres.TransactionSql;
+const COT = "id, ho_ten, vai_tro, quyen, id_don_vi, chuc_vu, id_don_vi_kiem_nhiem, chuc_vu_kiem_nhiem, chuc_vu_dang, pham_vi";
+
+async function nguoiGiao(sql: Q, user: User) {
+  const r = (await sql`SELECT ${sql.unsafe(COT)} FROM nguoi_dung WHERE id = ${user.id}`)[0] as unknown as NguoiGiaoViec;
+  return { ...r, pham_vi: user.pham_vi, quyenHieuLuc: new Set(user.quyen) };
+}
+
+/** Những người ở phía trên trong chuỗi giao việc của công việc (người giao, người tạo, người chủ trì của việc và các việc cha) */
+export async function chuoiTren(sql: Q, idViec: number | null): Promise<number[]> {
+  if (!idViec) return [];
+  const rows = await sql`
+    WITH RECURSIVE c AS (
+      SELECT id, id_cha, id_nguoi_giao, id_nguoi_tao, id_chu_tri, id_nguoi_thuc_hien, 0 AS d FROM cong_viec WHERE id = ${idViec}
+      UNION ALL
+      SELECT p.id, p.id_cha, p.id_nguoi_giao, p.id_nguoi_tao, p.id_chu_tri, p.id_nguoi_thuc_hien, c.d + 1 FROM cong_viec p JOIN c ON p.id = c.id_cha WHERE c.d < 20
+    ) SELECT * FROM c`;
+  const s = new Set<number>();
+  for (const r of rows) {
+    s.add(r.id_nguoi_giao);
+    s.add(r.id_nguoi_tao);
+    s.add(r.id_chu_tri);
+    if (r.d > 0 && r.id_nguoi_thuc_hien) s.add(r.id_nguoi_thuc_hien);
+  }
+  return [...s];
+}
+
+/** Lý do không được giao việc cho người nhận (null = được). idViecTren: việc cha / việc đang giao lại */
+export async function kiemTraGiao(sql: Q, user: User, idNhan: number, idViecTren: number | null = null): Promise<string | null> {
+  const giao = await nguoiGiao(sql, user);
+  const nhan = (await sql`SELECT ${sql.unsafe(COT)} FROM nguoi_dung WHERE id = ${idNhan}`)[0] as unknown as NguoiGiaoViec | undefined;
+  if (!nhan) return "Người nhận không hợp lệ.";
+  const units = (await sql`SELECT id, id_cha FROM don_vi`) as unknown as { id: number; id_cha: number | null }[];
+  const tren = (await chuoiTren(sql, idViecTren)).filter((x) => x !== user.id);
+  return lyDoKhongGiao(giao, nhan, units, tren);
+}
+
+/** Tập id cán bộ mà người dùng được giao việc tới (để lọc danh sách chọn) */
+export async function nguoiDuocGiao(sql: Q, user: User, idViecTren: number | null = null): Promise<Set<number>> {
+  const giao = await nguoiGiao(sql, user);
+  const all = (await sql`SELECT ${sql.unsafe(COT)} FROM nguoi_dung WHERE trang_thai = 'hoat_dong'`) as unknown as NguoiGiaoViec[];
+  const units = (await sql`SELECT id, id_cha FROM don_vi`) as unknown as { id: number; id_cha: number | null }[];
+  const tren = (await chuoiTren(sql, idViecTren)).filter((x) => x !== user.id);
+  return new Set(all.filter((n) => !lyDoKhongGiao(giao, n, units, tren)).map((n) => n.id));
+}
