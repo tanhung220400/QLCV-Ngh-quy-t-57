@@ -144,28 +144,47 @@ const NHAN: Record<string, { bar: string; text: string; soft: string }> = {
   slate: { bar: "bg-slate-300", text: "text-slate-700", soft: "bg-slate-50 border-slate-200" },
 };
 
-/** Nhóm menu: tiêu đề bấm được, mũi tên mở/đóng các mục bên trong */
+/**
+ * Nhóm menu (hoặc module cấp cao nhất có module con): thanh tiêu đề tô màu, mũi tên mở/đóng,
+ * các mục bên trong lùi đầu dòng với đường kẻ dọc. Module có trang riêng thì bấm tên để mở trang.
+ */
 function NavGroup({ n, unread, onClick, dark }: { n: NavNode; unread: number; onClick?: () => void; dark?: boolean }) {
   const active = useActive();
   const hasActive = (x: NavNode): boolean => x.con.some((c) => active(c.href) || hasActive(c));
   const [mo, toggle] = useMo(n.id, hasActive(n));
   const c = NHAN[n.mau] || NHAN.blue;
+  const link = n.loai !== "nhom";
+  const on = link && active(n.href);
+  const box = `mb-1.5 flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${
+    dark ? `border-white/15 backdrop-blur-sm ${on ? "bg-white/25" : "bg-white/10 hover:bg-white/18"}` : `${c.soft} ${on ? "ring-2 ring-brand-300" : "hover:brightness-[0.98]"}`
+  }`;
+  const title = (
+    <>
+      <span className={`h-6 w-1.5 shrink-0 rounded-full ${c.bar}`} />
+      <Icon name={n.icon} className={`h-5 w-5 shrink-0 ${dark ? "text-white" : c.text}`} />
+      <span className={`min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide uppercase ${dark ? "text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.45)]" : c.text}`}>{n.ten}</span>
+    </>
+  );
+  const chev = <Icon name="chevron" className={`h-[18px] w-[18px] shrink-0 transition-transform ${mo ? "rotate-90" : ""} ${dark ? "text-white/85" : c.text}`} />;
+  const label = { "aria-expanded": mo, "aria-label": mo ? `Thu gọn ${n.ten}` : `Mở ${n.ten}`, title: mo ? "Thu gọn" : `Xem ${n.con.length} mục` };
   return (
-    <div>
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={mo}
-        aria-label={mo ? `Thu gọn ${n.ten}` : `Mở ${n.ten}`}
-        title={mo ? "Thu gọn" : `Xem ${n.con.length} mục`}
-        className={`mb-1.5 flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${dark ? "border-white/15 bg-white/10 backdrop-blur-sm hover:bg-white/18" : `${c.soft} hover:brightness-[0.98]`}`}
-      >
-        <span className={`h-6 w-1.5 shrink-0 rounded-full ${c.bar}`} />
-        <Icon name={n.icon} className={`h-5 w-5 shrink-0 ${dark ? "text-white" : c.text}`} />
-        <span className={`min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide uppercase ${dark ? "text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.45)]" : c.text}`}>{n.ten}</span>
-        <Icon name="chevron" className={`h-[18px] w-[18px] shrink-0 transition-transform ${mo ? "rotate-90" : ""} ${dark ? "text-white/85" : c.text}`} />
-      </button>
-      <div hidden={!mo} className="space-y-0.5">
+    <div data-nhom={n.id}>
+      {link ? (
+        <div className={`${box} py-0 pr-1`}>
+          <Link href={n.href} onClick={onClick} title={n.ten} className="flex min-w-0 flex-1 items-center gap-2.5 py-2">
+            {title}
+          </Link>
+          <button type="button" onClick={toggle} {...label} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${dark ? "hover:bg-white/15" : "hover:bg-black/5"}`}>
+            {chev}
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={toggle} {...label} className={box}>
+          {title}
+          {chev}
+        </button>
+      )}
+      <div hidden={!mo} className={`ml-[21px] space-y-0.5 border-l-2 pl-2 ${dark ? "border-white/25" : "border-slate-200"}`}>
         {n.con.map((x) => (
           <NavLink key={x.id} n={x} depth={0} unread={unread} onClick={onClick} dark={dark} />
         ))}
@@ -178,7 +197,7 @@ function MenuList({ tree, unread, onClick, dark }: { tree: NavNode[]; unread: nu
   return (
     <div className="space-y-5">
       {tree.map((n) =>
-        n.loai === "nhom" ? (
+        n.loai === "nhom" || n.con.length > 0 ? (
           <NavGroup key={n.id} n={n} unread={unread} onClick={onClick} dark={dark} />
         ) : (
           <div key={n.id} className="space-y-0.5">

@@ -852,6 +852,8 @@ const day = (n) => {
     ok("nhóm Chỉ tiêu & báo cáo thu gọn, có mũi tên", !(await ctbc.isVisible()) && (await page.locator('aside button[aria-label="Mở Chỉ tiêu & báo cáo"]').count()) === 1);
     await page.click('aside button[aria-label="Mở Chỉ tiêu & báo cáo"]');
     ok("bấm tiêu đề nhóm để xổ xuống", await ctbc.isVisible());
+    const [hx, cx] = await Promise.all([page.locator('aside button[aria-label="Thu gọn Chỉ tiêu & báo cáo"]').boundingBox(), ctbc.boundingBox()]);
+    ok("mục trong nhóm lùi đầu dòng", cx.x > hx.x + 15, `${cx.x}/${hx.x}`);
     await page.click('aside button[aria-label="Mở Quản lý địa bàn"]');
     ok("nhóm Quản lý địa bàn xổ xuống", await page.locator('aside a[title="Hộ kinh doanh cá thể"]').isVisible());
     await page.click('aside button[aria-label="Mở Nhóm kiểm thử chính"]');
@@ -887,6 +889,7 @@ const day = (n) => {
     await page.waitForURL(/muc=mo_dun&xoa=1/, { waitUntil: "commit" });
     tree = await page.locator("main").innerText();
     ok("xóa module chính, giữ module con", !tree.includes("Nhóm kiểm thử đã sửa") && tree.includes("Con A kiểm thử"));
+    ok("module cấp cao nhất có module con hiện như tiêu đề nhóm tô màu", (await page.locator('aside [data-nhom] a[title="Con A kiểm thử"]').count()) === 1 && (await page.locator('aside [data-nhom] button[aria-label$="Con A kiểm thử"]').count()) === 1);
     // xóa nhóm có chức năng hệ thống (trước đây bị chặn), giữ các chức năng bên trong
     const bdId = await page.locator('a[aria-label="Sửa Biểu đồ tiến độ đơn vị"]').getAttribute("href");
     await page.goto(BASE + bdId);
