@@ -227,10 +227,11 @@ export async function deleteModuleAction(_: ActionState, fd: FormData): Promise<
   const sql = await db();
   const id = Number(str(fd, "id"));
   try {
-    await sql.begin((tx) => trashModule(tx, id, u.id, str(fd, "ly_do") || null));
+    await sql.begin((tx) => trashModule(tx, id, u.id, str(fd, "ly_do") || null, str(fd, "giu_con") === "1"));
   } catch (e) {
     return { error: (e as Error).message };
   }
+  if (str(fd, "o_lai") === "1") return { ok: true, message: "Đã xóa module vào Thùng rác." };
   return { redirect: "/quan-tri?muc=mo_dun&xoa=1" };
 }
 

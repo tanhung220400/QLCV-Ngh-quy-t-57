@@ -197,14 +197,15 @@ export const MAU_MODULE_NQ57: ModuleMau[] = [
 
 /** Thêm các chức năng hệ thống mới (khi nâng cấp phiên bản) vào menu đã có */
 export async function ensureSystemModules(tx: Q) {
-  if (!(await tx`SELECT 1 FROM mo_dun WHERE ma = 'bieu_do'`).length) {
+  const daXoa = ((await tx`SELECT gia_tri FROM cai_dat WHERE khoa = 'mo_dun_he_thong_da_xoa'`)[0]?.gia_tri as string[] | undefined) || [];
+  if (!daXoa.includes("bieu_do") && !(await tx`SELECT 1 FROM mo_dun WHERE ma = 'bieu_do'`).length) {
     const g = (await tx`SELECT id FROM mo_dun WHERE ma = 'chi-tieu-bao-cao'`)[0]?.id ?? null;
     const after = (await tx`SELECT thu_tu FROM mo_dun WHERE ma = 'bao_cao'`)[0]?.thu_tu ?? 2;
     await tx`UPDATE mo_dun SET thu_tu = thu_tu + 1 WHERE id_cha IS NOT DISTINCT FROM ${g} AND thu_tu > ${after}`;
     await tx`INSERT INTO mo_dun (ma, ten, mo_ta, bieu_tuong, mau, loai, duong_dan, id_cha, thu_tu)
       VALUES ('bieu_do', 'Biểu đồ tiến độ đơn vị', 'So sánh tiến độ thực hiện công việc giữa các đơn vị', 'chart', 'sky', 'he_thong', '/bieu-do', ${g}, ${after + 1})`;
   }
-  if (!(await tx`SELECT 1 FROM mo_dun WHERE ma = 'danh_gia_kpi'`).length) {
+  if (!daXoa.includes("danh_gia_kpi") && !(await tx`SELECT 1 FROM mo_dun WHERE ma = 'danh_gia_kpi'`).length) {
     const g = (await tx`SELECT id FROM mo_dun WHERE ma = 'chi-tieu-bao-cao'`)[0]?.id ?? null;
     const after = (await tx`SELECT thu_tu FROM mo_dun WHERE ma = 'bieu_do'`)[0]?.thu_tu ?? 3;
     await tx`UPDATE mo_dun SET thu_tu = thu_tu + 1 WHERE id_cha IS NOT DISTINCT FROM ${g} AND thu_tu > ${after}`;

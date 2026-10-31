@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ActionForm, Submit } from "./ActionForm";
 import { Icon, BIEU_TUONG } from "./Icon";
 import { Tile } from "./Nav";
-import { saveModuleAction, templateModuleAction, moveModuleAction, toggleModuleAction, saveFieldAction, fieldOpAction } from "@/app/actions/modules";
+import { saveModuleAction, templateModuleAction, moveModuleAction, toggleModuleAction, saveFieldAction, fieldOpAction, deleteModuleAction } from "@/app/actions/modules";
 import { MAU_MODULE, MAU_MODULE_NQ57, KIEU_TRUONG, moduleHref, type MoDun, type Truong } from "@/lib/modules";
 import { VAI_TRO } from "@/lib/const";
 
@@ -23,10 +23,10 @@ function parentOptions(all: MoDun[], self?: number) {
   return all.filter((m) => (m.loai === "nhom" || m.loai === "du_lieu") && !banned.has(m.id));
 }
 
-export function ModuleForm({ m, all }: { m?: MoDun; all: MoDun[] }) {
+export function ModuleForm({ m, all, cha }: { m?: MoDun; all: MoDun[]; cha?: number | null }) {
   const sys = m?.loai === "he_thong";
   return (
-    <ActionForm key={m?.id ?? "moi"} action={saveModuleAction} className="space-y-3">
+    <ActionForm key={m?.id ?? `moi-${cha ?? ""}`} action={saveModuleAction} className="space-y-3">
       {m && <input type="hidden" name="id" value={m.id} />}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -51,7 +51,7 @@ export function ModuleForm({ m, all }: { m?: MoDun; all: MoDun[] }) {
         </div>
         <div>
           <label className="label">Nằm trong</label>
-          <select name="id_cha" className="input" defaultValue={m?.id_cha ?? ""}>
+          <select name="id_cha" className="input" defaultValue={m ? (m.id_cha ?? "") : (cha ?? "")}>
             <option value="">— Cấp cao nhất —</option>
             {parentOptions(all, m?.id).map((p) => (
               <option key={p.id} value={p.id}>
@@ -168,6 +168,7 @@ function Small({ action, id, name, value, title, icon, extra }: { action: typeof
 
 export function ModuleTree({ rows }: { rows: Row[] }) {
   const kids = (id: number | null) => rows.filter((r) => (r.id_cha ?? null) === id);
+  const countDesc = (id: number): number => kids(id).reduce((n, k) => n + 1 + countDesc(k.id), 0);
   const orphan = rows.filter((r) => r.id_cha && !rows.some((p) => p.id === r.id_cha));
   const render = (r: Row, depth: number): React.ReactNode => (
     <div key={r.id}>
@@ -188,6 +189,25 @@ export function ModuleTree({ rows }: { rows: Row[] }) {
           <Small action={moveModuleAction} id={r.id} name="dir" value="len" title="Lên" icon="up" />
           <Small action={moveModuleAction} id={r.id} name="dir" value="xuong" title="Xuống" icon="down" />
           <Small action={toggleModuleAction} id={r.id} name="x" value="1" title={r.hien ? "Ẩn khỏi menu" : "Hiện trên menu"} icon={r.hien ? "eye" : "eyeoff"} />
+          {(r.loai === "nhom" || r.loai === "du_lieu") && (
+            <Link href={`/quan-tri?muc=mo_dun&cha=${r.id}#them`} className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50" title={`Thêm module con vào “${r.ten}”`} aria-label={`Thêm module con vào ${r.ten}`}>
+              <Icon name="plus" className="h-[18px] w-[18px]" />
+            </Link>
+          )}
+          <Link href={`/quan-tri/mo-dun/${r.id}`} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Sửa" aria-label={`Sửa ${r.ten}`}>
+            <Icon name="edit" className="h-[18px] w-[18px]" />
+          </Link>
+          <ActionForm
+            action={deleteModuleAction}
+            className="inline"
+            confirm={`Xóa “${r.ten}”${kids(r.id).length ? ` cùng ${countDesc(r.id)} module con` : ""}${r.so_ban_ghi ? ` và ${r.so_ban_ghi} bản ghi` : ""}? Có thể khôi phục trong Thùng rác.${kids(r.id).length ? " (Muốn giữ module con: bấm Sửa → Xóa module → chọn giữ lại.)" : ""}`}
+          >
+            <input type="hidden" name="id" value={r.id} />
+            <input type="hidden" name="o_lai" value="1" />
+            <button title="Xóa" aria-label={`Xóa ${r.ten}`} className="rounded-lg p-1.5 text-red-500 hover:bg-red-50">
+              <Icon name="trash" className="h-[18px] w-[18px]" />
+            </button>
+          </ActionForm>
           <Link href={moduleHref(r)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Mở">
             <Icon name="chevron" className="h-[18px] w-[18px]" />
           </Link>

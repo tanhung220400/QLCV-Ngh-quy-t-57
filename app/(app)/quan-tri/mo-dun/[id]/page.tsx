@@ -78,24 +78,40 @@ export default async function ModuleEdit({ params, searchParams }: { params: Pro
                 ))}
                 {!kids.length && <li className="text-slate-500">Chưa có.</li>}
               </ul>
-              <p className="mt-2 text-sm text-slate-500">Tạo module mới ở trang Module &amp; menu và chọn “Nằm trong: {m.ten}”.</p>
+              <details className="mt-3 rounded-xl border border-dashed border-emerald-300 p-3" open={!kids.length && m.loai === "nhom"}>
+                <summary className="cursor-pointer font-semibold text-emerald-700">+ Thêm module con vào “{m.ten}”</summary>
+                <div className="mt-2">
+                  <ModuleForm all={all} cha={m.id} />
+                </div>
+              </details>
             </div>
           )}
-          {m.loai !== "he_thong" ? (
-            <div className="card border-red-100">
-              <h2 className="h2 text-red-700">Xóa module</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Xóa cả module con và toàn bộ {n} bản ghi. Mọi thứ được chuyển vào Thùng rác và khôi phục được.
-              </p>
-              <ActionForm action={deleteModuleAction} confirm={`Xóa module “${m.ten}”?`} className="mt-2 flex flex-wrap gap-2">
-                <input type="hidden" name="id" value={id} />
+          <div className="card border-red-100">
+            <h2 className="h2 text-red-700">Xóa module</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {m.loai === "he_thong"
+                ? "Đây là chức năng có sẵn của phần mềm. Xóa chỉ bỏ khỏi menu (trang vẫn còn); khôi phục được trong Thùng rác."
+                : `Module và ${n} bản ghi được chuyển vào Thùng rác, khôi phục được.`}
+            </p>
+            <ActionForm action={deleteModuleAction} confirm={`Xóa module “${m.ten}”?`} className="mt-2 space-y-2">
+              <input type="hidden" name="id" value={id} />
+              {kids.length > 0 && (
+                <fieldset className="space-y-1 rounded-xl bg-slate-50 p-3">
+                  <legend className="text-sm font-semibold">{kids.length} module con</legend>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="giu_con" value="1" defaultChecked className="accent-brand-600" /> Giữ lại module con (chuyển lên {m.id_cha ? `“${all.find((x) => x.id === m.id_cha)?.ten}”` : "cấp cao nhất"})
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="giu_con" value="0" className="accent-red-600" /> Xóa cả module con
+                  </label>
+                </fieldset>
+              )}
+              <div className="flex flex-wrap gap-2">
                 <input name="ly_do" className="input max-w-xs flex-1" placeholder="Lý do (không bắt buộc)" />
                 <Submit className="btn btn-danger">Xóa module</Submit>
-              </ActionForm>
-            </div>
-          ) : (
-            <p className="card text-sm text-slate-500">Đây là chức năng có sẵn của phần mềm: có thể đổi tên, biểu tượng, vị trí, ẩn/hiện nhưng không xóa.</p>
-          )}
+              </div>
+            </ActionForm>
+          </div>
         </div>
       </div>
     </div>

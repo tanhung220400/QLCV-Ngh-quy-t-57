@@ -751,6 +751,72 @@ const day = (n) => {
   await page.goto(BASE + "/quan-tri?muc=danh_muc&loai=chuc_vu");
   ok("danh mục chức vụ, chức danh", (await page.locator("main").innerText()).includes("Chức danh Tổ giúp việc"));
   await ctx.close();
+  // 18. Module chính, module con: thêm, sửa, xóa ngay trên cây menu
+  {
+    ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
+    await page.goto(BASE + "/dang-nhap");
+    await page.fill('input[name="ten_dang_nhap"]', "quantri");
+    await page.fill('input[name="mat_khau"]', "Quantri@2026");
+    await page.click('button[type="submit"]');
+    await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+    // module chính mới
+    await page.goto(BASE + "/quan-tri?muc=mo_dun");
+    let f = page.locator('#them form');
+    await f.locator('input[name="ten"]').fill("Nhóm kiểm thử chính");
+    await f.locator('select[name="loai"]').selectOption("nhom");
+    await f.locator('button:has-text("Tạo module")').click();
+    await page.waitForURL(/quan-tri\/mo-dun\/\d+\?moi=1/, { waitUntil: "commit" });
+    const nhomUrl = page.url().split("?")[0];
+    ok("thêm module chính (nhóm cấp cao nhất)", (await page.locator("main h1").innerText()).includes("Nhóm kiểm thử chính"));
+    // thêm module con ngay trong trang module chính
+    await page.waitForSelector("summary:has-text('Thêm module con vào')");
+    const cf = page.locator("details:has(summary:has-text('Thêm module con vào')) form");
+    if (!(await cf.isVisible())) await page.click("summary:has-text('Thêm module con vào')");
+    await cf.locator('input[name="ten"]').fill("Con A kiểm thử");
+    await cf.locator('button:has-text("Tạo module")').click();
+    await page.waitForURL(/quan-tri\/mo-dun\/\d+\?moi=1/, { waitUntil: "commit" });
+    ok("thêm module con trong trang module chính", (await page.locator('select[name="id_cha"]').first().evaluate((e) => e.options[e.selectedIndex].text)).includes("Nhóm kiểm thử chính"));
+    // thêm module con từ nút + trên cây
+    await page.goto(BASE + "/quan-tri?muc=mo_dun");
+    await page.click('a[aria-label="Thêm module con vào Nhóm kiểm thử chính"]');
+    await page.waitForURL(/cha=\d+/);
+    f = page.locator('#them form');
+    ok("nút + chọn sẵn module cha", (await f.locator('select[name="id_cha"]').evaluate((e) => e.options[e.selectedIndex].text)).includes("Nhóm kiểm thử chính"));
+    await f.locator('input[name="ten"]').fill("Con B kiểm thử");
+    await f.locator('button:has-text("Tạo module")').click();
+    await page.waitForURL(/quan-tri\/mo-dun\/\d+\?moi=1/, { waitUntil: "commit" });
+    // sửa module chính: đổi tên
+    await page.goto(nhomUrl);
+    const ef = page.locator('form:has(button:has-text("Lưu module"))');
+    await ef.locator('input[name="ten"]').fill("Nhóm kiểm thử đã sửa");
+    await ef.locator('button:has-text("Lưu module")').click();
+    await page.waitForSelector("text=Đã lưu module.");
+    await page.goto(BASE + "/quan-tri?muc=mo_dun");
+    let tree = await page.locator("main").innerText();
+    ok("sửa tên module chính", tree.includes("Nhóm kiểm thử đã sửa"));
+    // xóa module con ngay trên cây
+    await page.click('button[aria-label="Xóa Con B kiểm thử"]');
+    await page.waitForFunction(() => !document.body.innerText.includes("Con B kiểm thử"), null, { timeout: 15000 });
+    ok("xóa module con trên cây menu", true);
+    // xóa module chính, giữ module con
+    await page.goto(nhomUrl);
+    await page.click('button:has-text("Xóa module")');
+    await page.waitForURL(/muc=mo_dun&xoa=1/, { waitUntil: "commit" });
+    tree = await page.locator("main").innerText();
+    ok("xóa module chính, giữ module con", !tree.includes("Nhóm kiểm thử đã sửa") && tree.includes("Con A kiểm thử"));
+    // xóa nhóm có chức năng hệ thống (trước đây bị chặn), giữ các chức năng bên trong
+    const bdId = await page.locator('a[aria-label="Sửa Biểu đồ tiến độ đơn vị"]').getAttribute("href");
+    await page.goto(BASE + bdId);
+    await page.click('button:has-text("Xóa module")');
+    await page.waitForURL(/muc=mo_dun&xoa=1/, { waitUntil: "commit" });
+    ok("xóa được chức năng hệ thống khỏi menu", !(await page.locator("aside").innerText()).includes("Biểu đồ tiến độ đơn vị"));
+    await page.goto(BASE + "/quan-tri?muc=thung_rac");
+    await page.locator('tr:has-text("Biểu đồ tiến độ đơn vị") button:has-text("Khôi phục")').first().click();
+    await page.waitForTimeout(1500);
+    await page.goto(BASE + "/quan-tri?muc=mo_dun");
+    ok("khôi phục chức năng hệ thống từ Thùng rác", (await page.locator("aside").innerText()).includes("Biểu đồ tiến độ đơn vị"));
+    await ctx.close();
+  }
   const nguoiChon = async (u) => {
     ({ ctx, page } = await newPage({ width: 1280, height: 800 }));
     await login(page, u);

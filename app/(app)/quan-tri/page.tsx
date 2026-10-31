@@ -99,7 +99,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
       )}
 
       {muc === "danh_muc" && <Catalogs open={sp.loai || "linh_vuc"} />}
-      {muc === "mo_dun" && <Modules deleted={!!sp.xoa} />}
+      {muc === "mo_dun" && <Modules deleted={!!sp.xoa} cha={Number(sp.cha) || null} />}
       {muc === "thung_rac" && <Trash />}
       {muc === "giao_dien" && <Theme />}
       {muc === "ngay_nghi" && <Holidays />}
@@ -689,21 +689,33 @@ async function Catalogs({ open }: { open: string }) {
   );
 }
 
-async function Modules({ deleted }: { deleted: boolean }) {
+async function Modules({ deleted, cha }: { deleted: boolean; cha: number | null }) {
   const sql = await db();
   const rows = (await sql`SELECT m.*, (SELECT count(*)::int FROM mo_dun_ban_ghi b WHERE b.id_mo_dun = m.id) AS so_ban_ghi FROM mo_dun m ORDER BY thu_tu, id`) as unknown as (MoDun & { so_ban_ghi: number })[];
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_400px]">
       <div className="card">
         <h2 className="h2">Cây menu, module</h2>
-        <p className="mb-2 text-sm text-slate-500">Dùng mũi tên để sắp xếp, con mắt để ẩn/hiện. Bấm tên để sửa thông tin, trường dữ liệu, vị trí.</p>
+        <p className="mb-2 text-sm text-slate-500">Mũi tên: sắp xếp · Con mắt: ẩn/hiện · Dấu +: thêm module con · Bút: sửa · Thùng rác: xóa (khôi phục được trong Thùng rác).</p>
         {deleted && <p className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">Đã xóa module vào Thùng rác.</p>}
         <ModuleTree rows={rows} />
       </div>
       <div className="space-y-5">
-        <div className="card">
-          <h2 className="h2 mb-3">Thêm module mới</h2>
-          <ModuleForm all={rows} />
+        <div id="them" className={`card scroll-mt-20 ${cha ? "ring-2 ring-emerald-300" : ""}`}>
+          <h2 className="h2 mb-1">{cha ? "Thêm module con" : "Thêm module chính hoặc module con"}</h2>
+          <p className="mb-3 text-sm text-slate-500">
+            {cha && rows.find((r) => r.id === cha) ? (
+              <>
+                Module mới sẽ nằm trong <b>{rows.find((r) => r.id === cha)!.ten}</b>.{" "}
+                <Link href="/quan-tri?muc=mo_dun#them" className="text-brand-700 underline">
+                  Thêm ở cấp cao nhất
+                </Link>
+              </>
+            ) : (
+              "Để “Nằm trong: Cấp cao nhất” là module chính (hiện như một nhóm trên menu); chọn một nhóm hoặc module là module con."
+            )}
+          </p>
+          <ModuleForm all={rows} cha={cha} />
         </div>
         <div className="card">
           <h2 className="h2">Tạo nhanh từ mẫu</h2>

@@ -113,11 +113,28 @@ export async function trashRecord(tx: Tx, id: number, uid: number, ly_do: string
 }
 
 // ---------- Module (kèm module con, trường, dữ liệu) ----------
-export async function trashModule(tx: Tx, id: number, uid: number, ly_do: string | null) {
+/**
+ * Xóa module vào thùng rác. giuCon = true: các module con được chuyển lên cấp của module bị xóa (giữ lại),
+ * ngược lại xóa cả module con. Module chức năng hệ thống cũng xóa được (chỉ bỏ khỏi menu; khôi phục từ Thùng rác).
+ */
+export async function trashModule(tx: Tx, id: number, uid: number, ly_do: string | null, giuCon = false) {
+  const goc = (await tx`SELECT id, id_cha FROM mo_dun WHERE id = ${id}`)[0];
+  if (!goc) throw new Error("Không tìm thấy module.");
+  if (giuCon) {
+    const n = ((await tx`SELECT coalesce(max(thu_tu), 0)::int AS n FROM mo_dun WHERE id_cha IS NOT DISTINCT FROM ${goc.id_cha}`)[0].n as number) + 1;
+    const con = await tx`SELECT id FROM mo_dun WHERE id_cha = ${id} ORDER BY thu_tu, id`;
+    for (const [i, c] of con.entries()) await tx`UPDATE mo_dun SET id_cha = ${goc.id_cha}, thu_tu = ${n + i} WHERE id = ${c.id}`;
+  }
   const all = await tx`WITH RECURSIVE t AS (SELECT id FROM mo_dun WHERE id = ${id} UNION SELECT c.id FROM mo_dun c JOIN t ON c.id_cha = t.id) SELECT id FROM t`;
   const ids = all.map((r) => r.id as number);
   const mods = await tx`SELECT * FROM mo_dun WHERE id IN ${tx(ids)} ORDER BY (id_cha IS NOT NULL), id`;
-  if (mods.some((m) => m.loai === "he_thong")) throw new Error("Module hệ thống chỉ có thể ẩn, không xóa được. Hãy chuyển module hệ thống ra khỏi nhóm trước khi xóa nhóm.");
+  // ghi nhớ chức năng hệ thống đã bị xóa để lần nâng cấp sau không tự thêm lại
+  const sys = mods.filter((m) => m.loai === "he_thong").map((m) => m.ma as string);
+  if (sys.length) {
+    const cu = ((await tx`SELECT gia_tri FROM cai_dat WHERE khoa = 'mo_dun_he_thong_da_xoa'`)[0]?.gia_tri as string[] | undefined) || [];
+    await tx`INSERT INTO cai_dat (khoa, gia_tri) VALUES ('mo_dun_he_thong_da_xoa', ${tx.json([...new Set([...cu, ...sys])])})
+             ON CONFLICT (khoa) DO UPDATE SET gia_tri = EXCLUDED.gia_tri`;
+  }
   const recs = await tx`SELECT * FROM mo_dun_ban_ghi WHERE id_mo_dun IN ${tx(ids)}`;
   const recIds = recs.map((r) => r.id as number);
   const bang: Bang[] = [
@@ -154,7 +171,14 @@ export async function restore(tx: Tx, trashId: number, uid: number) {
   for (const b of bang) {
     if (!b.rows.length) continue;
     const rows = unpack(tx, b.rows);
-    for (const row of rows) await tx`INSERT INTO ${tx(b.t)} ${tx(row as never)} ON CONFLICT DO NOTHING`;
+    for (const row of rows) {
+      // module cha đã bị xóa sau đó: khôi phục module ra cấp cao nhất
+      if (b.t === "mo_dun" && (row as { id_cha?: number | null }).id_cha) {
+        const cha = (row as { id_cha: number }).id_cha;
+        if (!(await tx`SELECT 1 FROM mo_dun WHERE id = ${cha}`).length && !rows.some((x) => (x as { id: number }).id === cha)) (row as { id_cha: number | null }).id_cha = null;
+      }
+      await tx`INSERT INTO ${tx(b.t)} ${tx(row as never)} ON CONFLICT DO NOTHING`;
+    }
   }
   await tx`UPDATE thung_rac SET trang_thai = 'da_khoi_phuc' WHERE id = ${trashId}`;
   await writeLog(tx, uid, "khoi_phuc", r.loai, r.id_goc, null, { thung_rac: trashId, tieu_de: r.tieu_de });
