@@ -27,7 +27,14 @@ export function Welcome({ img, tenXa, hoTen, bat }: { img: string | null; tenXa:
   };
 
   useEffect(() => {
-    if (!document.documentElement.hasAttribute("data-chao")) return setGone(true);
+    // Chuyển trang trong ứng dụng (ví dụ ngay sau đăng nhập) thì đoạn script phía dưới không chạy: tự quyết định ở đây
+    let seen = false;
+    try {
+      seen = !!sessionStorage.getItem(KEY);
+    } catch {}
+    const show = document.documentElement.hasAttribute("data-chao") || (bat && !seen) || location.search.includes("chao=1");
+    if (!show) return setGone(true);
+    document.documentElement.setAttribute("data-chao", "1");
     try {
       sessionStorage.setItem(KEY, "1");
     } catch {}
