@@ -298,6 +298,11 @@ const day = (n) => {
   await login(page, "cv.kinhte2");
   const bd2 = await check(page, "/bieu-do", "được cấp quyền biểu đồ");
   ok("admin cấp quyền thì xem được biểu đồ", bd2.includes("So sánh tiến độ thực hiện công việc"));
+  ok("biểu đồ con việc con của đơn vị mình", (await page.locator("svg[data-bieu-do-con]").count()) === 1 && bd2.includes("Biểu đồ con: tiến độ các việc con của Phòng Kinh tế"));
+  await page.locator("svg[data-bieu-do-con] rect[fill='transparent']").first().hover();
+  ok("di chuột biểu đồ con hiện việc con", await page.locator("text=Bấm vào cột để mở việc con").isVisible());
+  const subOpts = await page.locator('select[aria-label="Chọn việc lớn"] option').allInnerTexts();
+  ok("biểu đồ con lọc theo việc lớn", subOpts.some((o) => o.includes("giải phóng mặt bằng")), subOpts.join(" | ").slice(0, 160));
   const scopeTxt = await check(page, "/viec?tab=tat_ca", "công chức được mở phạm vi");
   ok("phạm vi đơn vị: thấy việc của cả phòng", scopeTxt.includes("Rà soát, thống kê diện tích đất công"));
   await page.goto(BASE + "/chi-tieu");
@@ -582,6 +587,8 @@ const day = (n) => {
   await login(page, "chutich");
   ok("menu có Biểu đồ tiến độ đơn vị", (await page.locator("aside").innerText()).includes("Biểu đồ tiến độ đơn vị"));
   const bd = await check(page, "/bieu-do", "biểu đồ");
+  ok("đơn vị khác không thấy việc con của Phòng Kinh tế", !bd.includes("Kiểm đếm tài sản") && (await page.locator("svg[data-bieu-do-con]").count()) === 0);
+  ok("biểu đồ chính chỉ tính việc lớn", bd.includes("không tính việc con"));
   ok("biểu đồ cột theo đơn vị", (await page.locator('svg[role="img"] path').count()) >= 3 && bd.includes("Phòng Kinh tế") && bd.includes("Tiến độ bình quân"));
   const svgW = (await page.locator('svg[role="img"]').boundingBox()).width;
   const mainW = (await page.locator("main").boundingBox()).width;

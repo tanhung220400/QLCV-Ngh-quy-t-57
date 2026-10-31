@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { UnitProgress } from "@/lib/unitProgress";
+import type { UnitProgress, SubTask } from "@/lib/unitProgress";
 
 // Màu trạng thái cố định (giống các biểu đồ khác của phần mềm), luôn kèm chú thích chữ
 const SEG = [
@@ -237,6 +237,124 @@ export function UnitProgressChart({ rows, linkBase }: { rows: UnitProgress[]; li
       )}
       <div className="mt-3 flex-1">
         <Columns rows={sorted} mode={mode} chiSo={chiSo} height={height} link={link} />
+      </div>
+    </div>
+  );
+}
+
+const NHOM_TEN: Record<SubTask["nhom"], string> = { dung_han: "Xong đúng hạn", tre_han: "Xong trễ hạn", dang_lam: "Đang làm, còn hạn", qua_han: "Chưa xong, đã quá hạn" };
+const NHOM_MAU: Record<SubTask["nhom"], string> = { dung_han: "#0ca30c", tre_han: "#ec835a", dang_lam: "#b9b8ad", qua_han: "#d03b3b" };
+
+/** Biểu đồ con: mỗi cột là một việc con, chiều cao là % tiến độ, màu theo tình trạng hạn */
+export function SubtaskChart({ rows }: { rows: SubTask[] }) {
+  const parents = [...new Map(rows.map((r) => [r.id_goc, r.ten_goc])).entries()];
+  const [goc, setGoc] = useState<number>(0);
+  const list = goc ? rows.filter((r) => r.id_goc === goc) : rows;
+  const [box, size] = useSize<HTMLDivElement>();
+  const [tip, setTip] = useState<{ x: number; y: number; r: SubTask } | null>(null);
+  const [vh, setVh] = useState(800);
+  useEffect(() => {
+    const on = () => setVh(window.innerHeight);
+    on();
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  const left = 48;
+  const right = 12;
+  const top = 28;
+  const minBand = 70;
+  const W = Math.max(size.w, list.length * minBand + left + right);
+  const H = Math.max(340, Math.min(620, vh - 360));
+  const band = (W - left - right) / Math.max(1, list.length);
+  const maxChars = Math.max(6, Math.floor((band - 6) / 7));
+  const labels = list.map((r) => wrap(r.ten, maxChars));
+  const bottom = 14 + Math.max(1, ...labels.map((l) => l.length)) * 16;
+  const ph = H - top - bottom;
+  const y = (v: number) => top + ph - (v / 100) * ph;
+  const barW = Math.min(48, Math.max(14, band * 0.5));
+  // dải nền nhạt phân biệt các việc lớn khi xem tất cả
+  const bands: { from: number; to: number; ten: string }[] = [];
+  list.forEach((r, i) => {
+    const last = bands[bands.length - 1];
+    if (last && list[i - 1]?.id_goc === r.id_goc) last.to = i;
+    else bands.push({ from: i, to: i, ten: r.ten_goc });
+  });
+
+  return (
+    <div className="card">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          Việc lớn
+          <select value={goc} onChange={(e) => setGoc(Number(e.target.value))} className="input min-h-10 w-auto max-w-[70vw] py-1.5" aria-label="Chọn việc lớn">
+            <option value={0}>Tất cả ({rows.length} việc con)</option>
+            {parents.map(([id, ten]) => (
+              <option key={id} value={id}>
+                {ten.length > 70 ? ten.slice(0, 68) + "…" : ten}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
+        {(Object.keys(NHOM_TEN) as SubTask["nhom"][]).map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: NHOM_MAU[k] }} />
+            {NHOM_TEN[k]}
+          </span>
+        ))}
+      </div>
+      <div ref={box} className="relative mt-3 w-full overflow-x-auto" onMouseLeave={() => setTip(null)}>
+        <svg width={W} height={H} role="img" aria-label="Tiến độ các việc con" className="block" data-bieu-do-con>
+          {!goc &&
+            bands.length > 1 &&
+            bands.map((b, i) =>
+              i % 2 === 1 ? <rect key={i} x={left + band * b.from} y={top} width={band * (b.to - b.from + 1)} height={ph} fill="#f1f5f9" /> : null,
+            )}
+          {[0, 20, 40, 60, 80, 100].map((t) => (
+            <g key={t}>
+              <line x1={left} x2={W - right} y1={y(t)} y2={y(t)} stroke={GRID} strokeWidth={1} />
+              <text x={left - 8} y={y(t) + 4} textAnchor="end" fontSize={12} fill={MUTED}>
+                {t}%
+              </text>
+            </g>
+          ))}
+          {list.map((r, i) => {
+            const cx = left + band * i + band / 2;
+            const enter = () => setTip({ x: Math.min(W - 136, Math.max(136, cx)), y: Math.max(190, y(r.tien_do)), r });
+            return (
+              <g key={r.id}>
+                <a href={`/viec/${r.id}`}>
+                  <rect x={left + band * i} y={top} width={band} height={ph} fill="transparent" onMouseEnter={enter} onFocus={enter} tabIndex={0} aria-label={`${r.ten}: ${r.tien_do}%`} />
+                  {r.tien_do > 0 && <path d={colPath(cx - barW / 2, y(r.tien_do), barW, top + ph - y(r.tien_do), 4)} fill={NHOM_MAU[r.nhom]} pointerEvents="none" />}
+                  <text x={cx} y={y(r.tien_do) - 8} textAnchor="middle" fontSize={13} fontWeight={600} fill={INK} pointerEvents="none">
+                    {r.tien_do}%
+                  </text>
+                </a>
+                {labels[i].map((ln, k) => (
+                  <text key={k} x={cx} y={top + ph + 18 + k * 16} textAnchor="middle" fontSize={13} fill={INK}>
+                    {ln}
+                  </text>
+                ))}
+              </g>
+            );
+          })}
+          <line x1={left} x2={W - right} y1={top + ph} y2={top + ph} stroke="#cbd5e1" strokeWidth={1} />
+        </svg>
+        {tip && (
+          <div className="pointer-events-none absolute z-10 w-64 -translate-x-1/2 -translate-y-full rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-lift" style={{ left: tip.x, top: tip.y - 10 }}>
+            <div className="font-semibold text-slate-900">{tip.r.ten}</div>
+            <div className="mt-0.5 text-slate-500">Thuộc: {tip.r.ten_goc}</div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: NHOM_MAU[tip.r.nhom] }} />
+              {NHOM_TEN[tip.r.nhom]}
+            </div>
+            <div className="mt-1 text-slate-700">
+              Chủ trì: {tip.r.chu_tri} · Hạn {tip.r.han}
+            </div>
+            <div className="mt-1 font-semibold text-slate-900">Tiến độ: {tip.r.tien_do}%</div>
+            <div className="text-xs text-slate-400">Bấm vào cột để mở việc con</div>
+          </div>
+        )}
       </div>
     </div>
   );

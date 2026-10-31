@@ -4,8 +4,8 @@ import { db } from "@/lib/db";
 import { taskScope } from "@/lib/perm";
 import { getCatalog } from "@/lib/settings";
 import { oldYears } from "@/lib/taskQuery";
-import { unitProgress } from "@/lib/unitProgress";
-import { UnitProgressChart } from "@/components/UnitProgressChart";
+import { unitProgress, subtaskProgress } from "@/lib/unitProgress";
+import { UnitProgressChart, SubtaskChart } from "@/components/UnitProgressChart";
 import { vnDate } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,8 @@ export default async function BieuDo({ searchParams }: { searchParams: Promise<R
   const scope = (await taskScope(sql, user)).q;
   const rows = await unitProgress(sql, scope, { nam, quy: thang ? 0 : quy, thang, linh_vuc: lv });
   const tong = rows.reduce((a, r) => a + r.tong, 0);
+  // Biểu đồ con: chỉ cán bộ thuộc chính đơn vị chủ trì mới xem việc con của đơn vị mình
+  const subs = user.id_don_vi ? await subtaskProgress(sql, user.id_don_vi, { nam, quy: thang ? 0 : quy, thang, linh_vuc: lv }) : [];
   const kyLabel = thang ? `tháng ${thang}/${nam}` : quy ? `quý ${["", "I", "II", "III", "IV"][quy]}/${nam}` : `năm ${nam}`;
   const linkBase = `/viec?tab=tat_ca${nam < cur ? `&nam=${nam}` : ""}${lv ? `&linh_vuc=${encodeURIComponent(lv)}` : ""}`;
 
@@ -32,8 +34,8 @@ export default async function BieuDo({ searchParams }: { searchParams: Promise<R
       <div>
         <h1 className="h1">So sánh tiến độ thực hiện công việc giữa các đơn vị</h1>
         <p className="muted">
-          Công việc giao trong {kyLabel}
-          {lv ? `, lĩnh vực ${lv}` : ""} · {rows.length} đơn vị · {tong} việc (không tính việc đã hủy)
+          Việc lớn giao trong {kyLabel}
+          {lv ? `, lĩnh vực ${lv}` : ""} · {rows.length} đơn vị · {tong} việc (không tính việc con và việc đã hủy)
         </p>
       </div>
 
@@ -88,6 +90,18 @@ export default async function BieuDo({ searchParams }: { searchParams: Promise<R
       </form>
 
       <UnitProgressChart rows={rows} linkBase={linkBase} />
+
+      {user.id_don_vi && (
+        <section className="space-y-2" id="bieu-do-con">
+          <div>
+            <h2 className="h2">Biểu đồ con: tiến độ các việc con của {user.ten_don_vi}</h2>
+            <p className="text-sm text-slate-500">
+              Mỗi cột là một việc con (việc được chia nhỏ từ việc lớn do {user.ten_don_vi} chủ trì), cao theo % tiến độ. Chỉ cán bộ thuộc {user.ten_don_vi} xem được phần này.
+            </p>
+          </div>
+          {subs.length ? <SubtaskChart rows={subs} /> : <div className="card text-slate-500">Đơn vị chưa có việc con trong {kyLabel}.</div>}
+        </section>
+      )}
 
       {rows.length > 0 && (
         <details className="card">
