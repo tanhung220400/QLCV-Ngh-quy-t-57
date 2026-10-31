@@ -738,7 +738,7 @@ const day = (n) => {
   ok("vai trò, quyền giao việc theo chức vụ", /Kiểm Thử Trưởng[\s\S]*Trưởng đơn vị[\s\S]*Giao việc cấp 2/.test(ds));
   // sửa cán bộ có đủ ô chọn
   await page.click("tr:has-text('Kiểm Thử Viên') a:has-text('Sửa')");
-  await page.waitForSelector('select[name="chuc_vu_kiem_nhiem"]');
+  await page.waitForSelector("h2:has-text('Sửa: Kiểm Thử Viên')");
   const kn = await page.locator('select[name="chuc_vu_kiem_nhiem"]').inputValue();
   const bcd = await page.locator('select[name="chuc_danh_bcd"]').inputValue();
   ok("biểu mẫu cán bộ có chức vụ kiêm nhiệm, BCĐ", kn === "Bí thư" && bcd === "Ủy viên", `${kn} / ${bcd}`);
@@ -754,7 +754,7 @@ const day = (n) => {
     ({ ctx, page } = await newPage({ width: 1280, height: 800 }));
     await login(page, u);
     await page.goto(BASE + "/viec/moi");
-    const t = await page.locator('select[name="phoi_hop"] option').allInnerTexts();
+    const t = await page.locator('select[name="phoi_hop"] option').evaluateAll((es) => es.map((e) => e.textContent));
     await ctx.close();
     return t.join(" | ");
   };
@@ -778,7 +778,7 @@ const day = (n) => {
   await page.goto(BASE + "/viec?tab=tat_ca&q=" + encodeURIComponent("Lập kế hoạch giải phóng mặt bằng"));
   await page.click("a:has-text('Lập kế hoạch giải phóng mặt bằng')");
   await page.waitForURL(/\/viec\/\d+/);
-  const sub = await page.locator('details:has(summary:has-text("Thêm việc con")) select[name="phoi_hop"] option').allInnerTexts();
+  const sub = await page.locator('details:has(summary:has-text("Thêm việc con")) select[name="phoi_hop"] option').evaluateAll((es) => es.map((e) => e.textContent));
   ok("việc con: không giao ngược cho người đã giao (chủ tịch)", sub.length > 0 && !sub.join("|").includes("Trần Thị Châu") && sub.join("|").includes("Vũ Thị Lan"), sub.join(" | "));
   // giao lại: chỉ cán bộ cấp dưới trong đơn vị
   const gl = await page.locator('form:has(input[name="op"][value="giao_lai"]) select option').allInnerTexts();
