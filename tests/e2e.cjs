@@ -737,8 +737,8 @@ const day = (n) => {
   await page.goto(BASE + "/quan-tri?muc=don_vi");
   ok("sửa đơn vị", (await page.locator("main").innerText()).includes("Chi đoàn đã sửa"));
   await page.click('button[aria-label="Xóa Chi đoàn đã sửa"]');
-  await page.waitForFunction(() => !document.body.innerText.includes("Chi đoàn đã sửa"), null, { timeout: 15000 });
-  ok("xóa đơn vị trống", true);
+  await page.waitForSelector("text=Đã xóa “Chi đoàn đã sửa”");
+  ok("xóa đơn vị trống", (await page.locator('button[aria-label="Xóa Chi đoàn đã sửa"]').count()) === 0);
   // hồ sơ cán bộ: thêm bằng biểu mẫu
   const taoCanBo = async (v) => {
     await page.goto(BASE + "/quan-tri?muc=nguoi_dung");
