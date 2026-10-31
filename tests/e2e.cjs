@@ -370,7 +370,7 @@ const day = (n) => {
   await page.selectOption('select[name="f_nganh_nghe"]', "Ăn uống");
   await page.click('button:has-text("Lưu")');
   await page.waitForURL(/\/m\/ho-kinh-doanh-ca-the\/\d+\?luu=1/, { waitUntil: "commit" });
-  const recUrl = page.url().split("?")[0];
+  const recUrl = page.url().split("?")[0].replace(BASE, "");
   const rec = await page.locator("main").innerText();
   ok("nhập bản ghi vào module mới", rec.includes("Quán cơm Bình Dân") && rec.includes("Ăn uống"));
   ok("module mới hiện trên menu", (await page.locator("aside").innerText()).includes("Hộ kinh doanh cá thể"));
@@ -398,7 +398,7 @@ const day = (n) => {
   const sTxt = await check(page, "/m/ho-kinh-doanh-ca-the?q=" + encodeURIComponent("tap hoa"), "tìm không dấu");
   ok("tìm kiếm không dấu trong module", sTxt.includes("Tạp hóa Minh Anh") && !sTxt.includes("Quán cơm Bình Dân"));
   // Xóa bản ghi -> thùng rác -> khôi phục
-  await page.goto(recUrl);
+  await page.goto(BASE + recUrl);
   await page.click("summary:has-text('Xóa bản ghi')");
   await page.click('button:has-text("Xóa")');
   await page.waitForURL(/xoa=1/, { waitUntil: "commit" });
@@ -413,12 +413,12 @@ const day = (n) => {
   await page.goto(BASE + "/viec?tab=tat_ca");
   await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại thôn");
   await page.waitForURL(/\/viec\/\d+$/, { waitUntil: "commit" });
-  const delUrl = page.url();
+  const delUrl = page.url().replace(BASE, "");
   await page.click("summary:has-text('Quản trị dữ liệu')");
   await page.locator('form:has(button:has-text("Xóa công việc")) input[name="ly_do"]').fill("Kiểm thử xóa");
   await page.click('button:has-text("Xóa công việc")');
   await page.waitForURL(/viec\?xoa=1/, { waitUntil: "commit" });
-  const gr = await page.goto(delUrl);
+  const gr = await page.goto(BASE + delUrl);
   const gone = await page.locator("body").innerText();
   ok("quản trị xóa công việc", gr.status() === 404 || /không tìm thấy|could not be found/i.test(gone), `HTTP ${gr.status()}`);
   await page.goto(BASE + "/quan-tri?muc=thung_rac");
