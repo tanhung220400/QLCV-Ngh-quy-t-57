@@ -289,11 +289,11 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
       <header className="no-print sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur lg:ml-(--side-w)">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-5">
           <BackButton />
-          <Link href="/" className={`items-center gap-2 lg:hidden ${path === "/" ? "flex" : "hidden sm:flex"}`}>
+          <Link href="/" className={`min-w-0 shrink items-center gap-2 lg:hidden ${path === "/" ? "flex" : "hidden sm:flex"}`}>
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">
               <Icon name="check" className="h-5 w-5" strokeWidth={2.6} />
             </span>
-            <span className="max-w-[46vw] truncate leading-tight font-bold text-slate-900">{me.ten_xa}</span>
+            <span className="max-w-[38vw] truncate leading-tight font-bold text-slate-900">{me.ten_xa}</span>
           </Link>
           {me.traCuu ? (
             <form action="/tra-cuu" className="relative hidden flex-1 md:block">
