@@ -397,6 +397,11 @@ html[data-chao] body {
   background: linear-gradient(180deg, rgb(12 30 80 / var(--phu)) 0%, rgb(16 38 100 / calc(var(--phu) - 0.04)) 45%, rgb(10 24 66 / calc(var(--phu) + 0.06)) 100%);
 }
 
+/* Trang cần dùng hết bề ngang màn hình (biểu đồ) */
+main:has([data-rong]) {
+  max-width: none;
+}
+
 @media print {
   .no-print {
     display: none !important;

@@ -71,6 +71,7 @@ export const QUYEN_HE_THONG: Record<string, string | null> = {
   chi_tieu: "ct.xem",
   bao_cao: "bc.xem",
   tra_cuu: "bc.tra_cuu",
+  bieu_do: "bc.bieu_do",
   thong_bao: null,
 };
 
@@ -192,6 +193,17 @@ export const MAU_MODULE_NQ57: ModuleMau[] = [
     ],
   },
 ];
+
+/** Thêm các chức năng hệ thống mới (khi nâng cấp phiên bản) vào menu đã có */
+export async function ensureSystemModules(tx: Q) {
+  if (!(await tx`SELECT 1 FROM mo_dun WHERE ma = 'bieu_do'`).length) {
+    const g = (await tx`SELECT id FROM mo_dun WHERE ma = 'chi-tieu-bao-cao'`)[0]?.id ?? null;
+    const after = (await tx`SELECT thu_tu FROM mo_dun WHERE ma = 'bao_cao'`)[0]?.thu_tu ?? 2;
+    await tx`UPDATE mo_dun SET thu_tu = thu_tu + 1 WHERE id_cha IS NOT DISTINCT FROM ${g} AND thu_tu > ${after}`;
+    await tx`INSERT INTO mo_dun (ma, ten, mo_ta, bieu_tuong, mau, loai, duong_dan, id_cha, thu_tu)
+      VALUES ('bieu_do', 'Biểu đồ tiến độ đơn vị', 'So sánh tiến độ thực hiện công việc giữa các đơn vị', 'chart', 'sky', 'he_thong', '/bieu-do', ${g}, ${after + 1})`;
+  }
+}
 
 /** Tạo menu mặc định: module hệ thống, nhóm, module mẫu Nghị quyết 57 (chạy một lần khi nâng cấp) */
 export async function seedModules(tx: Q) {

@@ -267,6 +267,7 @@ const day = (n) => {
   await page.check('label:has-text("Phòng Kinh tế") input[name="pv_don_vi"]');
   await page.uncheck('input[name="quyen"][value="ct.xem"]');
   await page.check('input[name="quyen"][value="bc.dashboard"]');
+  await page.check('input[name="quyen"][value="bc.bieu_do"]');
   await page.click('button:has-text("Lưu thay đổi")');
   await page.waitForSelector("text=Đã lưu.");
   ok("lưu phân quyền chi tiết", true);
@@ -287,7 +288,16 @@ const day = (n) => {
   await ctx.close();
 
   ({ ctx, page } = await newPage());
+  await login(page, "cv.kinhte1");
+  await page.goto(BASE + "/bieu-do");
+  ok("công chức chưa được phân quyền thì không xem được biểu đồ", page.url().includes("khong_quyen"));
+  ok("menu không hiện biểu đồ khi chưa có quyền", !(await page.locator("aside").innerText()).includes("Biểu đồ tiến độ"));
+  await ctx.close();
+
+  ({ ctx, page } = await newPage());
   await login(page, "cv.kinhte2");
+  const bd2 = await check(page, "/bieu-do", "được cấp quyền biểu đồ");
+  ok("admin cấp quyền thì xem được biểu đồ", bd2.includes("So sánh tiến độ thực hiện công việc"));
   const scopeTxt = await check(page, "/viec?tab=tat_ca", "công chức được mở phạm vi");
   ok("phạm vi đơn vị: thấy việc của cả phòng", scopeTxt.includes("Rà soát, thống kê diện tích đất công"));
   await page.goto(BASE + "/chi-tieu");
@@ -565,6 +575,35 @@ const day = (n) => {
     ok(`chỉ chào một lần mỗi phiên (${name})`, !(await p2.locator("#chao").isVisible().catch(() => false)));
     await c2.close();
   }
+
+
+  // 15. Biểu đồ so sánh tiến độ giữa các đơn vị (lãnh đạo)
+  ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
+  await login(page, "chutich");
+  ok("menu có Biểu đồ tiến độ đơn vị", (await page.locator("aside").innerText()).includes("Biểu đồ tiến độ đơn vị"));
+  const bd = await check(page, "/bieu-do", "biểu đồ");
+  ok("biểu đồ cột theo đơn vị", (await page.locator('svg[role="img"] path').count()) >= 3 && bd.includes("Phòng Kinh tế") && bd.includes("Tiến độ bình quân"));
+  const svgW = (await page.locator('svg[role="img"]').boundingBox()).width;
+  const mainW = (await page.locator("main").boundingBox()).width;
+  ok("biểu đồ rộng hết vùng làm việc", svgW > mainW - 120 && mainW > 1000, `svg ${svgW} / main ${mainW}`);
+  const svgH = (await page.locator('svg[role="img"]').boundingBox()).height;
+  ok("biểu đồ cao theo màn hình", svgH >= 500, `cao ${svgH}`);
+  await page.locator('svg[role="img"] rect[fill="transparent"]').first().hover();
+  ok("di chuột hiện chi tiết đơn vị", await page.locator("text=Bấm vào cột để xem danh sách việc").isVisible());
+  await page.click('button:has-text("Số việc theo trạng thái")');
+  ok("đổi sang biểu đồ trạng thái", (await page.locator("text=Chưa xong, đã quá hạn").count()) > 0);
+  await page.selectOption('select[name="quy"]', "4");
+  await page.click('button:has-text("Xem")');
+  await page.waitForURL(/quy=4/, { waitUntil: "commit" });
+  ok("lọc theo quý", (await page.locator("main").innerText()).includes("quý IV"));
+  await page.screenshot({ path: "/tmp/shot-bieudo.jpg", type: "jpeg", quality: 50 });
+  await ctx.close();
+  ({ ctx, page } = await newPage({ width: 390, height: 844 }));
+  await login(page, "chutich");
+  await page.goto(BASE + "/bieu-do");
+  const over2 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok("biểu đồ trên điện thoại không tràn trang (cuộn ngang trong khung)", over2 <= 1, `dư ${over2}px`);
+  await ctx.close();
 
   // PCT kinh tế không thấy chỉ tiêu lĩnh vực y tế
   ({ ctx, page } = await newPage());

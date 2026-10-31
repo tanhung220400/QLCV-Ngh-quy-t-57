@@ -29,6 +29,7 @@ export const NHOM_QUYEN: { nhom: string; quyen: [string, string][] }[] = [
       ["bc.danh_gia", "Xem số liệu đánh giá cán bộ"],
       ["bc.tra_cuu", "Tra cứu, tổng hợp số liệu theo yêu cầu"],
       ["bc.dashboard", "Xem dashboard tổng hợp (đơn vị, xu hướng, chỉ tiêu)"],
+      ["bc.bieu_do", "Xem biểu đồ so sánh tiến độ giữa các đơn vị"],
     ],
   },
   {
@@ -47,15 +48,15 @@ export const NHOM_QUYEN: { nhom: string; quyen: [string, string][] }[] = [
 export const TAT_CA_QUYEN = NHOM_QUYEN.flatMap((n) => n.quyen.map((q) => q[0]));
 
 export const QUYEN_MAC_DINH: Record<string, string[]> = {
-  lanh_dao: ["cv.giao", "cv.nhap_nhanh", "cv.duyet", "cv.quan_ly", "cv.xuat", "ct.xem", "ct.quan_ly", "ct.xac_nhan", "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard"],
-  tong_hop: ["cv.giao", "cv.nhap_nhanh", "cv.xuat", "ct.xem", "ct.quan_ly", "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "qt.nhat_ky"],
+  lanh_dao: ["cv.giao", "cv.nhap_nhanh", "cv.duyet", "cv.quan_ly", "cv.xuat", "ct.xem", "ct.quan_ly", "ct.xac_nhan", "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "bc.bieu_do"],
+  tong_hop: ["cv.giao", "cv.nhap_nhanh", "cv.xuat", "ct.xem", "ct.quan_ly", "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "bc.bieu_do", "qt.nhat_ky"],
   truong_don_vi: ["cv.giao", "cv.duyet", "cv.quan_ly", "cv.xuat", "ct.xem", "ct.nhap_so_lieu", "ct.xac_nhan", "bc.xem", "bc.xuat", "bc.tra_cuu", "bc.dashboard"],
   cong_chuc: ["ct.xem", "ct.nhap_so_lieu", "bc.xem", "bc.tra_cuu"],
   truong_thon: ["ct.xem", "ct.nhap_so_lieu"],
   quan_tri: [
     "cv.giao", "cv.nhap_nhanh", "cv.duyet", "cv.quan_ly", "cv.xuat",
     "ct.xem", "ct.quan_ly", "ct.nhap_so_lieu", "ct.xac_nhan",
-    "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard",
+    "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard", "bc.bieu_do",
     "qt.du_lieu", "qt.mo_dun", "qt.nguoi_dung", "qt.co_cau", "qt.cai_dat", "qt.nhat_ky",
   ],
 };
