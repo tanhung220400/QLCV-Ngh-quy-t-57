@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/auth";
 import { writeLog } from "@/lib/log";
@@ -175,7 +176,7 @@ export async function saveModuleAction(_: ActionState, fd: FormData): Promise<Ac
     await sql`UPDATE mo_dun_truong SET hien_danh_sach = FALSE WHERE id_mo_dun = ${r.id} AND khoa = 'ghi_chu'`;
   }
   revalidatePath("/", "layout");
-  return { redirect: `/quan-tri/mo-dun/${r.id}?moi=1` };
+  redirect(`/quan-tri/mo-dun/${r.id}?moi=1`);
 }
 
 export async function templateModuleAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -191,7 +192,7 @@ export async function templateModuleAction(_: ActionState, fd: FormData): Promis
   const id = await sql.begin((tx) => createModuleFromTemplate(tx, t, id_cha, n, ma));
   await writeLog(sql, u.id, "tao_mo_dun", "mo_dun", id, null, { mau: t.ma, ma });
   revalidatePath("/", "layout");
-  return { redirect: `/quan-tri/mo-dun/${id}?moi=1` };
+  redirect(`/quan-tri/mo-dun/${id}?moi=1`);
 }
 
 export async function moveModuleAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -239,7 +240,7 @@ export async function deleteModuleAction(_: ActionState, fd: FormData): Promise<
   }
   if (str(fd, "o_lai") === "1") return { ok: true, message: "Đã xóa module vào Thùng rác." };
   revalidatePath("/", "layout");
-  return { redirect: "/quan-tri?muc=mo_dun&xoa=1" };
+  redirect("/quan-tri?muc=mo_dun&xoa=1");
 }
 
 // ----- Trường dữ liệu -----

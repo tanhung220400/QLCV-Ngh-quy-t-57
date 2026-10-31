@@ -172,7 +172,7 @@ export function ModuleTree({ rows }: { rows: Row[] }) {
   const orphan = rows.filter((r) => r.id_cha && !rows.some((p) => p.id === r.id_cha));
   const render = (r: Row, depth: number): React.ReactNode => (
     <div key={r.id}>
-      <div className={`flex items-center gap-2 border-b border-slate-100 py-2 ${r.hien ? "" : "opacity-55"}`} style={{ paddingLeft: depth * 22 }}>
+      <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-slate-100 py-2 sm:flex-nowrap ${r.hien ? "" : "opacity-55"}`} style={{ paddingLeft: Math.min(depth, 4) * 18 }}>
         <Tile icon={r.bieu_tuong} mau={r.mau} />
         <div className="min-w-0 flex-1">
           <Link href={`/quan-tri/mo-dun/${r.id}`} className="font-semibold text-slate-900 hover:text-brand-700">
@@ -185,7 +185,7 @@ export function ModuleTree({ rows }: { rows: Row[] }) {
             {(r.vai_tro_xem.length > 0 || r.vai_tro_nhap.length > 0) && <span>· Giới hạn vai trò</span>}
           </div>
         </div>
-        <div className="flex shrink-0 items-center">
+        <div className="ml-auto flex shrink-0 items-center">
           <Small action={moveModuleAction} id={r.id} name="dir" value="len" title="Lên" icon="up" />
           <Small action={moveModuleAction} id={r.id} name="dir" value="xuong" title="Xuống" icon="down" />
           <Small action={toggleModuleAction} id={r.id} name="x" value="1" title={r.hien ? "Ẩn khỏi menu" : "Hiện trên menu"} icon={r.hien ? "eye" : "eyeoff"} />
