@@ -26,7 +26,7 @@ export async function GET() {
   styleHeader(ws);
   ws.addRow({ a: "Nguyễn Văn A", b: "Đảng ủy viên", c: "Trưởng phòng", d: "Phòng Kinh tế, Hạ tầng và Đô thị", h: "Tổ phó", i: "0912345678" });
   ws.addRow({ a: "Trần Thị B", c: "Chuyên viên", d: "Phòng Kinh tế, Hạ tầng và Đô thị", h: "Thành viên" });
-  ws.addRow({ a: "Lê Văn C", b: "Ủy viên Ban Thường vụ Đảng ủy", c: "Phó Chủ tịch", d: "Ủy ban nhân dân phường", g: "Phó Trưởng ban", k: "Lãnh đạo xã", l: "Đất đai; Xây dựng, giao thông", m: "Cấp 1" });
+  ws.addRow({ a: "Lê Văn C", b: "Ủy viên Ban Thường vụ Đảng ủy", c: "Phó Chủ tịch", d: "Ủy ban nhân dân phường", g: "Phó Trưởng ban", k: "Lãnh đạo phường", l: "Đất đai; Xây dựng, giao thông", m: "Cấp 1" });
   borderAll(ws, 1);
   return toResponse(wb, "Mau_danh_sach_can_bo.xlsx");
 }

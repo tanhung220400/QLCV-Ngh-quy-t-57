@@ -99,6 +99,7 @@ export async function nhapCanBo(
   const names = new Set(users.map((u) => u.ten_dang_nhap));
   const roleBy: Record<string, string> = {};
   for (const [k, v] of Object.entries(VAI_TRO)) (roleBy[khongDau(v)] = k), (roleBy[k] = k);
+  roleBy["lanh dao xa"] = "lanh_dao";
 
   const donVi = async (ten?: string): Promise<{ id: number; ten: string } | null> => {
     if (!ten) return null;

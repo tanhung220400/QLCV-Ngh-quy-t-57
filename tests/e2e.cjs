@@ -708,35 +708,62 @@ const day = (n) => {
   ok("tác vụ quét hạn", cron.status() === 200, await cron.text());
   await ctx.close();
 
-  // 17. Cán bộ: chức vụ Đảng, chính quyền, kiêm nhiệm, BCĐ, Tổ giúp việc; giao việc cấp 1 / cấp 2
-  {
-    const ExcelJS = require("/vercel/app/node_modules/exceljs");
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("x");
-    ws.addRow(["Họ và tên", "Chức vụ trong Đảng", "Chức vụ chính quyền", "Đơn vị chính", "Chức vụ kiêm nhiệm", "Đơn vị kiêm nhiệm", "Chức danh Ban chỉ đạo", "Chức danh Tổ giúp việc", "Số điện thoại"]);
-    ws.addRow(["Kiểm Thử Trưởng", "ĐUV", "Trưởng phòng", "Phòng Kinh tế", null, null, null, "Tổ phó", null]);
-    ws.addRow(["Kiểm Thử Phó", null, "Phó Trường Phòng", "Phòng Kinh tế", null, null, null, null, null]);
-    ws.addRow(["Kiểm Thử Viên", null, "Chuyên viên", "Phòng Kinh tế", "Bí thư", "Đoàn phường", "Ủy viên", "Thành viên", "0912 000 111"]);
-    ws.addRow(["Hoàng Văn Khánh", "UV BTVĐU", "Trưởng phòng", "Phòng Kinh tế", null, null, null, null, null]);
-    await wb.xlsx.writeFile("/tmp/can-bo.xlsx");
-  }
+  // 17. Cơ cấu tổ chức (thêm, sửa, xóa) và hồ sơ cán bộ: chức vụ Đảng, chính quyền, kiêm nhiệm, BCĐ, Tổ giúp việc
   ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
   await page.goto(BASE + "/dang-nhap");
   await page.fill('input[name="ten_dang_nhap"]', "quantri");
   await page.fill('input[name="mat_khau"]', "Quantri@2026");
   await page.click('button[type="submit"]');
   await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
-  await page.goto(BASE + "/quan-tri?muc=nguoi_dung");
-  await page.setInputFiles('form:has(button:has-text("Nhập")) input[name="file"]', "/tmp/can-bo.xlsx");
-  await page.click('form:has(input[name="file"]) button:has-text("Nhập")');
-  await page.waitForSelector("text=Đã tạo 3 tài khoản", { timeout: 20000 });
-  const msg = await page.locator("main").innerText();
-  ok("nhập danh sách cán bộ theo mẫu mới", /cập nhật 1 tài khoản/.test(msg) && /thêm 1 đơn vị \(Đoàn phường\)/.test(msg), msg.slice(0, 300));
+  await page.goto(BASE + "/quan-tri?muc=don_vi");
+  let uf = page.locator("#them_dv form");
+  await uf.locator('input[name="ten"]').fill("Đoàn phường");
+  await uf.locator('select[name="loai"]').selectOption("doan_the");
+  await uf.locator('button:has-text("Thêm đơn vị")').click();
+  await page.waitForURL(/luu=1/, { waitUntil: "commit" });
+  ok("thêm đơn vị", (await page.locator("main").innerText()).includes("Đoàn phường"));
+  await page.click('a[aria-label="Thêm đơn vị trực thuộc Đoàn phường"]');
+  await page.waitForURL(/cha=\d+/);
+  uf = page.locator("#them_dv form");
+  ok("nút + chọn sẵn đơn vị cha", (await uf.locator('select[name="id_cha"]').evaluate((e) => e.options[e.selectedIndex].text)) === "Đoàn phường");
+  await uf.locator('input[name="ten"]').fill("Chi đoàn kiểm thử");
+  await uf.locator('button:has-text("Thêm đơn vị")').click();
+  await page.waitForURL(/luu=1/, { waitUntil: "commit" });
+  await page.click('a[aria-label="Sửa Chi đoàn kiểm thử"]');
+  await page.waitForSelector("h2:has-text('Sửa đơn vị')");
+  await page.locator('form:has(button:has-text("Lưu thay đổi")) input[name="ten"]').fill("Chi đoàn đã sửa");
+  await page.click('button:has-text("Lưu thay đổi")');
+  await page.waitForSelector("text=Đã lưu đơn vị.");
+  await page.goto(BASE + "/quan-tri?muc=don_vi");
+  ok("sửa đơn vị", (await page.locator("main").innerText()).includes("Chi đoàn đã sửa"));
+  await page.click('button[aria-label="Xóa Chi đoàn đã sửa"]');
+  await page.waitForFunction(() => !document.body.innerText.includes("Chi đoàn đã sửa"), null, { timeout: 15000 });
+  ok("xóa đơn vị trống", true);
+  // hồ sơ cán bộ: thêm bằng biểu mẫu
+  const taoCanBo = async (v) => {
+    await page.goto(BASE + "/quan-tri?muc=nguoi_dung");
+    await page.click("summary:has-text('Thêm cán bộ')");
+    const f = page.locator('form:has(button:has-text("Tạo tài khoản"))');
+    await f.locator('input[name="ho_ten"]').fill(v.ten);
+    await f.locator('input[name="ten_dang_nhap"]').fill(v.u);
+    for (const k of ["chuc_vu_dang", "chuc_vu", "chuc_vu_kiem_nhiem", "chuc_danh_bcd", "chuc_danh_tgv"]) if (v[k]) await f.locator(`select[name="${k}"]`).selectOption(v[k]);
+    for (const k of ["id_don_vi", "id_don_vi_kiem_nhiem"]) if (v[k]) await f.locator(`select[name="${k}"]`).selectOption({ label: v[k] });
+    if (v.vai_tro) await f.locator('select[name="vai_tro"]').selectOption(v.vai_tro);
+    await f.locator('button:has-text("Tạo tài khoản")').click();
+    await page.waitForSelector(`text=Đã tạo tài khoản ${v.u}`);
+  };
+  await taoCanBo({ ten: "Kiểm Thử Trưởng", u: "kt.truong", chuc_vu_dang: "Đảng ủy viên", chuc_vu: "Trưởng phòng", id_don_vi: "Phòng Kinh tế", chuc_danh_tgv: "Tổ phó", vai_tro: "truong_don_vi" });
+  await taoCanBo({ ten: "Kiểm Thử Phó", u: "kt.pho", chuc_vu: "Phó Trưởng phòng", id_don_vi: "Phòng Kinh tế", vai_tro: "truong_don_vi" });
+  await taoCanBo({ ten: "Kiểm Thử Viên", u: "kt.vien", chuc_vu: "Chuyên viên", id_don_vi: "Phòng Kinh tế", chuc_vu_kiem_nhiem: "Bí thư", id_don_vi_kiem_nhiem: "Đoàn phường", chuc_danh_bcd: "Ủy viên", chuc_danh_tgv: "Thành viên" });
+  ok("tạo cán bộ có chức vụ Đảng, kiêm nhiệm, BCĐ, Tổ giúp việc", true);
+  ok("không còn mục nhập danh sách cán bộ từ Excel", !(await page.locator("main").innerText()).includes("Nhập danh sách cán bộ từ Excel"));
+  ok("vai trò Lãnh đạo phường", (await page.locator('select[name="vai_tro"] option').allTextContents()).includes("Lãnh đạo phường"));
   await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=" + encodeURIComponent("Kiểm Thử"));
   const ds = await page.locator("main table").innerText();
   ok("danh sách cán bộ có kiêm nhiệm, Đảng, BCĐ, Tổ giúp việc", ds.includes("Kiêm nhiệm: Bí thư · Đoàn phường") && ds.includes("Đảng ủy viên") && ds.includes("BCĐ: Ủy viên") && ds.includes("Tổ giúp việc: Thành viên"), ds.slice(0, 400));
-  ok("chuẩn hóa chức vụ viết tắt / sai chính tả", ds.includes("Phó Trưởng phòng"));
-  ok("vai trò, quyền giao việc theo chức vụ", /Kiểm Thử Trưởng[\s\S]*Trưởng đơn vị[\s\S]*Giao việc cấp 2/.test(ds));
+  ok("vai trò, quyền giao việc theo vai trò", /Kiểm Thử Trưởng[\s\S]*Trưởng đơn vị[\s\S]*Giao việc cấp 2/.test(ds));
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok("màn hình cán bộ vừa khung (máy tính)", over <= 1, `dư ${over}px`);
   // sửa cán bộ có đủ ô chọn
   await page.click("tr:has-text('Kiểm Thử Viên') a:has-text('Sửa')");
   await page.waitForSelector("h2:has-text('Sửa: Kiểm Thử Viên')");
@@ -750,6 +777,30 @@ const day = (n) => {
   ok("lưu chức danh Tổ giúp việc", (await page.locator("main table").innerText()).includes("Tổ giúp việc: Tổ phó"));
   await page.goto(BASE + "/quan-tri?muc=danh_muc&loai=chuc_vu");
   ok("danh mục chức vụ, chức danh", (await page.locator("main").innerText()).includes("Chức danh Tổ giúp việc"));
+  // xóa đơn vị còn cán bộ: phải chuyển sang đơn vị khác
+  await page.goto(BASE + "/quan-tri?muc=don_vi");
+  await page.click('button[aria-label="Xóa Đoàn phường"]');
+  await page.waitForSelector("text=đang có 1 cán bộ");
+  ok("không xóa ngay đơn vị còn cán bộ", true);
+  await page.click('a[aria-label="Sửa Đoàn phường"]');
+  await page.waitForSelector("h2:has-text('Xóa đơn vị')");
+  await page.selectOption('select[name="chuyen_sang"]', { label: "Phòng Văn hóa - Xã hội" });
+  await page.click('button:has-text("Xóa đơn vị")');
+  await page.waitForSelector("text=Đã xóa “Đoàn phường”");
+  await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=" + encodeURIComponent("Kiểm Thử Viên"));
+  ok("xóa đơn vị, chuyển cán bộ kiêm nhiệm sang đơn vị khác", (await page.locator("main table").innerText()).includes("Kiêm nhiệm: Bí thư · Phòng Văn hóa - Xã hội"));
+  await ctx.close();
+  ({ ctx, page } = await newPage({ width: 390, height: 844 }));
+  await page.goto(BASE + "/dang-nhap");
+  await page.fill('input[name="ten_dang_nhap"]', "quantri");
+  await page.fill('input[name="mat_khau"]', "Quantri@2026");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+  for (const p of ["/quan-tri?muc=nguoi_dung", "/quan-tri?muc=don_vi", "/quan-tri?muc=mo_dun"]) {
+    await page.goto(BASE + p, { waitUntil: "networkidle" });
+    const o = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    ok(`điện thoại vừa khung ${p}`, o <= 1, `dư ${o}px`);
+  }
   await ctx.close();
   // 18. Module chính, module con: thêm, sửa, xóa ngay trên cây menu
   {
@@ -774,7 +825,8 @@ const day = (n) => {
     if (!(await cf.isVisible())) await page.click("summary:has-text('Thêm module con vào')");
     await cf.locator('input[name="ten"]').fill("Con A kiểm thử");
     await cf.locator('button:has-text("Tạo module")').click();
-    await page.waitForURL(/quan-tri\/mo-dun\/\d+\?moi=1/, { waitUntil: "commit" });
+    await page.waitForURL((u) => /\/quan-tri\/mo-dun\/\d+$/.test(u.pathname) && !nhomUrl.endsWith(u.pathname), { waitUntil: "commit" });
+    await page.waitForSelector("h1:has-text('Con A kiểm thử')");
     ok("thêm module con trong trang module chính", (await page.locator('select[name="id_cha"]').first().evaluate((e) => e.options[e.selectedIndex].text)).includes("Nhóm kiểm thử chính"));
     // thêm module con từ nút + trên cây
     await page.goto(BASE + "/quan-tri?muc=mo_dun");

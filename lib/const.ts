@@ -1,5 +1,5 @@
 export const VAI_TRO: Record<string, string> = {
-  lanh_dao: "Lãnh đạo xã",
+  lanh_dao: "Lãnh đạo phường",
   truong_don_vi: "Trưởng đơn vị",
   cong_chuc: "Công chức, viên chức",
   tong_hop: "Thường trực tổng hợp",

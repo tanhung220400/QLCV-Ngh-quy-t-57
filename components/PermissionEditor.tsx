@@ -28,7 +28,7 @@ export function PermissionEditor({
   const changed = sel.length !== def.size || sel.some((q) => !def.has(q));
 
   return (
-    <div className="space-y-4 sm:col-span-2">
+    <div className="space-y-4 sm:col-span-2 xl:col-span-4">
       <input type="hidden" name="co_phan_quyen" value="1" />
       <div>
         <label className="label">Vai trò (bộ quyền mặc định)</label>

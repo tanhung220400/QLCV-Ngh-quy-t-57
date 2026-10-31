@@ -12,7 +12,7 @@ import { getTheme, themeImageUrl } from "@/lib/theme";
 import { ModuleTree, ModuleForm, TemplateForm } from "@/components/ModuleAdmin";
 import { Icon } from "@/components/Icon";
 import type { MoDun } from "@/lib/modules";
-import { saveUnitAction, saveUserAction, resetPasswordAction, importUsersAction, saveHolidaysAction, saveSettingsAction, saveSmsAction, testSmsAction } from "@/app/actions/admin";
+import { saveUnitAction, deleteUnitAction, saveUserAction, resetPasswordAction, saveHolidaysAction, saveSettingsAction, saveSmsAction, testSmsAction } from "@/app/actions/admin";
 import { VAI_TRO, LOAI_DON_VI } from "@/lib/const";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { capGiao } from "@/lib/canBo";
@@ -60,43 +60,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
 
       {muc === "nguoi_dung" && <Users units={units as never} linhVuc={linhVuc} edit={Number(sp.sua) || 0} q={sp.q || ""} />}
 
-      {muc === "don_vi" && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-          <div className="card overflow-x-auto">
-            <table className="tbl min-w-[560px]">
-              <thead>
-                <tr>
-                  <th>Đơn vị</th>
-                  <th>Loại</th>
-                  <th>Trực thuộc</th>
-                  <th>Cán bộ</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {units.map((u) => (
-                  <tr key={u.id} className={u.hoat_dong ? "" : "text-slate-400"}>
-                    <td className="font-medium">{u.ten}</td>
-                    <td>{LOAI_DON_VI[u.loai]}</td>
-                    <td>{u.ten_cha || ""}</td>
-                    <td>{u.so_nguoi}</td>
-                    <td>
-                      <details>
-                        <summary className="cursor-pointer text-brand-700">Sửa</summary>
-                        <UnitForm u={u as never} units={units as never} />
-                      </details>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="card">
-            <h2 className="h2">Thêm đơn vị</h2>
-            <UnitForm units={units as never} />
-          </div>
-        </div>
-      )}
+      {muc === "don_vi" && <Units units={units as never} sua={Number(sp.sua) || 0} cha={Number(sp.cha) || null} luu={!!sp.luu} />}
 
       {muc === "danh_muc" && <Catalogs open={sp.loai || "linh_vuc"} />}
       {muc === "mo_dun" && <Modules deleted={!!sp.xoa} cha={Number(sp.cha) || null} />}
@@ -110,37 +74,184 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
   );
 }
 
-function UnitForm({ u, units }: { u?: Record<string, never>; units: { id: number; ten: string }[] }) {
+type DonViRow = { id: number; ten: string; loai: string; id_cha: number | null; thu_tu: number; hoat_dong: boolean; ten_cha: string | null; so_nguoi: number };
+
+function UnitForm({ u, units, cha }: { u?: DonViRow; units: DonViRow[]; cha?: number | null }) {
+  // không cho chọn chính nó và đơn vị trực thuộc của nó làm đơn vị cha
+  const banned = new Set<number>(u ? [u.id] : []);
+  for (let ch = true; ch; ) {
+    ch = false;
+    for (const x of units) if (x.id_cha && banned.has(x.id_cha) && !banned.has(x.id)) (banned.add(x.id), (ch = true));
+  }
   return (
-    <ActionForm action={saveUnitAction} className="mt-2 space-y-2">
+    <ActionForm key={u?.id ?? `moi-${cha ?? ""}`} action={saveUnitAction} className="space-y-3">
       {u && <input type="hidden" name="id" value={u.id} />}
-      <input name="ten" className="input" defaultValue={u?.ten} placeholder="Tên đơn vị" required />
-      <select name="loai" className="input" defaultValue={u?.loai || "phong"}>
-        {Object.entries(LOAI_DON_VI).map(([k, v]) => (
-          <option key={k} value={k}>
-            {v}
-          </option>
-        ))}
-      </select>
-      <select name="id_cha" className="input" defaultValue={u?.id_cha ?? ""}>
-        <option value="">Không trực thuộc</option>
-        {units
-          .filter((x) => x.id !== u?.id)
-          .map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.ten}
-            </option>
-          ))}
-      </select>
-      <input name="thu_tu" type="number" className="input" defaultValue={u?.thu_tu ?? 0} placeholder="Thứ tự" />
-      {u && (
-        <select name="hoat_dong" className="input" defaultValue={u.hoat_dong ? "1" : "0"}>
-          <option value="1">Đang hoạt động</option>
-          <option value="0">Ngừng (ẩn khỏi danh sách giao)</option>
+      <label className="block">
+        <span className="label req">Tên đơn vị</span>
+        <input name="ten" className="input" defaultValue={u?.ten} required />
+      </label>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        <label className="block">
+          <span className="label">Loại</span>
+          <select name="loai" className="input" defaultValue={u?.loai || "phong"}>
+            {Object.entries(LOAI_DON_VI).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="label">Thứ tự</span>
+          <input name="thu_tu" type="number" className="input" defaultValue={u?.thu_tu ?? 0} />
+        </label>
+      </div>
+      <label className="block">
+        <span className="label">Trực thuộc</span>
+        <select name="id_cha" className="input" defaultValue={u ? (u.id_cha ?? "") : (cha ?? "")}>
+          <option value="">— Không trực thuộc (cấp cao nhất) —</option>
+          {units
+            .filter((x) => !banned.has(x.id))
+            .map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.ten}
+              </option>
+            ))}
         </select>
+      </label>
+      {u && (
+        <label className="block">
+          <span className="label">Trạng thái</span>
+          <select name="hoat_dong" className="input" defaultValue={u.hoat_dong ? "1" : "0"}>
+            <option value="1">Đang hoạt động</option>
+            <option value="0">Ngừng (ẩn khỏi danh sách giao, giữ lịch sử)</option>
+          </select>
+        </label>
       )}
-      <Submit className="btn btn-primary btn-sm">Lưu</Submit>
+      <Submit>{u ? "Lưu thay đổi" : "Thêm đơn vị"}</Submit>
     </ActionForm>
+  );
+}
+
+async function Units({ units, sua, cha, luu }: { units: DonViRow[]; sua: number; cha: number | null; luu: boolean }) {
+  const sql = await db();
+  const kn = new Map((await sql`SELECT id_don_vi_kiem_nhiem AS id, count(*)::int AS n FROM nguoi_dung WHERE id_don_vi_kiem_nhiem IS NOT NULL GROUP BY 1`).map((r) => [r.id as number, r.n as number]));
+  // sắp theo cây: đơn vị cha rồi tới đơn vị trực thuộc
+  const tree: { u: DonViRow; d: number }[] = [];
+  const seen = new Set<number>();
+  const walk = (p: number | null, d: number) => {
+    for (const x of units.filter((y) => (y.id_cha ?? null) === p)) {
+      if (seen.has(x.id)) continue;
+      seen.add(x.id);
+      tree.push({ u: x, d });
+      walk(x.id, d + 1);
+    }
+  };
+  walk(null, 0);
+  for (const x of units) if (!seen.has(x.id)) tree.push({ u: x, d: 0 });
+  const cur = sua ? units.find((x) => x.id === sua) : undefined;
+  const curInfo = cur
+    ? ((await sql`SELECT (SELECT count(*)::int FROM nguoi_dung WHERE id_don_vi = ${cur.id} OR id_don_vi_kiem_nhiem = ${cur.id}) AS nguoi,
+        (SELECT count(*)::int FROM don_vi WHERE id_cha = ${cur.id}) AS con,
+        (SELECT count(*)::int FROM cong_viec WHERE id_don_vi_chu_tri = ${cur.id}) AS viec,
+        (SELECT count(*)::int FROM chi_tieu WHERE id_don_vi_phu_trach = ${cur.id}) AS chi_tieu`)[0] as { nguoi: number; con: number; viec: number; chi_tieu: number })
+    : null;
+  const dung = curInfo ? curInfo.nguoi + curInfo.con + curInfo.viec + curInfo.chi_tieu : 0;
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="card">
+        <h2 className="h2">Cơ cấu tổ chức ({units.length} đơn vị)</h2>
+        <p className="mb-2 text-sm text-slate-500">Dấu +: thêm đơn vị trực thuộc · Bút: sửa · Thùng rác: xóa.</p>
+        {luu && <p className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">Đã thêm đơn vị.</p>}
+        <ul className="divide-y divide-slate-100">
+          {tree.map(({ u, d }) => (
+            <li key={u.id} className={`flex items-center gap-2 py-2 ${u.hoat_dong ? "" : "opacity-55"} ${u.id === sua ? "bg-brand-50" : ""}`} style={{ paddingLeft: Math.min(d, 4) * 20 }}>
+              <div className="min-w-0 flex-1">
+                <Link href={`/quan-tri?muc=don_vi&sua=${u.id}`} className="font-medium text-slate-900 hover:text-brand-700">
+                  {u.ten}
+                </Link>
+                <div className="text-xs text-slate-500">
+                  {LOAI_DON_VI[u.loai] || u.loai} · {u.so_nguoi} cán bộ{kn.get(u.id) ? ` (+${kn.get(u.id)} kiêm nhiệm)` : ""}
+                  {!u.hoat_dong && " · Ngừng hoạt động"}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center">
+                <Link href={`/quan-tri?muc=don_vi&cha=${u.id}#them_dv`} className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50" title="Thêm đơn vị trực thuộc" aria-label={`Thêm đơn vị trực thuộc ${u.ten}`}>
+                  <Icon name="plus" className="h-[18px] w-[18px]" />
+                </Link>
+                <Link href={`/quan-tri?muc=don_vi&sua=${u.id}`} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Sửa" aria-label={`Sửa ${u.ten}`}>
+                  <Icon name="edit" className="h-[18px] w-[18px]" />
+                </Link>
+                <ActionForm action={deleteUnitAction} className="inline" confirm={`Xóa đơn vị “${u.ten}”?`}>
+                  <input type="hidden" name="id" value={u.id} />
+                  <button className="rounded-lg p-1.5 text-red-500 hover:bg-red-50" title="Xóa" aria-label={`Xóa ${u.ten}`}>
+                    <Icon name="trash" className="h-[18px] w-[18px]" />
+                  </button>
+                </ActionForm>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+        {cur ? (
+          <>
+            <div className="card ring-2 ring-brand-200">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="h2">Sửa đơn vị</h2>
+                <Link href="/quan-tri?muc=don_vi" className="text-sm text-brand-700 underline">
+                  Đóng
+                </Link>
+              </div>
+              <UnitForm u={cur} units={units} />
+            </div>
+            <div className="card border-red-100">
+              <h2 className="h2 text-red-700">Xóa đơn vị</h2>
+              {dung ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  Đơn vị đang có{" "}
+                  {[curInfo!.nguoi && `${curInfo!.nguoi} cán bộ`, curInfo!.con && `${curInfo!.con} đơn vị trực thuộc`, curInfo!.viec && `${curInfo!.viec} công việc`, curInfo!.chi_tieu && `${curInfo!.chi_tieu} chỉ tiêu`].filter(Boolean).join(", ")}
+                  . Chọn đơn vị nhận để chuyển toàn bộ sang trước khi xóa.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-slate-600">Đơn vị chưa có cán bộ, công việc nào.</p>
+              )}
+              <ActionForm action={deleteUnitAction} confirm={`Xóa đơn vị “${cur.ten}”?`} className="mt-2 space-y-2">
+                <input type="hidden" name="id" value={cur.id} />
+                {dung > 0 && (
+                  <select name="chuyen_sang" className="input" required defaultValue="" aria-label="Chuyển sang đơn vị">
+                    <option value="" disabled>
+                      Chuyển sang đơn vị…
+                    </option>
+                    {units
+                      .filter((x) => x.id !== cur.id)
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.ten}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                <Submit className="btn btn-danger">Xóa đơn vị</Submit>
+              </ActionForm>
+            </div>
+          </>
+        ) : (
+          <div id="them_dv" className={`card scroll-mt-20 ${cha ? "ring-2 ring-emerald-300" : ""}`}>
+            <h2 className="h2 mb-1">{cha ? "Thêm đơn vị trực thuộc" : "Thêm đơn vị"}</h2>
+            {cha && units.find((x) => x.id === cha) && (
+              <p className="mb-2 text-sm text-slate-500">
+                Trực thuộc <b>{units.find((x) => x.id === cha)!.ten}</b>.{" "}
+                <Link href="/quan-tri?muc=don_vi" className="text-brand-700 underline">
+                  Thêm ở cấp cao nhất
+                </Link>
+              </p>
+            )}
+            <UnitForm units={units} cha={cha} />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -176,10 +287,16 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
   };
   const cur = edit ? users.find((u) => u.id === edit) : null;
   const form = (u?: Record<string, never> | null) => (
-    <ActionForm key={u?.id ?? "moi"} action={saveUserAction} className="grid gap-2 sm:grid-cols-2">
+    <ActionForm key={u?.id ?? "moi"} action={saveUserAction} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {u && <input type="hidden" name="id" value={u.id} />}
-      <input name="ho_ten" className="input" placeholder="Họ tên" defaultValue={u?.ho_ten} required />
-      <input name="ten_dang_nhap" className="input" placeholder="Tên đăng nhập (không dấu)" defaultValue={u?.ten_dang_nhap} autoCapitalize="none" required />
+      <label className="block">
+        <span className="label req">Họ và tên</span>
+        <input name="ho_ten" className="input" defaultValue={u?.ho_ten} required />
+      </label>
+      <label className="block">
+        <span className="label req">Tên đăng nhập (không dấu)</span>
+        <input name="ten_dang_nhap" className="input" defaultValue={u?.ten_dang_nhap} autoCapitalize="none" required />
+      </label>
       <label className="block sm:col-span-2">
         <span className="label">Chức vụ trong Đảng</span>
         {catSel("chuc_vu_dang", cvDang, u?.chuc_vu_dang, "Không")}
@@ -212,7 +329,7 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
         <span className="label">Số điện thoại (nhận SMS nhắc việc)</span>
         <input name="sdt" className="input" inputMode="tel" defaultValue={u?.sdt ?? ""} />
       </label>
-      <div className="sm:col-span-2">
+      <div className="sm:col-span-2 xl:col-span-4">
         <label className="label">Lĩnh vực phụ trách (với lãnh đạo: để trống = toàn phường; với cán bộ: lĩnh vực theo dõi)</label>
         <div className="flex flex-wrap gap-2">
           {linhVuc.map((l) => (
@@ -231,87 +348,89 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
         units={units}
         linhVuc={linhVuc}
       />
-      {u && (
-        <select name="trang_thai" className="input" defaultValue={u.trang_thai}>
-          <option value="hoat_dong">Đang hoạt động</option>
-          <option value="khoa">Khóa tài khoản</option>
-        </select>
-      )}
-      <Submit className="btn btn-primary">{u ? "Lưu thay đổi" : "Tạo tài khoản"}</Submit>
+      <div className="flex flex-wrap items-center gap-3 sm:col-span-2 xl:col-span-4">
+        {u && (
+          <select name="trang_thai" className="input max-w-xs" defaultValue={u.trang_thai} aria-label="Trạng thái tài khoản">
+            <option value="hoat_dong">Đang hoạt động</option>
+            <option value="khoa">Khóa tài khoản</option>
+          </select>
+        )}
+        <Submit className="btn btn-primary">{u ? "Lưu thay đổi" : "Tạo tài khoản"}</Submit>
+        {u && (
+          <Link href="/quan-tri?muc=nguoi_dung" className="btn btn-outline">
+            Đóng
+          </Link>
+        )}
+      </div>
     </ActionForm>
   );
+  const capOf = (u: Record<string, never>) => capGiao(tinhQuyen(u.vai_tro, u.quyen));
+  const CapChip = ({ c }: { c: number }) =>
+    c ? <span className={`chip py-0 text-xs ${c === 1 ? "border-violet-200 bg-violet-50 text-violet-700" : "border-sky-200 bg-sky-50 text-sky-700"}`}>Giao việc cấp {c}</span> : null;
+  const kn = (u: Record<string, string>) => (u.id_don_vi_kiem_nhiem || u.chuc_vu_kiem_nhiem ? `Kiêm nhiệm: ${[u.chuc_vu_kiem_nhiem, u.ten_don_vi_kn].filter(Boolean).join(" · ")}` : "");
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="card">
-          <h2 className="h2">{cur ? `Sửa: ${cur.ho_ten}` : "Thêm cán bộ"}</h2>
-          <p className="mb-2 text-sm text-slate-500">Phân quyền theo chức vụ + đơn vị. Khi luân chuyển cán bộ, chỉ cần đổi đơn vị, chức vụ, vai trò.</p>
+      {cur ? (
+        <div className="card ring-2 ring-brand-200">
+          <h2 className="h2">Sửa: {cur.ho_ten}</h2>
+          <p className="mb-3 text-sm text-slate-500">Phân quyền theo chức vụ + đơn vị. Khi luân chuyển cán bộ, chỉ cần đổi đơn vị, chức vụ, vai trò.</p>
           {form(cur as never)}
-          {cur && (
-            <ActionForm action={resetPasswordAction} className="mt-3 border-t border-slate-200 pt-3" confirm="Cấp lại mật khẩu tạm cho cán bộ này?">
-              <input type="hidden" name="id" value={cur.id} />
-              <Submit className="btn btn-outline btn-sm">Cấp lại mật khẩu</Submit>
-            </ActionForm>
-          )}
-        </div>
-        <div className="card">
-          <h2 className="h2">Nhập danh sách cán bộ từ Excel</h2>
-          <p className="text-sm text-slate-500">
-            Tải <a href="/api/mau/can-bo" className="text-brand-700 underline">tệp mẫu</a>. Các cột: Họ và tên, Chức vụ trong Đảng, Chức vụ chính quyền, Đơn vị chính, Chức vụ kiêm nhiệm, Đơn vị kiêm nhiệm, Chức danh Ban chỉ đạo, Chức danh Tổ giúp việc, Số điện thoại (thứ tự tùy ý). Đơn vị chưa có sẽ tự tạo. Cán bộ đã có tài khoản (trùng họ tên hoặc tên đăng nhập) được cập nhật chức vụ, đơn vị, giữ nguyên mật khẩu và quyền. Tài khoản mới nhận mật khẩu tạm, phải đổi khi đăng nhập lần đầu.
-          </p>
-          <ActionForm action={importUsersAction} className="mt-2 space-y-2">
-            <input type="file" name="file" accept=".xlsx" className="input" required />
-            <Submit className="btn btn-primary">Nhập</Submit>
+          <ActionForm action={resetPasswordAction} className="mt-3 border-t border-slate-200 pt-3" confirm="Cấp lại mật khẩu tạm cho cán bộ này?">
+            <input type="hidden" name="id" value={cur.id} />
+            <Submit className="btn btn-outline btn-sm">Cấp lại mật khẩu</Submit>
           </ActionForm>
         </div>
-      </div>
-      <div className="card overflow-x-auto">
-        <form className="mb-3 flex gap-2" action="/quan-tri">
+      ) : (
+        <details className="card">
+          <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold text-brand-700">
+            <Icon name="plus" className="h-5 w-5" /> Thêm cán bộ
+          </summary>
+          <p className="mt-2 mb-3 text-sm text-slate-500">Tài khoản mới nhận mật khẩu tạm, phải đổi khi đăng nhập lần đầu.</p>
+          {form(null)}
+        </details>
+      )}
+      <div className="card">
+        <form className="mb-3 flex flex-wrap items-center gap-2" action="/quan-tri">
           <input type="hidden" name="muc" value="nguoi_dung" />
-          <input name="q" defaultValue={q} placeholder="Tìm theo tên" className="input max-w-xs" />
+          <input name="q" defaultValue={q} placeholder="Tìm theo tên, chức vụ, đơn vị" className="input max-w-xs flex-1" />
           <button className="btn btn-outline">Tìm</button>
+          <span className="ml-auto text-sm text-slate-500">{users.length} cán bộ</span>
         </form>
-        <table className="tbl min-w-[900px]">
+        <table className="tbl hidden md:table">
           <thead>
             <tr>
               <th>Họ tên</th>
-              <th>Tên đăng nhập</th>
               <th>Đơn vị · Chức vụ</th>
-              <th>Đảng · BCĐ · Tổ giúp việc</th>
+              <th className="hidden xl:table-cell">Đảng · BCĐ · Tổ giúp việc</th>
               <th>Vai trò · Giao việc</th>
-              <th>OTP</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className={u.trang_thai === "khoa" ? "text-slate-400" : ""}>
-                <td className="font-medium">
-                  {u.ho_ten}
+                <td>
+                  <span className="font-medium">{u.ho_ten}</span>
                   {u.trang_thai === "khoa" && " (đã khóa)"}
+                  <span className="block text-xs text-slate-500">
+                    {u.ten_dang_nhap}
+                    {u.otp_bat ? " · OTP" : ""}
+                  </span>
                 </td>
-                <td>{u.ten_dang_nhap}</td>
                 <td>
                   {u.ten_don_vi}
                   {u.chuc_vu ? ` · ${u.chuc_vu}` : ""}
-                  {u.id_don_vi_kiem_nhiem || u.chuc_vu_kiem_nhiem ? (
-                    <span className="block text-xs text-slate-500">
-                      Kiêm nhiệm: {[u.chuc_vu_kiem_nhiem, u.ten_don_vi_kn].filter(Boolean).join(" · ")}
-                    </span>
-                  ) : null}
+                  {kn(u as never) && <span className="block text-xs text-slate-500">{kn(u as never)}</span>}
+                  <span className="block text-xs text-slate-500 xl:hidden">{[u.chuc_vu_dang, u.chuc_danh_bcd && `BCĐ: ${u.chuc_danh_bcd}`, u.chuc_danh_tgv && `Tổ giúp việc: ${u.chuc_danh_tgv}`].filter(Boolean).join(" · ")}</span>
                 </td>
-                <td className="text-sm">
+                <td className="hidden text-sm xl:table-cell">
                   {u.chuc_vu_dang && <span className="block">{u.chuc_vu_dang}</span>}
                   {u.chuc_danh_bcd && <span className="block text-slate-600">BCĐ: {u.chuc_danh_bcd}</span>}
                   {u.chuc_danh_tgv && <span className="block text-slate-600">Tổ giúp việc: {u.chuc_danh_tgv}</span>}
                 </td>
                 <td>
-                  {VAI_TRO[u.vai_tro]}
-                  {(() => {
-                    const c = capGiao(tinhQuyen(u.vai_tro, u.quyen));
-                    return c ? <span className={`ml-1 chip py-0 text-xs ${c === 1 ? "border-violet-200 bg-violet-50 text-violet-700" : "border-sky-200 bg-sky-50 text-sky-700"}`}>Giao việc cấp {c}</span> : null;
-                  })()}
-                  {u.linh_vuc_phu_trach?.length ? <span className="block text-xs text-slate-500">{u.linh_vuc_phu_trach.join(", ")}</span> : null}
+                  <span className="mr-1">{VAI_TRO[u.vai_tro]}</span>
+                  <CapChip c={capOf(u as never)} />
                   {u.pham_vi?.loai && <span className="block text-xs text-indigo-700">Phạm vi: {LOAI_PHAM_VI[u.pham_vi.loai as keyof typeof LOAI_PHAM_VI]}</span>}
                   {u.quyen && (u.quyen.them?.length || u.quyen.bo?.length) ? (
                     <span className="block text-xs text-amber-700">
@@ -319,8 +438,7 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
                     </span>
                   ) : null}
                 </td>
-                <td>{u.otp_bat ? "✓" : ""}</td>
-                <td>
+                <td className="text-right">
                   <Link href={`/quan-tri?muc=nguoi_dung&sua=${u.id}`} className="text-brand-700 underline">
                     Sửa
                   </Link>
@@ -329,6 +447,30 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
             ))}
           </tbody>
         </table>
+        <ul className="divide-y divide-slate-100 md:hidden">
+          {users.map((u) => (
+            <li key={u.id} className={`py-2.5 ${u.trang_thai === "khoa" ? "text-slate-400" : ""}`}>
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium">
+                    {u.ho_ten}
+                    {u.trang_thai === "khoa" && " (đã khóa)"}
+                  </div>
+                  <div className="text-sm text-slate-600">{[u.chuc_vu, u.ten_don_vi].filter(Boolean).join(" · ")}</div>
+                  {kn(u as never) && <div className="text-xs text-slate-500">{kn(u as never)}</div>}
+                  <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+                    <span>{u.ten_dang_nhap}</span>
+                    <span>· {VAI_TRO[u.vai_tro]}</span>
+                    <CapChip c={capOf(u as never)} />
+                  </div>
+                </div>
+                <Link href={`/quan-tri?muc=nguoi_dung&sua=${u.id}`} className="btn btn-outline btn-sm shrink-0">
+                  Sửa
+                </Link>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

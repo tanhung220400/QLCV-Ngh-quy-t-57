@@ -5,7 +5,7 @@ import { getUser, hashPassword } from "@/lib/auth";
 import { writeLog } from "@/lib/log";
 import { saveSettings } from "@/lib/settings";
 import type { ActionState } from "@/components/ActionForm";
-import { VAI_TRO } from "@/lib/const";
+import { VAI_TRO, LOAI_DON_VI } from "@/lib/const";
 import { TAT_CA_QUYEN, QUYEN_MAC_DINH, LOAI_PHAM_VI } from "@/lib/quyen";
 import { saveSmsConfig, getSmsConfig, sendSms, smsReady, chuanSdt, buildSmsText, SU_KIEN_SMS, type SmsConfig } from "@/lib/sms";
 
@@ -31,6 +31,11 @@ export async function saveUnitAction(_: ActionState, fd: FormData): Promise<Acti
   const v = { ten: str(fd, "ten"), loai: str(fd, "loai") || "phong", id_cha: Number(str(fd, "id_cha")) || null, thu_tu: Number(str(fd, "thu_tu")) || 0, hoat_dong: str(fd, "hoat_dong") !== "0" };
   if (!v.ten) return { error: "Nhập tên đơn vị." };
   if (id && v.id_cha === id) return { error: "Đơn vị cha không hợp lệ." };
+  if (!LOAI_DON_VI[v.loai]) v.loai = "phong";
+  if (id && v.id_cha) {
+    const sub = await sql`WITH RECURSIVE t AS (SELECT id FROM don_vi WHERE id = ${id} UNION SELECT d.id FROM don_vi d JOIN t ON d.id_cha = t.id) SELECT id FROM t`;
+    if (sub.some((r) => r.id === v.id_cha)) return { error: "Không đặt đơn vị trực thuộc chính đơn vị con của nó." };
+  }
   if (id) {
     const cu = (await sql`SELECT * FROM don_vi WHERE id = ${id}`)[0];
     await sql`UPDATE don_vi SET ${sql(v)} WHERE id = ${id}`;
@@ -39,7 +44,60 @@ export async function saveUnitAction(_: ActionState, fd: FormData): Promise<Acti
     const [r] = await sql`INSERT INTO don_vi ${sql(v)} RETURNING id`;
     await writeLog(sql, u.id, "tao_don_vi", "don_vi", r.id, null, v);
   }
-  return { ok: true, message: "Đã lưu đơn vị.", reset: !id };
+  if (!id) {
+    if (str(fd, "tiep") === "1") return { ok: true, message: `Đã thêm “${v.ten}”.`, reset: true };
+    return { redirect: "/quan-tri?muc=don_vi&luu=1" };
+  }
+  return { ok: true, message: "Đã lưu đơn vị." };
+}
+
+/** Xóa đơn vị. Nếu còn cán bộ, đơn vị con, công việc, chỉ tiêu, dữ liệu: phải chọn đơn vị nhận để chuyển sang trước khi xóa. */
+export async function deleteUnitAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await need("qt.co_cau");
+  if (!u) return { error: "Không có quyền." };
+  const sql = await db();
+  const id = Number(str(fd, "id"));
+  const den = Number(str(fd, "chuyen_sang")) || null;
+  const dv = (await sql`SELECT * FROM don_vi WHERE id = ${id}`)[0];
+  if (!dv) return { error: "Không tìm thấy đơn vị." };
+  const c = (await sql`SELECT
+      (SELECT count(*)::int FROM nguoi_dung WHERE id_don_vi = ${id} OR id_don_vi_kiem_nhiem = ${id}) AS nguoi,
+      (SELECT count(*)::int FROM don_vi WHERE id_cha = ${id}) AS con,
+      (SELECT count(*)::int FROM cong_viec WHERE id_don_vi_chu_tri = ${id}) AS viec,
+      (SELECT count(*)::int FROM chi_tieu WHERE id_don_vi_phu_trach = ${id}) AS chi_tieu,
+      (SELECT count(*)::int FROM mo_dun_ban_ghi WHERE id_don_vi = ${id}) AS ban_ghi`)[0] as { nguoi: number; con: number; viec: number; chi_tieu: number; ban_ghi: number };
+  const parts = [c.nguoi && `${c.nguoi} cán bộ`, c.con && `${c.con} đơn vị trực thuộc`, c.viec && `${c.viec} công việc`, c.chi_tieu && `${c.chi_tieu} chỉ tiêu`, c.ban_ghi && `${c.ban_ghi} bản ghi dữ liệu`].filter(Boolean);
+  if (parts.length && !den)
+    return { error: `“${dv.ten}” đang có ${parts.join(", ")}. Bấm Sửa → chọn “Chuyển sang đơn vị” rồi xóa, hoặc đặt “Ngừng hoạt động” để giữ lịch sử.` };
+  if (den) {
+    if (den === id) return { error: "Đơn vị nhận phải khác đơn vị bị xóa." };
+    const sub = await sql`WITH RECURSIVE t AS (SELECT id FROM don_vi WHERE id = ${id} UNION SELECT d.id FROM don_vi d JOIN t ON d.id_cha = t.id) SELECT id FROM t`;
+    if (sub.some((r) => r.id === den)) return { error: "Không chuyển sang đơn vị trực thuộc của chính đơn vị bị xóa." };
+    if (!(await sql`SELECT 1 FROM don_vi WHERE id = ${den}`).length) return { error: "Đơn vị nhận không hợp lệ." };
+  }
+  const ten_den = den ? (await sql`SELECT ten FROM don_vi WHERE id = ${den}`)[0].ten : null;
+  await sql.begin(async (tx) => {
+    if (den) {
+      await tx`UPDATE nguoi_dung SET id_don_vi = ${den} WHERE id_don_vi = ${id}`;
+      await tx`UPDATE nguoi_dung SET id_don_vi_kiem_nhiem = CASE WHEN id_don_vi = ${den} THEN NULL ELSE ${den}::int END WHERE id_don_vi_kiem_nhiem = ${id}`;
+      await tx`UPDATE don_vi SET id_cha = ${den} WHERE id_cha = ${id}`;
+      await tx`UPDATE cong_viec SET id_don_vi_chu_tri = ${den} WHERE id_don_vi_chu_tri = ${id}`;
+      await tx`UPDATE chi_tieu SET id_don_vi_phu_trach = ${den} WHERE id_don_vi_phu_trach = ${id}`;
+      await tx`UPDATE mo_dun_ban_ghi SET id_don_vi = ${den} WHERE id_don_vi = ${id}`;
+      const fs = await tx`SELECT id_mo_dun, khoa FROM mo_dun_truong WHERE kieu = 'don_vi'`;
+      for (const f of fs) await tx`UPDATE mo_dun_ban_ghi SET du_lieu = jsonb_set(du_lieu, ${"{" + f.khoa + "}"}::text[], to_jsonb(${den}::int)) WHERE id_mo_dun = ${f.id_mo_dun} AND du_lieu->>${f.khoa} = ${String(id)}`;
+    }
+    // bỏ đơn vị khỏi phạm vi được phân công của cán bộ
+    for (const r of await tx`SELECT id, pham_vi FROM nguoi_dung WHERE pham_vi IS NOT NULL AND jsonb_typeof(pham_vi->'don_vi') = 'array'`) {
+      const ds = (r.pham_vi.don_vi as unknown[]).map(Number);
+      if (!ds.includes(id)) continue;
+      const moi = [...new Set(ds.map((x) => (x === id ? den : x)).filter((x): x is number => !!x))];
+      await tx`UPDATE nguoi_dung SET pham_vi = ${tx.json({ ...r.pham_vi, don_vi: moi })} WHERE id = ${r.id}`;
+    }
+    await tx`DELETE FROM don_vi WHERE id = ${id}`;
+    await writeLog(tx, u.id, "xoa_don_vi", "don_vi", id, dv, { chuyen_sang: den, ...c });
+  });
+  return { ok: true, message: `Đã xóa “${dv.ten}”${den ? `; đã chuyển ${parts.join(", ")} sang “${ten_den}”` : ""}.` };
 }
 
 export async function saveUserAction(_: ActionState, fd: FormData): Promise<ActionState> {

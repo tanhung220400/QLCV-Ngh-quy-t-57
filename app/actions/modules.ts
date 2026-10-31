@@ -1,4 +1,5 @@
 "use server";
+import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/auth";
 import { writeLog } from "@/lib/log";
@@ -160,6 +161,7 @@ export async function saveModuleAction(_: ActionState, fd: FormData): Promise<Ac
   if (id) {
     await sql`UPDATE mo_dun SET ${sql(v as never)} WHERE id = ${id}`;
     await writeLog(sql, u.id, "sua_mo_dun", "mo_dun", id, cu, v);
+    revalidatePath("/", "layout");
     return { ok: true, message: "Đã lưu module." };
   }
   let ma = slugify(str(fd, "ma") || ten);
@@ -172,6 +174,7 @@ export async function saveModuleAction(_: ActionState, fd: FormData): Promise<Ac
     await sql`INSERT INTO mo_dun_truong (id_mo_dun, khoa, ten, kieu, bat_buoc, thu_tu) VALUES (${r.id}, 'ten', 'Tên, nội dung', 'van_ban', TRUE, 1), (${r.id}, 'ghi_chu', 'Ghi chú', 'doan_van', FALSE, 2)`;
     await sql`UPDATE mo_dun_truong SET hien_danh_sach = FALSE WHERE id_mo_dun = ${r.id} AND khoa = 'ghi_chu'`;
   }
+  revalidatePath("/", "layout");
   return { redirect: `/quan-tri/mo-dun/${r.id}?moi=1` };
 }
 
@@ -187,6 +190,7 @@ export async function templateModuleAction(_: ActionState, fd: FormData): Promis
   const n = ((await sql`SELECT coalesce(max(thu_tu), 0)::int AS n FROM mo_dun WHERE id_cha IS NOT DISTINCT FROM ${id_cha}`)[0].n as number) + 1;
   const id = await sql.begin((tx) => createModuleFromTemplate(tx, t, id_cha, n, ma));
   await writeLog(sql, u.id, "tao_mo_dun", "mo_dun", id, null, { mau: t.ma, ma });
+  revalidatePath("/", "layout");
   return { redirect: `/quan-tri/mo-dun/${id}?moi=1` };
 }
 
@@ -207,6 +211,7 @@ export async function moveModuleAction(_: ActionState, fd: FormData): Promise<Ac
     [ids[i], ids[j]] = [ids[j], ids[i]];
     for (const [k, x] of ids.entries()) await tx`UPDATE mo_dun SET thu_tu = ${k + 1} WHERE id = ${x}`;
   });
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 
@@ -218,6 +223,7 @@ export async function toggleModuleAction(_: ActionState, fd: FormData): Promise<
   const [r] = await sql`UPDATE mo_dun SET hien = NOT hien WHERE id = ${id} RETURNING ten, hien`;
   if (!r) return { error: "Không tìm thấy module." };
   await writeLog(sql, u.id, r.hien ? "hien_mo_dun" : "an_mo_dun", "mo_dun", id, null, { ten: r.ten });
+  revalidatePath("/", "layout");
   return { ok: true, message: r.hien ? `Đã hiện “${r.ten}”.` : `Đã ẩn “${r.ten}”.` };
 }
 
@@ -232,6 +238,7 @@ export async function deleteModuleAction(_: ActionState, fd: FormData): Promise<
     return { error: (e as Error).message };
   }
   if (str(fd, "o_lai") === "1") return { ok: true, message: "Đã xóa module vào Thùng rác." };
+  revalidatePath("/", "layout");
   return { redirect: "/quan-tri?muc=mo_dun&xoa=1" };
 }
 
