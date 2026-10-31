@@ -60,7 +60,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
 
       {muc === "nguoi_dung" && <Users units={units as never} linhVuc={linhVuc} edit={Number(sp.sua) || 0} q={sp.q || ""} />}
 
-      {muc === "don_vi" && <Units units={units as never} sua={Number(sp.sua) || 0} cha={Number(sp.cha) || null} luu={!!sp.luu} />}
+      {muc === "don_vi" && <Units units={units as never} sua={Number(sp.sua) || 0} cha={Number(sp.cha) || null} luu={!!sp.luu} daXoa={sp.da_xoa || ""} />}
 
       {muc === "danh_muc" && <Catalogs open={sp.loai || "linh_vuc"} />}
       {muc === "mo_dun" && <Modules deleted={!!sp.xoa} cha={Number(sp.cha) || null} />}
@@ -133,7 +133,7 @@ function UnitForm({ u, units, cha }: { u?: DonViRow; units: DonViRow[]; cha?: nu
   );
 }
 
-async function Units({ units, sua, cha, luu }: { units: DonViRow[]; sua: number; cha: number | null; luu: boolean }) {
+async function Units({ units, sua, cha, luu, daXoa }: { units: DonViRow[]; sua: number; cha: number | null; luu: boolean; daXoa: string }) {
   const sql = await db();
   const kn = new Map((await sql`SELECT id_don_vi_kiem_nhiem AS id, count(*)::int AS n FROM nguoi_dung WHERE id_don_vi_kiem_nhiem IS NOT NULL GROUP BY 1`).map((r) => [r.id as number, r.n as number]));
   // sắp theo cây: đơn vị cha rồi tới đơn vị trực thuộc
@@ -163,6 +163,7 @@ async function Units({ units, sua, cha, luu }: { units: DonViRow[]; sua: number;
         <h2 className="h2">Cơ cấu tổ chức ({units.length} đơn vị)</h2>
         <p className="mb-2 text-sm text-slate-500">Dấu +: thêm đơn vị trực thuộc · Bút: sửa · Thùng rác: xóa.</p>
         {luu && <p className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">Đã thêm đơn vị.</p>}
+        {daXoa && <p className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">{daXoa.slice(0, 300)}</p>}
         <ul className="divide-y divide-slate-100">
           {tree.map(({ u, d }) => (
             <li key={u.id} className={`flex items-center gap-2 py-2 ${u.hoat_dong ? "" : "opacity-55"} ${u.id === sua ? "bg-brand-50" : ""}`} style={{ paddingLeft: Math.min(d, 4) * 20 }}>

@@ -97,7 +97,8 @@ export async function deleteUnitAction(_: ActionState, fd: FormData): Promise<Ac
     await tx`DELETE FROM don_vi WHERE id = ${id}`;
     await writeLog(tx, u.id, "xoa_don_vi", "don_vi", id, dv, { chuyen_sang: den, ...c });
   });
-  return { ok: true, message: `Đã xóa “${dv.ten}”${den ? `; đã chuyển ${parts.join(", ")} sang “${ten_den}”` : ""}.` };
+  const msg = `Đã xóa “${dv.ten}”${den ? `; đã chuyển ${parts.join(", ")} sang “${ten_den}”` : ""}.`;
+  return { redirect: `/quan-tri?muc=don_vi&da_xoa=${encodeURIComponent(msg)}` };
 }
 
 export async function saveUserAction(_: ActionState, fd: FormData): Promise<ActionState> {
