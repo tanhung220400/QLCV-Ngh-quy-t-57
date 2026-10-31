@@ -70,6 +70,7 @@ async function migrate() {
   }
   await s.begin(async (tx) => {
     await tx`SET LOCAL lock_timeout = '25s'`;
+    await tx`SET LOCAL idle_in_transaction_session_timeout = '20s'`;
     await tx`SELECT pg_advisory_xact_lock(570057)`;
     const schema = dbSchema();
     if (schema) {
