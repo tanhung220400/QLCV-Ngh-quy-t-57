@@ -94,7 +94,7 @@ export function PermissionEditor({
                 {u.ten}
               </label>
             ))}
-            <p className="w-full text-sm text-slate-500">Không chọn đơn vị nào thì dùng đơn vị của cán bộ. Đơn vị con (thôn, tổ) được xem kèm.</p>
+            <p className="w-full text-sm text-slate-500">Không chọn đơn vị nào thì dùng đơn vị của cán bộ. Đơn vị con (khu phố) được xem kèm.</p>
           </div>
         )}
       </fieldset>

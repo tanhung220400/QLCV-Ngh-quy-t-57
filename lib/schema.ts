@@ -1,5 +1,5 @@
 // Mô hình dữ liệu theo mục 8 của đặc tả. Chạy lại nhiều lần không sao (IF NOT EXISTS).
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS don_vi (

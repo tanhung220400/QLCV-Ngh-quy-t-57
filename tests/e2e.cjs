@@ -575,6 +575,18 @@ const day = (n) => {
     ok(`màn hình chào (${name})`, txt.replace(/\s+/g, " ").includes("Chào mừng bạn đến với Phần mềm quản lý công việc Nghị quyết 57-NQ/TW"), txt.replace(/\s+/g, " "));
     const fit = await p2.evaluate(() => { const b = document.querySelector(".chao-body").getBoundingClientRect(); return b.right <= innerWidth + 1 && b.left >= -1 && document.documentElement.scrollWidth <= innerWidth + 1; });
     ok(`chữ chào vừa màn hình (${name})`, fit);
+    const st = await p2.evaluate(() => {
+      const cs = (q) => getComputedStyle(document.querySelector(q));
+      const img = document.querySelector(".chao-badge img");
+      const delays = new Set([...document.querySelectorAll(".chao-word")].map((e) => getComputedStyle(e).animationDelay));
+      const b = document.querySelector(".chao-body").getBoundingClientRect();
+      return { logo: !!img && img.complete && img.naturalWidth > 0 && img.getBoundingClientRect().height >= 60, org: cs(".chao-org").fontSize, l2: cs(".chao-l2").fontSize, l3: cs(".chao-l3 .chao-word").color, delays: [...delays], tall: b.top >= -1 && b.bottom <= innerHeight + 1 };
+    });
+    ok(`chào: Công an hiệu lớn, rõ (${name})`, st.logo);
+    ok(`chào: tên đơn vị cỡ chữ bằng dòng tiêu đề (${name})`, st.org === st.l2, `${st.org} vs ${st.l2}`);
+    ok(`chào: dòng Nghị quyết 57 màu trắng (${name})`, st.l3 === "rgb(255, 255, 255)", st.l3);
+    ok(`chào: chuyển động đồng loạt (${name})`, st.delays.length === 1, st.delays.join(","));
+    ok(`chào: vừa chiều cao màn hình (${name})`, st.tall);
     await p2.screenshot({ path: `/tmp/shot-chao-${vp.width}.jpg`, type: "jpeg", quality: 50 });
     await p2.click("text=Bắt đầu làm việc");
     await p2.waitForSelector("#chao", { state: "detached", timeout: 5000 });

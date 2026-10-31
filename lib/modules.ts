@@ -94,13 +94,13 @@ export const MAU_MODULE_NQ57: ModuleMau[] = [
   {
     ma: "to-cong-nghe-so",
     ten: "Tổ công nghệ số cộng đồng",
-    mo_ta: "Danh sách Tổ công nghệ số cộng đồng ở các thôn, tổ dân phố và kết quả hỗ trợ người dân",
+    mo_ta: "Danh sách Tổ công nghệ số cộng đồng ở các khu phố và kết quả hỗ trợ người dân",
     bieu_tuong: "users",
     mau: "teal",
     pham_vi: "don_vi",
     truong: [
       { khoa: "ten_to", ten: "Tên tổ", kieu: "van_ban", bat_buoc: true },
-      { khoa: "thon", ten: "Thôn, tổ dân phố", kieu: "don_vi", bat_buoc: true },
+      { khoa: "thon", ten: "Khu phố", kieu: "don_vi", bat_buoc: true },
       { khoa: "to_truong", ten: "Tổ trưởng", kieu: "van_ban", bat_buoc: true },
       { khoa: "sdt", ten: "Số điện thoại tổ trưởng", kieu: "so_dien_thoai" },
       { khoa: "so_thanh_vien", ten: "Số thành viên", kieu: "so" },
@@ -132,7 +132,7 @@ export const MAU_MODULE_NQ57: ModuleMau[] = [
     bieu_tuong: "wifi",
     mau: "sky",
     truong: [
-      { khoa: "thon", ten: "Thôn, tổ dân phố", kieu: "don_vi", bat_buoc: true },
+      { khoa: "thon", ten: "Khu phố", kieu: "don_vi", bat_buoc: true },
       { khoa: "song_4g5g", ten: "Phủ sóng di động", kieu: "lua_chon", tuy_chon: ["5G", "4G toàn thôn", "4G một phần", "Chưa ổn định"] },
       { khoa: "cap_quang", ten: "Tỷ lệ hộ có cáp quang (%)", kieu: "so" },
       { khoa: "wifi_cong_cong", ten: "Có điểm wifi công cộng", kieu: "co_khong" },
@@ -211,6 +211,13 @@ export async function ensureSystemModules(tx: Q) {
     await tx`INSERT INTO mo_dun (ma, ten, mo_ta, bieu_tuong, mau, loai, duong_dan, id_cha, thu_tu)
       VALUES ('danh_gia_kpi', 'Đánh giá KPI', 'Kết quả thực hiện công việc của cán bộ và đơn vị: vượt tiến độ, đúng hạn, trễ hạn, quá hạn, tồn việc', 'flag', 'amber', 'he_thong', '/danh-gia-kpi', ${g}, ${after + 1})`;
   }
+}
+
+/** Đổi tên gọi "Thôn, tổ dân phố" → "Khu phố" trong dữ liệu đã có (chạy một lần khi nâng cấp) */
+export async function renameKhuPho(tx: Q) {
+  await tx`UPDATE mo_dun_truong SET ten = 'Khu phố' WHERE ten IN ('Thôn, tổ dân phố', 'Thôn/tổ dân phố')`;
+  await tx`UPDATE mo_dun SET mo_ta = replace(replace(mo_ta, 'thôn, tổ dân phố', 'khu phố'), 'Thôn, tổ dân phố', 'Khu phố') WHERE mo_ta ILIKE '%thôn, tổ dân phố%'`;
+  await tx`UPDATE nguoi_dung SET chuc_vu = 'Trưởng khu phố' WHERE chuc_vu IN ('Trưởng thôn', 'Trưởng thôn, tổ dân phố')`;
 }
 
 /** Tạo menu mặc định: module hệ thống, nhóm, module mẫu Nghị quyết 57 (chạy một lần khi nâng cấp) */

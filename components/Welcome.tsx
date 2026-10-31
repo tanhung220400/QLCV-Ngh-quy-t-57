@@ -50,7 +50,6 @@ export function Welcome({ img, tenXa, hoTen, bat }: { img: string | null; tenXa:
   }, []);
 
   if (gone) return null;
-  let w = 0;
   const hello = hoTen.split(" ").slice(-1)[0];
   return (
     <>
@@ -60,23 +59,22 @@ export function Welcome({ img, tenXa, hoTen, bat }: { img: string | null; tenXa:
         }}
       />
       <div id="chao" role="dialog" aria-label="Màn hình chào mừng" className={`chao no-print ${closing ? "chao-out" : ""}`} onClick={close}>
-        <div className="chao-bg" style={img ? { backgroundImage: `url(${img})` } : undefined} />
+        <div className="chao-bg" style={{ backgroundImage: `url(${img || "/chao.webp"})` }} />
         <div className="chao-shade" />
         <div className="chao-glow chao-glow-a" />
         <div className="chao-glow chao-glow-b" />
 
         <div className="chao-body">
           <div className="chao-badge">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 sm:h-10 sm:w-10" aria-hidden>
-              <path d="M4 12.5 9 17.5 20 6.5" />
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cong-an-hieu.webp" alt="Công an hiệu" />
           </div>
           <div className="chao-org">{tenXa}</div>
           <h1 className="chao-title">
             {LINES.map((l) => (
               <span key={l.text} className={`chao-line ${l.cls}`}>
                 {l.text.split(" ").map((word, i) => (
-                  <span key={i} className="chao-word" style={{ animationDelay: `${0.55 + w++ * 0.11}s` }}>
+                  <span key={i} className="chao-word">
                     {word}
                     {i < l.text.split(" ").length - 1 ? " " : ""}
                   </span>

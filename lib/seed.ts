@@ -50,8 +50,8 @@ async function seedDemo(tx: Tx, ld: number, vp: number) {
   const tvh = await user("Bùi Thị Mai", "tp.vanhoa", vh, "Trưởng phòng Văn hóa - Xã hội", "truong_don_vi");
   const v1 = await user("Đặng Văn Nam", "cv.vanhoa1", vh, "Chuyên viên y tế, BHXH", "cong_chuc");
   const thc = await user("Lý Thị Ngọc", "gd.hcc", hcc, "Giám đốc Trung tâm", "truong_don_vi");
-  const t1 = await user("Mai Văn Quang", "thon.dong", th1, "Trưởng thôn", "truong_thon");
-  await user("Cao Thị Sen", "thon.tay", th2, "Trưởng thôn", "truong_thon");
+  const t1 = await user("Mai Văn Quang", "thon.dong", th1, "Trưởng khu phố", "truong_thon");
+  await user("Cao Thị Sen", "thon.tay", th2, "Trưởng khu phố", "truong_thon");
   void bt;
 
   const today = vnDate();

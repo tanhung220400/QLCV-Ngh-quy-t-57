@@ -3,7 +3,7 @@ export const VAI_TRO: Record<string, string> = {
   truong_don_vi: "Trưởng đơn vị",
   cong_chuc: "Công chức, viên chức",
   tong_hop: "Thường trực tổng hợp",
-  truong_thon: "Trưởng thôn, tổ dân phố",
+  truong_thon: "Trưởng khu phố",
   quan_tri: "Quản trị hệ thống",
 };
 
@@ -32,7 +32,7 @@ export const LOAI_DON_VI: Record<string, string> = {
   lanh_dao: "Lãnh đạo",
   phong: "Phòng",
   trung_tam: "Trung tâm",
-  thon: "Thôn, tổ dân phố",
+  thon: "Khu phố",
 };
 
 export const LOAI_CHI_TIEU: Record<string, string> = {

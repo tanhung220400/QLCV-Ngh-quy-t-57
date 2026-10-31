@@ -36,7 +36,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <li>tp.kinhte — Trưởng phòng Kinh tế</li>
             <li>cv.kinhte1 — Chuyên viên</li>
             <li>vanphong — Văn phòng (tổng hợp)</li>
-            <li>thon.dong — Trưởng thôn</li>
+            <li>thon.dong — Trưởng khu phố</li>
           </ul>
           <p className="mt-2">Quản trị nên khóa các tài khoản này khi dùng thật.</p>
         </details>

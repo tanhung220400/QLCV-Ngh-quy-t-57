@@ -257,9 +257,8 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
         {me.menuImg && <div className="side-bg-img" style={{ backgroundImage: `url(${me.menuImg})` }} />}
         <div className="side-shade" style={{ ["--phu" as string]: me.menuImg ? me.phu : 0.15 }} />
         <Link href="/" className="relative flex items-center gap-3 border-b border-white/10 px-5 pt-5 pb-4">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lift">
-            <Icon name="check" className="h-6 w-6" strokeWidth={2.6} />
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cong-an-hieu-128.png" alt="Công an hiệu" className="h-12 w-[3.6rem] shrink-0 object-contain drop-shadow-[0_2px_6px_rgb(0_0_0/0.45)]" />
           <span className="min-w-0">
             <span className="block leading-tight font-bold text-white">Giao việc &amp; Chỉ tiêu</span>
             <span className="block truncate text-sm text-white/75">{me.ten_xa}</span>
@@ -290,9 +289,8 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-5">
           <BackButton />
           <Link href="/" className={`min-w-0 shrink items-center gap-2 lg:hidden ${path === "/" ? "flex" : "hidden sm:flex"}`}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">
-              <Icon name="check" className="h-5 w-5" strokeWidth={2.6} />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/cong-an-hieu-128.png" alt="Công an hiệu" className="h-9 w-11 shrink-0 object-contain" />
             <span className="max-w-[38vw] truncate leading-tight font-bold text-slate-900">{me.ten_xa}</span>
           </Link>
           {me.traCuu ? (
