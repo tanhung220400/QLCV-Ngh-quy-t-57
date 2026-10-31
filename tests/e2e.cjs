@@ -623,6 +623,38 @@ const day = (n) => {
   ok("biểu đồ trên điện thoại không tràn trang (cuộn ngang trong khung)", over2 <= 1, `dư ${over2}px`);
   await ctx.close();
 
+  // 16. Đánh giá KPI: admin xem toàn phường, trưởng phòng xem đơn vị mình, công chức không xem được
+  ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
+  await page.goto(BASE + "/dang-nhap");
+  await page.fill('input[name="ten_dang_nhap"]', "quantri");
+  await page.fill('input[name="mat_khau"]', "Quantri@2026");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+  ok("menu có Đánh giá KPI", (await page.locator("aside").innerText()).includes("Đánh giá KPI"));
+  const kq = await check(page, "/danh-gia-kpi", "KPI toàn phường");
+  ok("KPI toàn phường theo đơn vị", kq.includes("Phạm vi: toàn phường") && kq.includes("Phòng Kinh tế") && kq.includes("Phòng Văn hóa - Xã hội") && /Hoàn thành|Chưa hoàn thành|Chưa đủ dữ liệu/.test(kq));
+  ok("KPI có các chỉ số vượt tiến độ, trễ hạn, quá hạn, tồn", ["Vượt tiến độ", "Trễ hạn", "Đang quá hạn", "Tồn việc", "Điểm KPI"].every((t) => kq.includes(t)));
+  await page.click("table >> text=Phòng Kinh tế");
+  await page.waitForURL(/xem=can_bo/, { waitUntil: "commit" });
+  const kcb = await page.locator("main").innerText();
+  ok("bấm đơn vị xem KPI cán bộ của đơn vị", kcb.includes("Hoàng Văn Khánh") && !kcb.includes("Đặng Văn Nam"));
+  const kx = await page.request.get(BASE + "/api/xuat/kpi?xem=can_bo");
+  ok("xuất Excel KPI", kx.status() === 200 && (await kx.body()).length > 1000);
+  await ctx.close();
+  ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
+  await login(page, "tp.kinhte");
+  const kt = await check(page, "/danh-gia-kpi?xem=can_bo", "KPI đơn vị");
+  ok("trưởng phòng chỉ xem KPI đơn vị mình", kt.includes("Phạm vi: Phòng Kinh tế") && kt.includes("Hoàng Văn Khánh") && !kt.includes("Đặng Văn Nam") && !kt.includes("Phòng Văn hóa"));
+  const ktx = await page.request.get(BASE + "/api/xuat/kpi?dv=999");
+  ok("trưởng phòng xuất Excel KPI đơn vị mình", ktx.status() === 200);
+  await ctx.close();
+  ({ ctx, page } = await newPage());
+  await login(page, "cv.vanhoa1");
+  await page.goto(BASE + "/danh-gia-kpi");
+  ok("công chức không xem được KPI khi chưa được cấp quyền", page.url().includes("khong_quyen"));
+  ok("API KPI chặn công chức", (await page.request.get(BASE + "/api/xuat/kpi")).status() === 403);
+  await ctx.close();
+
   // PCT kinh tế không thấy chỉ tiêu lĩnh vực y tế
   ({ ctx, page } = await newPage());
   await login(page, "pct.kinhte");
@@ -636,7 +668,7 @@ const day = (n) => {
   // 9. Giao diện điện thoại: không tràn ngang
   ({ ctx, page } = await newPage({ width: 390, height: 844 }));
   await login(page, "tp.kinhte");
-  for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", `/viec/${taskId}`, "/viec/moi", "/chi-tieu", "/bao-cao", "/thong-bao", "/tai-khoan", "/m/to-cong-nghe-so", "/m/quan-ly-dia-ban", "/m/binh-dan-hoc-vu-so/moi"]) {
+  for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", `/viec/${taskId}`, "/viec/moi", "/chi-tieu", "/bao-cao", "/thong-bao", "/tai-khoan", "/danh-gia-kpi", "/m/to-cong-nghe-so", "/m/quan-ly-dia-ban", "/m/binh-dan-hoc-vu-so/moi"]) {
     await page.goto(BASE + p, { waitUntil: "networkidle" });
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     const wide = over > 1 ? await page.evaluate(() => [...document.querySelectorAll("body *")].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1).slice(-3).map((e) => e.tagName + "." + String(e.className).slice(0, 60)).join(" | ")) : "";

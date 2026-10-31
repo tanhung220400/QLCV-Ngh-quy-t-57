@@ -64,7 +64,7 @@ export const MAU_MODULE: Record<string, { bg: string; fg: string; ring: string; 
 };
 
 /** Quyền chức năng cần có để thấy module hệ thống */
-export const QUYEN_HE_THONG: Record<string, string | null> = {
+export const QUYEN_HE_THONG: Record<string, string | string[] | null> = {
   tong_quan: null,
   cong_viec: null,
   giao_viec: "cv.giao",
@@ -72,6 +72,7 @@ export const QUYEN_HE_THONG: Record<string, string | null> = {
   bao_cao: "bc.xem",
   tra_cuu: "bc.tra_cuu",
   bieu_do: "bc.bieu_do",
+  danh_gia_kpi: ["bc.kpi", "bc.kpi_don_vi"],
   thong_bao: null,
 };
 
@@ -203,6 +204,13 @@ export async function ensureSystemModules(tx: Q) {
     await tx`INSERT INTO mo_dun (ma, ten, mo_ta, bieu_tuong, mau, loai, duong_dan, id_cha, thu_tu)
       VALUES ('bieu_do', 'Biểu đồ tiến độ đơn vị', 'So sánh tiến độ thực hiện công việc giữa các đơn vị', 'chart', 'sky', 'he_thong', '/bieu-do', ${g}, ${after + 1})`;
   }
+  if (!(await tx`SELECT 1 FROM mo_dun WHERE ma = 'danh_gia_kpi'`).length) {
+    const g = (await tx`SELECT id FROM mo_dun WHERE ma = 'chi-tieu-bao-cao'`)[0]?.id ?? null;
+    const after = (await tx`SELECT thu_tu FROM mo_dun WHERE ma = 'bieu_do'`)[0]?.thu_tu ?? 3;
+    await tx`UPDATE mo_dun SET thu_tu = thu_tu + 1 WHERE id_cha IS NOT DISTINCT FROM ${g} AND thu_tu > ${after}`;
+    await tx`INSERT INTO mo_dun (ma, ten, mo_ta, bieu_tuong, mau, loai, duong_dan, id_cha, thu_tu)
+      VALUES ('danh_gia_kpi', 'Đánh giá KPI', 'Kết quả thực hiện công việc của cán bộ và đơn vị: vượt tiến độ, đúng hạn, trễ hạn, quá hạn, tồn việc', 'flag', 'amber', 'he_thong', '/danh-gia-kpi', ${g}, ${after + 1})`;
+  }
 }
 
 /** Tạo menu mặc định: module hệ thống, nhóm, module mẫu Nghị quyết 57 (chạy một lần khi nâng cấp) */
@@ -247,7 +255,7 @@ export function canSeeModule(user: User, m: MoDun): boolean {
   if (!m.hien && !user.quyen.includes("qt.mo_dun")) return false;
   if (m.loai === "he_thong") {
     const need = QUYEN_HE_THONG[m.ma];
-    if (need && !user.quyen.includes(need)) return false;
+    if (need && ![need].flat().some((q) => user.quyen.includes(q))) return false;
   }
   if (user.quyen.includes("qt.mo_dun") || user.quyen.includes("qt.du_lieu")) return true;
   return !m.vai_tro_xem.length || m.vai_tro_xem.includes(user.vai_tro);
