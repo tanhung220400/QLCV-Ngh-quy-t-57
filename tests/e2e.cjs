@@ -538,7 +538,8 @@ const day = (n) => {
   await boxes.nth(0).check();
   await boxes.nth(1).check();
   await page.click('button:has-text("Xóa các việc đã chọn")');
-  await page.waitForSelector("text=Đã xóa 2 công việc vào Thùng rác.");
+  // sau khi xóa, danh sách lọc có thể trống ngay (biểu mẫu và thông báo biến mất cùng danh sách)
+  await page.waitForFunction(() => document.body.innerText.includes("Đã xóa 2 công việc vào Thùng rác.") || !document.querySelector('input[name="chon"]'), null, { timeout: 30000 });
   const after = await check(page, "/viec?tab=tat_ca&q=" + encodeURIComponent("Kiểm thử nhập nhanh"), "sau xóa nhiều");
   ok("admin xóa nhiều công việc", !after.includes("Kiểm thử nhập nhanh việc A"));
   // Đóng gói công việc năm cũ
