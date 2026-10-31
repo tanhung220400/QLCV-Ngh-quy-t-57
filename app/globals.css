@@ -117,6 +117,282 @@ body {
   }
 }
 
+
+/* ===================== Màn hình chào mừng ===================== */
+html:not([data-chao]) #chao {
+  display: none;
+}
+html[data-chao] body {
+  overflow: hidden;
+}
+.chao {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #fff;
+  background: #0b1f4d;
+  cursor: pointer;
+  animation: chao-in 0.5s ease-out both;
+}
+.chao-out {
+  animation: chao-out 0.65s ease-in forwards;
+}
+.chao-bg {
+  position: absolute;
+  inset: -4%;
+  background:
+    radial-gradient(circle at 20% 20%, #3b74f6 0, transparent 45%),
+    radial-gradient(circle at 85% 75%, #0ea5e9 0, transparent 40%),
+    linear-gradient(135deg, #0b1f4d, #1d4fd8 55%, #4338ca);
+  background-size: cover;
+  background-position: center;
+  animation: chao-zoom 14s ease-out both;
+}
+.chao-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(8 20 52 / 0.55) 0%, rgb(8 20 52 / 0.35) 40%, rgb(8 20 52 / 0.8) 100%),
+    radial-gradient(ellipse at center, rgb(8 20 52 / 0.15) 0%, rgb(8 20 52 / 0.6) 100%);
+}
+.chao-glow {
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.35;
+  mix-blend-mode: screen;
+}
+.chao-glow-a {
+  left: -12vmax;
+  top: -14vmax;
+  background: #60a5fa;
+  animation: chao-float 9s ease-in-out infinite alternate;
+}
+.chao-glow-b {
+  right: -14vmax;
+  bottom: -16vmax;
+  background: #f59e0b;
+  opacity: 0.22;
+  animation: chao-float 11s ease-in-out infinite alternate-reverse;
+}
+.chao-body {
+  position: relative;
+  width: min(92vw, 980px);
+  padding: 1.5rem 1rem calc(2rem + env(safe-area-inset-bottom));
+  text-align: center;
+}
+.chao-badge {
+  margin: 0 auto 1rem;
+  display: flex;
+  height: clamp(3.5rem, 9vw, 4.75rem);
+  width: clamp(3.5rem, 9vw, 4.75rem);
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.4rem;
+  background: linear-gradient(135deg, #fbbf24, #f97316);
+  color: #fff;
+  box-shadow: 0 10px 30px rgb(249 115 22 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.4);
+  animation: chao-pop 0.8s cubic-bezier(0.2, 1.4, 0.4, 1) 0.15s both;
+}
+.chao-org {
+  font-size: clamp(0.85rem, 2.4vw, 1.05rem);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.85);
+  animation: chao-fade 0.7s ease-out 0.35s both;
+}
+.chao-title {
+  margin-top: clamp(0.75rem, 2.5vh, 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.15rem, 1vh, 0.5rem);
+  font-weight: 700;
+  line-height: 1.18;
+  text-wrap: balance;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 0.35);
+}
+.chao-line {
+  display: block;
+}
+.chao-l1 {
+  font-size: clamp(1.15rem, 3.6vw, 1.9rem);
+  font-weight: 500;
+  color: rgb(255 255 255 / 0.92);
+}
+.chao-l2 {
+  font-size: clamp(1.7rem, 6.4vw, 3.7rem);
+  letter-spacing: -0.01em;
+}
+.chao-l3 {
+  font-size: clamp(1.9rem, 7.2vw, 4.2rem);
+  letter-spacing: -0.01em;
+}
+.chao-l3 .chao-word {
+  background: linear-gradient(90deg, #fde68a, #fbbf24, #fb923c, #fde68a);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 10px rgb(0 0 0 / 0.35));
+  animation:
+    chao-word 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+    chao-shine 4s linear 1.8s infinite;
+}
+.chao-word {
+  display: inline-block;
+  white-space: nowrap;
+  animation: chao-word 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.chao-rule {
+  margin: clamp(1rem, 3vh, 1.6rem) auto 0;
+  height: 4px;
+  width: min(220px, 40vw);
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+  transform-origin: center;
+  animation: chao-grow 0.9s ease-out 1.9s both;
+}
+.chao-sub {
+  margin: clamp(0.75rem, 2.5vh, 1.25rem) auto 0;
+  max-width: 40rem;
+  font-size: clamp(0.95rem, 2.6vw, 1.15rem);
+  color: rgb(255 255 255 / 0.88);
+  animation: chao-fade 0.8s ease-out 2.2s both;
+}
+.chao-btn {
+  margin-top: clamp(1.25rem, 4vh, 2.25rem);
+  display: inline-flex;
+  min-height: 3.1rem;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: #fff;
+  padding: 0.7rem 1.6rem;
+  font-weight: 700;
+  color: #1d4fd8;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+  transition: transform 0.2s;
+  animation: chao-fade 0.8s ease-out 2.6s both;
+}
+.chao-btn:hover {
+  transform: translateY(-2px);
+}
+.chao-bar {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4px;
+  background: rgb(255 255 255 / 0.12);
+}
+.chao-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #f97316);
+  transform-origin: left;
+  animation: chao-bar 7s linear both;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .chao-badge {
+    display: none;
+  }
+  .chao-sub {
+    display: none;
+  }
+}
+@keyframes chao-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes chao-out {
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+    filter: blur(6px);
+  }
+}
+@keyframes chao-zoom {
+  from {
+    transform: scale(1.12);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes chao-float {
+  to {
+    transform: translate(6vmax, 4vmax) scale(1.1);
+  }
+}
+@keyframes chao-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-12deg);
+  }
+}
+@keyframes chao-fade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes chao-word {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em) scale(0.96);
+    filter: blur(8px);
+  }
+}
+@keyframes chao-shine {
+  to {
+    background-position: -250% 0;
+  }
+}
+@keyframes chao-grow {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+@keyframes chao-bar {
+  from {
+    transform: scaleX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chao *,
+  .chao {
+    animation-duration: 0.01s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ===================== Cột menu có ảnh nền ===================== */
+.side-bg {
+  background:
+    radial-gradient(circle at 0% 0%, rgb(59 116 246 / 0.55), transparent 55%),
+    linear-gradient(180deg, #102a6b 0%, #1a3d99 55%, #1e2f7a 100%);
+}
+.side-bg-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+.side-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(12 30 80 / var(--phu)) 0%, rgb(16 38 100 / calc(var(--phu) - 0.04)) 45%, rgb(10 24 66 / calc(var(--phu) + 0.06)) 100%);
+}
+
 @media print {
   .no-print {
     display: none !important;

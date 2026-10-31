@@ -14,6 +14,12 @@ const day = (n) => {
   const errors = [];
   const newPage = async (viewport = { width: 1280, height: 900 }) => {
     const ctx = await browser.newContext({ viewport, locale: "vi-VN", timezoneId: "Asia/Ho_Chi_Minh" });
+    // bỏ qua màn hình chào mừng trong các bước kiểm thử (có bước riêng để thử)
+    await ctx.addInitScript(() => {
+      try {
+        if (!location.search.includes("chao=1")) sessionStorage.setItem("qlcv_chao", "1");
+      } catch {}
+    });
     const page = await ctx.newPage();
     page.on("dialog", (d) => d.accept());
     page.on("pageerror", (e) => errors.push(`pageerror ${page.url()}: ${e.message}`));
@@ -52,7 +58,7 @@ const day = (n) => {
   await page.click('button[type="submit"]');
   await page.waitForURL(BASE + "/", { timeout: 60000, waitUntil: "commit" });
   ok("khởi tạo + dữ liệu mẫu", true);
-  for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", "/chi-tieu", "/bao-cao", "/quan-tri", "/quan-tri?muc=don_vi", "/quan-tri?muc=danh_muc", "/quan-tri?muc=ngay_nghi", "/quan-tri?muc=cai_dat", "/quan-tri?muc=nhat_ky", "/quan-tri?muc=mo_dun", "/quan-tri?muc=thung_rac", "/quan-tri?muc=sms", "/m/nghi-quyet-57", "/m/to-cong-nghe-so", "/m/binh-dan-hoc-vu-so", "/m/ha-tang-so-thon", "/m/sang-kien-doi-moi", "/m/san-pham-so-ocop", "/m/phan-anh-kien-nghi", "/m/phan-anh-kien-nghi/moi", "/thong-bao", "/tai-khoan"])
+  for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", "/chi-tieu", "/bao-cao", "/quan-tri", "/quan-tri?muc=don_vi", "/quan-tri?muc=danh_muc", "/quan-tri?muc=ngay_nghi", "/quan-tri?muc=cai_dat", "/quan-tri?muc=nhat_ky", "/quan-tri?muc=mo_dun", "/quan-tri?muc=thung_rac", "/quan-tri?muc=sms", "/quan-tri?muc=giao_dien", "/m/nghi-quyet-57", "/m/to-cong-nghe-so", "/m/binh-dan-hoc-vu-so", "/m/ha-tang-so-thon", "/m/sang-kien-doi-moi", "/m/san-pham-so-ocop", "/m/phan-anh-kien-nghi", "/m/phan-anh-kien-nghi/moi", "/thong-bao", "/tai-khoan"])
     await check(page, p, "quản trị");
   await ctx.close();
 
@@ -457,6 +463,62 @@ const day = (n) => {
   await page.goto(BASE + "/m/ha-tang-so-thon", { waitUntil: "networkidle" });
   await page.screenshot({ path: "/tmp/shot-module.jpg", type: "jpeg", quality: 45, fullPage: true });
   await ctx.close();
+
+
+  // 14. Giao diện: ảnh nền menu, màn hình chào mừng, nút Quay lại
+  ({ ctx, page } = await newPage());
+  await page.goto(BASE + "/dang-nhap");
+  await page.fill('input[name="ten_dang_nhap"]', "quantri");
+  await page.fill('input[name="mat_khau"]', "Quantri@2026");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+  await page.goto(BASE + "/quan-tri?muc=giao_dien");
+  await page.screenshot({ path: "/tmp/anh-thu.jpg", type: "jpeg", quality: 60 });
+  await page.setInputFiles('input[data-loai="menu"]', "/tmp/anh-thu.jpg");
+  await page.waitForSelector("text=Đã cập nhật ảnh.");
+  await page.setInputFiles('input[data-loai="chao"]', "/tmp/anh-thu.jpg");
+  await page.waitForTimeout(2500);
+  await page.goto(BASE + "/viec", { waitUntil: "networkidle" });
+  const bg = await page.evaluate(() => getComputedStyle(document.querySelector("aside .side-bg-img") || document.body).backgroundImage);
+  ok("ảnh nền cột menu", /api\/giao-dien\/menu/.test(bg), bg.slice(0, 80));
+  const im = await page.request.get(BASE + "/api/giao-dien/menu");
+  ok("phục vụ ảnh giao diện", im.status() === 200 && (im.headers()["content-type"] || "").startsWith("image/"));
+  ok("tiêu đề nhóm nổi bật", (await page.locator("aside div.uppercase, aside span.uppercase").allInnerTexts()).some((t) => /điều hành/i.test(t)));
+  // Quay lại
+  await page.goto(BASE + "/viec", { waitUntil: "networkidle" });
+  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại thôn");
+  await page.waitForURL(/\/viec\/\d+$/, { waitUntil: "commit" });
+  await page.click('button:has-text("Quay lại")');
+  await page.waitForURL((u) => u.pathname === "/viec", { waitUntil: "commit" });
+  ok("nút Quay lại về trang trước", true);
+  await page.goto(BASE + "/m/to-cong-nghe-so/moi", { waitUntil: "networkidle" });
+  ok("có nút Quay lại ở trang con", (await page.locator('button:has-text("Quay lại")').count()) === 1);
+  await page.goto(BASE + "/", { waitUntil: "networkidle" });
+  ok("trang chủ không có nút Quay lại", (await page.locator('button:has-text("Quay lại")').count()) === 0);
+  await ctx.close();
+  // Màn hình chào mừng: máy tính, máy tính bảng, điện thoại
+  for (const [name, vp] of [["máy tính", { width: 1440, height: 900 }], ["máy tính bảng", { width: 820, height: 1180 }], ["điện thoại", { width: 390, height: 844 }]]) {
+    const c2 = await browser.newContext({ viewport: vp, locale: "vi-VN" });
+    const p2 = await c2.newPage();
+    p2.on("pageerror", (e) => errors.push(`pageerror chao: ${e.message}`));
+    await p2.goto(BASE + "/dang-nhap");
+    await p2.fill('input[name="ten_dang_nhap"]', "chutich");
+    await p2.fill('input[name="mat_khau"]', PW);
+    await p2.click('button[type="submit"]');
+    await p2.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+    await p2.waitForSelector("#chao", { state: "visible", timeout: 10000 });
+    await p2.waitForTimeout(3200);
+    const txt = await p2.locator("#chao h1").innerText();
+    ok(`màn hình chào (${name})`, txt.replace(/\s+/g, " ").includes("Chào mừng bạn đến với Phần mềm quản lý công việc Nghị quyết 57-NQ/TW"), txt.replace(/\s+/g, " "));
+    const fit = await p2.evaluate(() => { const b = document.querySelector(".chao-body").getBoundingClientRect(); return b.right <= innerWidth + 1 && b.left >= -1 && document.documentElement.scrollWidth <= innerWidth + 1; });
+    ok(`chữ chào vừa màn hình (${name})`, fit);
+    await p2.screenshot({ path: `/tmp/shot-chao-${vp.width}.jpg`, type: "jpeg", quality: 50 });
+    await p2.click("text=Bắt đầu làm việc");
+    await p2.waitForSelector("#chao", { state: "detached", timeout: 5000 });
+    await p2.reload({ waitUntil: "networkidle" });
+    ok(`chỉ chào một lần mỗi phiên (${name})`, !(await p2.locator("#chao").isVisible().catch(() => false)));
+    await c2.close();
+  }
 
   // PCT kinh tế không thấy chỉ tiêu lĩnh vực y tế
   ({ ctx, page } = await newPage());

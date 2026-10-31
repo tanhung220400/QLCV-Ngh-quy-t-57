@@ -6,7 +6,9 @@ import { getSmsConfig, SU_KIEN_SMS, smsReady } from "@/lib/sms";
 import { db } from "@/lib/db";
 import { getCatalog, getSettings } from "@/lib/settings";
 import { ActionForm, Submit } from "@/components/ActionForm";
-import { catalogItemAction, trashAction, seedDemoAction } from "@/app/actions/admin";
+import { catalogItemAction, trashAction, seedDemoAction, saveThemeAction } from "@/app/actions/admin";
+import { ThemeUpload } from "@/components/ThemeUpload";
+import { getTheme, themeImageUrl } from "@/lib/theme";
 import { ModuleTree, ModuleForm, TemplateForm } from "@/components/ModuleAdmin";
 import { Icon } from "@/components/Icon";
 import type { MoDun } from "@/lib/modules";
@@ -22,6 +24,7 @@ const MUC: [string, string, string][] = [
   ["don_vi", "Cơ cấu tổ chức", "qt.co_cau"],
   ["danh_muc", "Danh mục", "qt.co_cau"],
   ["ngay_nghi", "Ngày nghỉ, lễ", "qt.co_cau"],
+  ["giao_dien", "Giao diện, màn hình chào", "qt.cai_dat"],
   ["cai_dat", "Cài đặt, mẫu báo cáo", "qt.cai_dat"],
   ["sms", "Tin nhắn SMS", "qt.cai_dat"],
   ["thung_rac", "Thùng rác, dữ liệu", "qt.du_lieu"],
@@ -92,6 +95,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
       {muc === "danh_muc" && <Catalogs open={sp.loai || "linh_vuc"} />}
       {muc === "mo_dun" && <Modules deleted={!!sp.xoa} />}
       {muc === "thung_rac" && <Trash />}
+      {muc === "giao_dien" && <Theme />}
       {muc === "ngay_nghi" && <Holidays />}
       {muc === "cai_dat" && <Settings />}
       {muc === "nhat_ky" && <Logs q={sp.q || ""} />}
@@ -716,6 +720,37 @@ async function Trash() {
           )}
         </ActionForm>
       </div>
+    </div>
+  );
+}
+
+async function Theme() {
+  const sql = await db();
+  const t = await getTheme(sql);
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <div className="card">
+        <ThemeUpload loai="menu" label="Ảnh nền cột menu" src={themeImageUrl("menu", t.menu_v)} hint="Nên dùng ảnh dọc hoặc ảnh có chủ thể ở giữa. Phần mềm phủ một lớp màu xanh lên ảnh để tên module luôn rõ, dễ đọc." />
+      </div>
+      <div className="card">
+        <ThemeUpload loai="chao" label="Ảnh màn hình chào mừng" src={themeImageUrl("chao", t.chao_v)} hint="Nên dùng ảnh ngang, rõ nét (trụ sở, quang cảnh địa phương). Trên điện thoại ảnh được cắt giữa cho vừa màn hình dọc." />
+      </div>
+      <ActionForm action={saveThemeAction} className="card space-y-4 lg:col-span-2">
+        <h2 className="h2">Tùy chỉnh</h2>
+        <label className="flex items-center gap-3">
+          <input type="checkbox" name="chao_bat" value="1" defaultChecked={t.chao_bat} className="h-5 w-5 accent-brand-600" />
+          Hiện màn hình chào mừng mỗi lần mở phần mềm
+        </label>
+        <label className="block max-w-md">
+          <span className="label">Độ đậm lớp phủ trên ảnh menu ({Math.round(t.phu_menu * 100)}%)</span>
+          <input type="range" name="phu_menu" min={0.55} max={0.95} step={0.05} defaultValue={t.phu_menu} className="w-full accent-brand-600" />
+          <span className="text-sm text-slate-500">Kéo sang phải nếu ảnh nhiều chi tiết làm chữ khó đọc.</span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <Submit>Lưu</Submit>
+          <a href="/?chao=1" className="btn btn-outline">Xem thử màn hình chào</a>
+        </div>
+      </ActionForm>
     </div>
   );
 }

@@ -9,6 +9,8 @@ import { flushSms } from "@/lib/sms";
 import { OfflineSync } from "@/components/OfflineSync";
 import { menuTree, type MenuNode } from "@/lib/modules";
 import { getSettings } from "@/lib/settings";
+import { getTheme, themeImageUrl } from "@/lib/theme";
+import { Welcome } from "@/components/Welcome";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +26,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   if (user.doi_mat_khau) redirect("/doi-mat-khau");
   const sql = await db();
-  const [unreadRow, tree, cfg] = await Promise.all([
+  const [unreadRow, tree, cfg, theme] = await Promise.all([
     sql`SELECT count(*)::int AS n FROM thong_bao WHERE id_nguoi_nhan = ${user.id} AND NOT da_doc`,
     menuTree(sql, user),
     getSettings(),
+    getTheme(sql),
   ]);
   const unread = unreadRow[0].n as number;
 
@@ -41,6 +44,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   });
 
   const me = {
+    menuImg: themeImageUrl("menu", theme.menu_v),
+    phu: theme.phu_menu,
     ho_ten: user.ho_ten,
     chuc_vu: user.chuc_vu || "",
     don_vi: user.ten_don_vi || "",
@@ -52,6 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-dvh">
+      <Welcome img={themeImageUrl("chao", theme.chao_v)} tenXa={cfg.ten_don_vi || "UBND xã"} hoTen={user.ho_ten} bat={theme.chao_bat} />
       <Nav tree={tree.map(slim)} unread={unread} me={me} />
       <div className="lg:pl-72">
         <main className="mx-auto max-w-6xl px-3 pt-5 pb-28 sm:px-5 lg:pb-12">

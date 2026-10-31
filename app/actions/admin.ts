@@ -383,3 +383,14 @@ export async function seedDemoAction(_: ActionState, fd: FormData): Promise<Acti
   const r = await sql.begin((tx) => seedDemoNQ57(tx, u.id));
   return { ok: true, message: `Đã nạp ${r.cong_viec} công việc, ${r.chi_tieu} chỉ tiêu, ${r.ban_ghi} bản ghi mẫu.` };
 }
+
+export async function saveThemeAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await need("qt.cai_dat");
+  if (!u) return { error: "Không có quyền." };
+  const { saveTheme } = await import("@/lib/theme");
+  const sql = await db();
+  const phu = Math.min(0.95, Math.max(0.55, Number(str(fd, "phu_menu")) || 0.82));
+  await saveTheme(sql, { chao_bat: str(fd, "chao_bat") === "1", phu_menu: phu });
+  await writeLog(sql, u.id, "sua_giao_dien", "he_thong", null, null, { chao_bat: str(fd, "chao_bat") === "1", phu_menu: phu });
+  return { ok: true, message: "Đã lưu cài đặt giao diện." };
+}

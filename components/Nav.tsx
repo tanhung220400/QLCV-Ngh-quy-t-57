@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { Icon } from "./Icon";
@@ -9,7 +9,7 @@ import { MAU_MODULE } from "@/lib/modules";
 export { Icon };
 
 export type NavNode = { id: number; ten: string; href: string; icon: string; mau: string; loai: string; con: NavNode[] };
-type Me = { ho_ten: string; chuc_vu: string; don_vi: string; ten_xa: string; admin: boolean; traCuu: boolean; giaoViec: boolean };
+type Me = { menuImg: string | null; phu: number; ho_ten: string; chuc_vu: string; don_vi: string; ten_xa: string; admin: boolean; traCuu: boolean; giaoViec: boolean };
 
 const initials = (s: string) =>
   s
@@ -34,29 +34,34 @@ function Tile({ icon, mau, size = "sm" }: { icon: string; mau: string; size?: "s
   );
 }
 
-function NavLink({ n, depth, unread, onClick }: { n: NavNode; depth: number; unread: number; onClick?: () => void }) {
+function NavLink({ n, depth, unread, onClick, dark }: { n: NavNode; depth: number; unread: number; onClick?: () => void; dark?: boolean }) {
   const active = useActive();
   const on = active(n.href);
   const ext = n.href.startsWith("http");
+  const tone = dark
+    ? on
+      ? "bg-white text-brand-800 shadow-lift"
+      : "text-white hover:bg-white/12"
+    : on
+      ? "bg-brand-50 text-brand-700"
+      : "text-slate-700 hover:bg-slate-50 hover:text-slate-900";
   return (
     <>
       <Link
         href={n.href}
         onClick={onClick}
         target={ext ? "_blank" : undefined}
-        className={`group flex items-center gap-3 rounded-xl py-1.5 pr-2 font-medium transition ${depth ? "pl-6 text-[15px]" : "pl-2"} ${
-          on ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-        }`}
+        className={`group flex items-center gap-3 rounded-xl py-1.5 pr-2 font-semibold transition ${depth ? "pl-7 text-[15px] font-medium" : "pl-2"} ${tone}`}
       >
-        {depth ? <span className={`h-1.5 w-1.5 rounded-full ${on ? "bg-brand-600" : "bg-slate-300"}`} /> : <Tile icon={n.icon} mau={n.mau} />}
-        <span className="min-w-0 flex-1 truncate">{n.ten}</span>
+        {depth ? <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${on ? "bg-brand-600" : dark ? "bg-white/60" : "bg-slate-300"}`} /> : <Tile icon={n.icon} mau={n.mau} />}
+        <span className={`min-w-0 flex-1 truncate ${dark && !on ? "[text-shadow:0_1px_2px_rgb(0_0_0/0.35)]" : ""}`}>{n.ten}</span>
         {n.href === "/thong-bao" && unread > 0 && <span className="rounded-full bg-red-500 px-2 text-xs leading-5 font-semibold text-white">{unread}</span>}
-        {ext && <Icon name="link" className="h-4 w-4 text-slate-400" />}
+        {ext && <Icon name="link" className={`h-4 w-4 ${dark && !on ? "text-white/60" : "text-slate-400"}`} />}
       </Link>
       {n.con.length > 0 && depth < 2 && (
         <div className="space-y-0.5">
           {n.con.map((c) => (
-            <NavLink key={c.id} n={c} depth={depth + 1} unread={unread} onClick={onClick} />
+            <NavLink key={c.id} n={c} depth={depth + 1} unread={unread} onClick={onClick} dark={dark} />
           ))}
         </div>
       )}
@@ -64,26 +69,87 @@ function NavLink({ n, depth, unread, onClick }: { n: NavNode; depth: number; unr
   );
 }
 
-function MenuList({ tree, unread, onClick }: { tree: NavNode[]; unread: number; onClick?: () => void }) {
+/** Màu nhấn cho tiêu đề nhóm */
+const NHAN: Record<string, { bar: string; text: string; soft: string }> = {
+  blue: { bar: "bg-sky-300", text: "text-sky-700", soft: "bg-sky-50 border-sky-200" },
+  sky: { bar: "bg-sky-300", text: "text-sky-700", soft: "bg-sky-50 border-sky-200" },
+  teal: { bar: "bg-teal-300", text: "text-teal-700", soft: "bg-teal-50 border-teal-200" },
+  emerald: { bar: "bg-emerald-300", text: "text-emerald-700", soft: "bg-emerald-50 border-emerald-200" },
+  amber: { bar: "bg-amber-300", text: "text-amber-700", soft: "bg-amber-50 border-amber-200" },
+  orange: { bar: "bg-orange-300", text: "text-orange-700", soft: "bg-orange-50 border-orange-200" },
+  rose: { bar: "bg-rose-300", text: "text-rose-700", soft: "bg-rose-50 border-rose-200" },
+  violet: { bar: "bg-violet-300", text: "text-violet-700", soft: "bg-violet-50 border-violet-200" },
+  indigo: { bar: "bg-indigo-300", text: "text-indigo-700", soft: "bg-indigo-50 border-indigo-200" },
+  slate: { bar: "bg-slate-300", text: "text-slate-700", soft: "bg-slate-50 border-slate-200" },
+};
+
+function GroupTitle({ n, dark }: { n: NavNode; dark?: boolean }) {
+  const c = NHAN[n.mau] || NHAN.blue;
+  if (dark)
+    return (
+      <div className="mb-1.5 flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-2.5 py-2 backdrop-blur-sm">
+        <span className={`h-6 w-1.5 shrink-0 rounded-full ${c.bar}`} />
+        <Icon name={n.icon} className="h-5 w-5 shrink-0 text-white" />
+        <span className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide text-white uppercase [text-shadow:0_1px_3px_rgb(0_0_0/0.45)]">{n.ten}</span>
+      </div>
+    );
   return (
-    <div className="space-y-4">
+    <div className={`mb-1.5 flex items-center gap-2.5 rounded-xl border px-2.5 py-2 ${c.soft}`}>
+      <span className={`h-6 w-1.5 shrink-0 rounded-full ${c.bar}`} />
+      <Icon name={n.icon} className={`h-5 w-5 shrink-0 ${c.text}`} />
+      <span className={`min-w-0 flex-1 truncate text-[15px] font-bold tracking-wide uppercase ${c.text}`}>{n.ten}</span>
+    </div>
+  );
+}
+
+function MenuList({ tree, unread, onClick, dark }: { tree: NavNode[]; unread: number; onClick?: () => void; dark?: boolean }) {
+  return (
+    <div className="space-y-5">
       {tree.map((n) =>
         n.loai === "nhom" ? (
           <div key={n.id}>
-            <div className="mb-1 px-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">{n.ten}</div>
+            <GroupTitle n={n} dark={dark} />
             <div className="space-y-0.5">
               {n.con.map((c) => (
-                <NavLink key={c.id} n={c} depth={0} unread={unread} onClick={onClick} />
+                <NavLink key={c.id} n={c} depth={0} unread={unread} onClick={onClick} dark={dark} />
               ))}
             </div>
           </div>
         ) : (
           <div key={n.id} className="space-y-0.5">
-            <NavLink n={n} depth={0} unread={unread} onClick={onClick} />
+            <NavLink n={n} depth={0} unread={unread} onClick={onClick} dark={dark} />
           </div>
         ),
       )}
     </div>
+  );
+}
+
+/** Số trang đã đi qua trong phiên (để biết có trang trước trong phần mềm hay không) */
+let visited = 0;
+
+/** Nút quay lại trang trước (hoặc trang cha nếu mở thẳng đường dẫn) */
+function BackButton() {
+  const router = useRouter();
+  const path = usePathname();
+  useEffect(() => {
+    visited++;
+  }, [path]);
+  if (path === "/") return null;
+  const up = path.split("/").slice(0, -1).join("/") || "/";
+  const parent = up === "/m" ? "/" : up === "/quan-tri/mo-dun" ? "/quan-tri?muc=mo_dun" : up === "/in" ? "/bao-cao" : up;
+  return (
+    <button
+      type="button"
+      onClick={() => (visited > 1 ? router.back() : router.push(parent))}
+      className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 shadow-soft hover:border-brand-200 hover:text-brand-700"
+      aria-label="Quay lại trang trước"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+      <span>Quay lại</span>
+    </button>
   );
 }
 
@@ -101,29 +167,31 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
 
   return (
     <>
-      {/* Thanh bên trên máy tính */}
-      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-slate-200/70 bg-white lg:flex">
-        <Link href="/" className="flex items-center gap-3 px-5 pt-5 pb-4">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-soft">
-            <Icon name="check" className="h-5 w-5" strokeWidth={2.6} />
+      {/* Thanh bên trên máy tính: ảnh nền + lớp phủ màu để tên module luôn rõ */}
+      <aside className="side-bg no-print fixed inset-y-0 left-0 z-30 hidden w-72 flex-col overflow-hidden text-white lg:flex">
+        {me.menuImg && <div className="side-bg-img" style={{ backgroundImage: `url(${me.menuImg})` }} />}
+        <div className="side-shade" style={{ ["--phu" as string]: me.menuImg ? me.phu : 0.15 }} />
+        <Link href="/" className="relative flex items-center gap-3 border-b border-white/10 px-5 pt-5 pb-4">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lift">
+            <Icon name="check" className="h-6 w-6" strokeWidth={2.6} />
           </span>
           <span className="min-w-0">
-            <span className="block leading-tight font-bold text-slate-900">Giao việc &amp; Chỉ tiêu</span>
-            <span className="block truncate text-sm text-slate-500">{me.ten_xa}</span>
+            <span className="block leading-tight font-bold text-white">Giao việc &amp; Chỉ tiêu</span>
+            <span className="block truncate text-sm text-white/75">{me.ten_xa}</span>
           </span>
         </Link>
-        <nav className="flex-1 overflow-y-auto px-3 pb-4">
-          <MenuList tree={tree} unread={unread} />
+        <nav className="relative flex-1 overflow-y-auto px-3 pt-4 pb-4 [scrollbar-color:rgb(255_255_255/0.25)_transparent]">
+          <MenuList tree={tree} unread={unread} dark />
         </nav>
-        <div className="space-y-0.5 border-t border-slate-100 p-3">
+        <div className="relative space-y-0.5 border-t border-white/10 bg-black/10 p-3">
           {me.admin && (
-            <Link href="/quan-tri" className={`flex items-center gap-3 rounded-xl px-2 py-1.5 font-medium ${active("/quan-tri") ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-50"}`}>
+            <Link href="/quan-tri" className={`flex items-center gap-3 rounded-xl px-2 py-1.5 font-semibold ${active("/quan-tri") ? "bg-white text-brand-800" : "text-white hover:bg-white/12"}`}>
               <Tile icon="cog" mau="slate" />
               Quản trị hệ thống
             </Link>
           )}
           <form action={logoutAction}>
-            <button className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 font-medium text-slate-600 hover:bg-red-50 hover:text-red-700">
+            <button className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 font-semibold text-white hover:bg-red-500/25">
               <Tile icon="logout" mau="rose" />
               Đăng xuất
             </button>
@@ -133,8 +201,9 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
 
       {/* Thanh trên cùng */}
       <header className="no-print sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur lg:ml-72">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-3 sm:px-5">
-          <Link href="/" className="flex items-center gap-2 lg:hidden">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-5">
+          <BackButton />
+          <Link href="/" className={`items-center gap-2 lg:hidden ${path === "/" ? "flex" : "hidden sm:flex"}`}>
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">
               <Icon name="check" className="h-5 w-5" strokeWidth={2.6} />
             </span>
