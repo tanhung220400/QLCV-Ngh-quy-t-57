@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import { after } from "next/server";
 import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema";
 import { seedModules, ensureSystemModules } from "./modules";
 
@@ -112,7 +113,23 @@ export async function ensureSchema() {
 }
 
 /** Trả về client SQL đã bảo đảm có bảng. */
+/**
+ * Vercel tạm dừng hàm ngay sau khi trả trang; khi đó bộ đếm idle_timeout của postgres.js không chạy
+ * nên kết nối rảnh bị giữ mãi, chiếm hết 15 chỗ của Supabase Session pooler.
+ * Giữ hàm sống thêm một chút sau mỗi yêu cầu để kết nối rảnh tự đóng (cùng cơ chế attachDatabasePool của Vercel).
+ */
+const RELEASE_MS = 6500;
+function releaseIdleAfterResponse() {
+  if (!process.env.VERCEL) return;
+  try {
+    after(() => new Promise<void>((r) => setTimeout(r, RELEASE_MS)));
+  } catch {
+    /* ngoài phạm vi một yêu cầu (tác vụ nền, sau after()): bỏ qua */
+  }
+}
+
 export async function db() {
   await ensureSchema();
+  releaseIdleAfterResponse();
   return rawSql();
 }
