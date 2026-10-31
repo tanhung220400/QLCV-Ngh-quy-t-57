@@ -296,6 +296,11 @@ async function Settings() {
           <input name="ten_don_vi" className="input" defaultValue={c.ten_don_vi} required />
         </label>
         <label className="block">
+          <span className="label">Tên hiển thị trên phần mềm (góc trên bên trái, màn hình chào, trang đăng nhập)</span>
+          <input name="ten_hien_thi" className="input" defaultValue={c.ten_hien_thi} placeholder={`Để trống thì dùng “${c.ten_don_vi}”`} />
+          <span className="text-sm text-slate-500">Không ảnh hưởng tên cơ quan in trên báo cáo Word.</span>
+        </label>
+        <label className="block">
           <span className="label">Địa danh (ví dụ: Tân Hưng)</span>
           <input name="dia_danh" className="input" defaultValue={c.dia_danh} />
         </label>

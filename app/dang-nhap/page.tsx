@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const cfg = await getSettings();
   const demo = (await sql`SELECT 1 FROM nguoi_dung WHERE ten_dang_nhap = 'chutich' LIMIT 1`).length > 0;
   return (
-    <AuthShell title="Đăng nhập" sub={cfg.ten_don_vi}>
+    <AuthShell title="Đăng nhập" sub={cfg.ten_hien_thi || cfg.ten_don_vi}>
       {sp.dat_lai && <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-emerald-800">Đã đặt lại mật khẩu. Mời đăng nhập.</p>}
       <ActionForm action={loginAction} className="space-y-4">
         <LoginFields />

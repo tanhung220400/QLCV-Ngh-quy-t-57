@@ -82,6 +82,8 @@ export const DANH_MUC_MAC_DINH: Record<string, string[]> = {
 
 export const CAI_DAT_MAC_DINH = {
   ten_don_vi: "UBND xã",
+  /** Tên hiện ở góc trên bên trái, màn hình chào, trang đăng nhập (để trống = dùng tên cơ quan ban hành) */
+  ten_hien_thi: "",
   ten_cap_tren: "",
   dia_danh: "",
   chuc_vu_ky: "CHỦ TỊCH",

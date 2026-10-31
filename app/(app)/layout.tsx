@@ -58,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ho_ten: user.ho_ten,
     chuc_vu: user.chuc_vu || "",
     don_vi: user.ten_don_vi || "",
-    ten_xa: cfg.ten_don_vi || "UBND xã",
+    ten_xa: cfg.ten_hien_thi || cfg.ten_don_vi || "UBND xã",
     admin: isAdmin(user),
     traCuu: user.quyen.includes("bc.tra_cuu"),
     giaoViec: canCreateTask(user),
@@ -66,7 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-dvh">
-      <Welcome img={themeImageUrl("chao", theme.chao_v)} tenXa={cfg.ten_don_vi || "UBND xã"} hoTen={user.ho_ten} bat={theme.chao_bat} />
+      <Welcome img={themeImageUrl("chao", theme.chao_v)} tenXa={cfg.ten_hien_thi || cfg.ten_don_vi || "UBND xã"} hoTen={user.ho_ten} bat={theme.chao_bat} />
       <Nav tree={nav} unread={unread} me={me} />
       <div className="lg:pl-(--side-w)">
         <main className="mx-auto max-w-6xl px-3 pt-5 pb-28 sm:px-5 lg:pb-12">

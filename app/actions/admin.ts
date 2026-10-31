@@ -204,6 +204,7 @@ export async function saveSettingsAction(_: ActionState, fd: FormData): Promise<
   const nums = (k: string) => str(fd, k).split(/[,; ]+/).map(Number).filter((n) => n > 0);
   const v = {
     ten_don_vi: str(fd, "ten_don_vi"),
+    ten_hien_thi: str(fd, "ten_hien_thi"),
     ten_cap_tren: str(fd, "ten_cap_tren"),
     dia_danh: str(fd, "dia_danh"),
     chuc_vu_ky: str(fd, "chuc_vu_ky"),
