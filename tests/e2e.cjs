@@ -362,20 +362,6 @@ const day = (n) => {
   ok("menu nhóm theo module (NQ57, địa bàn)", side.includes("NGHỊ QUYẾT 57") || side.includes("Nghị quyết 57"), side.replace(/\n/g, " | ").slice(0, 200));
   const sideAll = await page.locator("aside").textContent();
   ok("menu có module nhập liệu", sideAll.includes("Tổ công nghệ số cộng đồng") && sideAll.includes("Phản ánh, kiến nghị"));
-  // module chính có mũi tên mở/đóng module con; con lùi vào, cùng cỡ chữ
-  const nut = page.locator('aside button[aria-label="Mở Nghị quyết 57"]');
-  ok("module con thu gọn, có mũi tên xổ xuống", (await nut.count()) === 1 && !side.includes("Tổ công nghệ số cộng đồng"));
-  await nut.click();
-  const con = page.locator('aside a[title="Tổ công nghệ số cộng đồng"]');
-  await con.waitFor({ state: "visible" });
-  const cha = page.locator('aside a[title="Nghị quyết 57"]');
-  const [fc, fp] = await Promise.all([con.evaluate((e) => getComputedStyle(e).fontSize), cha.evaluate((e) => getComputedStyle(e).fontSize)]);
-  const [xc, xp] = await Promise.all([con.boundingBox(), cha.boundingBox()]);
-  ok("module con cùng cỡ chữ, lùi đầu dòng", fc === fp && xc.x > xp.x + 15, `${fc}/${fp} ${xc.x}/${xp.x}`);
-  await page.reload({ waitUntil: "networkidle" });
-  ok("nhớ trạng thái mở module", await page.locator('aside a[title="Tổ công nghệ số cộng đồng"]').isVisible());
-  await page.click('aside button[aria-label="Thu gọn Nghị quyết 57"]');
-  ok("thu gọn module con", !(await page.locator('aside a[title="Tổ công nghệ số cộng đồng"]').isVisible()));
   const tcn = await check(page, "/m/to-cong-nghe-so", "module");
   ok("dữ liệu mẫu NQ57 trong module", (tcn.match(/Tổ công nghệ số cộng đồng Thôn/g) || []).length >= 2);
   const home = await check(page, "/", "trang chủ");
@@ -852,6 +838,27 @@ const day = (n) => {
     await f.locator('input[name="ten"]').fill("Con B kiểm thử");
     await f.locator('button:has-text("Tạo module")').click();
     await page.waitForURL(/quan-tri\/mo-dun\/\d+\?moi=1/, { waitUntil: "commit" });
+    // module có module con: mũi tên mở/đóng, con lùi vào, cùng cỡ chữ
+    await page.goto(BASE + "/quan-tri?muc=mo_dun");
+    await page.click('a[aria-label="Thêm module con vào Con A kiểm thử"]');
+    await page.waitForURL(/cha=\d+/);
+    await page.locator("#them form input[name='ten']").fill("Cháu kiểm thử");
+    await page.locator('#them form button:has-text("Tạo module")').click();
+    await page.waitForURL(/quan-tri\/mo-dun\/\d+\?moi=1/, { waitUntil: "commit" });
+    await page.goto(BASE + "/", { waitUntil: "networkidle" });
+    const nut = page.locator('aside button[aria-label="Mở Con A kiểm thử"]');
+    const chau = page.locator('aside a[title="Cháu kiểm thử"]');
+    ok("module con thu gọn, có mũi tên xổ xuống", (await nut.count()) === 1 && !(await chau.isVisible()));
+    await nut.click();
+    await chau.waitFor({ state: "visible" });
+    const cha = page.locator('aside a[title="Con A kiểm thử"]');
+    const [fc, fp] = await Promise.all([chau.evaluate((e) => getComputedStyle(e).fontSize), cha.evaluate((e) => getComputedStyle(e).fontSize)]);
+    const [xc, xp] = await Promise.all([chau.boundingBox(), cha.boundingBox()]);
+    ok("module con cùng cỡ chữ, lùi đầu dòng", fc === fp && xc.x > xp.x + 15, `${fc}/${fp} ${xc.x}/${xp.x}`);
+    await page.reload({ waitUntil: "networkidle" });
+    ok("nhớ trạng thái mở module", await page.locator('aside a[title="Cháu kiểm thử"]').isVisible());
+    await page.click('aside button[aria-label="Thu gọn Con A kiểm thử"]');
+    ok("thu gọn module con", !(await page.locator('aside a[title="Cháu kiểm thử"]').isVisible()));
     // sửa module chính: đổi tên
     await page.goto(nhomUrl);
     const ef = page.locator('form:has(button:has-text("Lưu module"))');
