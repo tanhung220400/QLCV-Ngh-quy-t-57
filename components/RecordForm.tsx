@@ -92,7 +92,7 @@ function Field({ f, v, lk }: { f: Truong; v: unknown; lk: Lookups }) {
 export function RecordForm({ ma, fields, lk, id, data }: { ma: string; fields: Truong[]; lk: Lookups; id?: number; data?: Record<string, unknown> }) {
   const wide = (f: Truong) => ["doan_van", "nhieu_lua_chon"].includes(f.kieu);
   return (
-    <ActionForm action={saveRecordAction} className="space-y-4">
+    <ActionForm key={id ?? "moi"} action={saveRecordAction} className="space-y-4">
       <input type="hidden" name="ma" value={ma} />
       {id && <input type="hidden" name="id" value={id} />}
       <div className="grid gap-4 sm:grid-cols-2">

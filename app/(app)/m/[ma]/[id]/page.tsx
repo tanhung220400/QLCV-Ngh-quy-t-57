@@ -41,7 +41,7 @@ export default async function RecordPage({ params, searchParams }: { params: Pro
   const extra = Object.keys(r.du_lieu).filter((k) => !fields.some((f) => f.khoa === k));
 
   return (
-    <div className="space-y-5">
+    <div key={`${m.id}-${id}-${editing ? 1 : 0}`} className="space-y-5">
       <Crumbs up={up} last={{ ten: m.ten, href: `/m/${m.ma}` }} />
       {sp.luu && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">Đã lưu.</p>}
       <div className="flex flex-wrap items-center gap-3">

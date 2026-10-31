@@ -271,6 +271,8 @@ const day = (n) => {
   await page.click('button:has-text("Lưu thay đổi")');
   await page.waitForSelector("text=Đã lưu.");
   ok("lưu phân quyền chi tiết", true);
+  const dv = require("child_process").execSync(`psql -h 127.0.0.1 -U postgres -d qlcv -tAc "SELECT d.ten FROM nguoi_dung n JOIN don_vi d ON d.id = n.id_don_vi WHERE n.ten_dang_nhap = 'cv.kinhte2'"`).toString().trim();
+  ok("sửa phân quyền không làm mất đơn vị của cán bộ", dv === "Phòng Kinh tế", dv || "(trống)");
   // Bật SMS qua webhook thử
   await page.goto(BASE + "/quan-tri?muc=sms");
   await page.check('input[name="bat"]');

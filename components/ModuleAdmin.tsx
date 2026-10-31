@@ -26,7 +26,7 @@ function parentOptions(all: MoDun[], self?: number) {
 export function ModuleForm({ m, all }: { m?: MoDun; all: MoDun[] }) {
   const sys = m?.loai === "he_thong";
   return (
-    <ActionForm action={saveModuleAction} className="space-y-3">
+    <ActionForm key={m?.id ?? "moi"} action={saveModuleAction} className="space-y-3">
       {m && <input type="hidden" name="id" value={m.id} />}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">

@@ -53,7 +53,7 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
   const sumKids = kids.reduce((a, c) => a + Number(c.ke_hoach_nam), 0);
 
   return (
-    <div className="space-y-4">
+    <div key={id} className="space-y-4">
       <div className="text-sm">
         <Link href={`/chi-tieu?nam=${k.nam}`} className="text-brand-700 underline">
           ‹ Chỉ tiêu năm {k.nam}

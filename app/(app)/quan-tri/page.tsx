@@ -145,7 +145,7 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
     ORDER BY d.thu_tu NULLS LAST, n.ho_ten`;
   const cur = edit ? users.find((u) => u.id === edit) : null;
   const form = (u?: Record<string, never> | null) => (
-    <ActionForm action={saveUserAction} className="grid gap-2 sm:grid-cols-2">
+    <ActionForm key={u?.id ?? "moi"} action={saveUserAction} className="grid gap-2 sm:grid-cols-2">
       {u && <input type="hidden" name="id" value={u.id} />}
       <input name="ho_ten" className="input" placeholder="Họ tên" defaultValue={u?.ho_ten} required />
       <input name="ten_dang_nhap" className="input" placeholder="Tên đăng nhập (không dấu)" defaultValue={u?.ten_dang_nhap} autoCapitalize="none" required />

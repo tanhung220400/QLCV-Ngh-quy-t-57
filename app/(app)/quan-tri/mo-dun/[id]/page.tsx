@@ -24,7 +24,7 @@ export default async function ModuleEdit({ params, searchParams }: { params: Pro
   const kids = all.filter((x) => x.id_cha === id);
 
   return (
-    <div className="space-y-5">
+    <div key={id} className="space-y-5">
       <div className="text-sm">
         <Link href="/quan-tri?muc=mo_dun" className="text-brand-700 hover:underline">
           ‹ Module &amp; menu

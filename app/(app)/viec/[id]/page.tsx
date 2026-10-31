@@ -99,7 +99,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
   const blob = !!process.env.BLOB_READ_WRITE_TOKEN;
 
   return (
-    <div className="space-y-4">
+    <div key={id} className="space-y-4">
       <div className="no-print flex items-center gap-2 text-sm">
         <Link href="/viec" className="text-brand-700 underline">
           ‹ Công việc
@@ -306,7 +306,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
           <details id="quan-tri" className="card scroll-mt-20 border-violet-200" open={!!sp.qt}>
             <summary className="h2 cursor-pointer text-violet-800">Quản trị dữ liệu: sửa toàn bộ, xóa</summary>
             <p className="mt-1 text-sm text-slate-500">Dành cho tài khoản có quyền quản trị dữ liệu. Mọi thay đổi được ghi nhật ký.</p>
-            <ActionForm action={taskAction} className="mt-3 space-y-3">
+            <ActionForm key={`qt${id}`} action={taskAction} className="mt-3 space-y-3">
               <Hidden id={id} op="sua_admin" />
               <div>
                 <label className="label req">Tên công việc</label>
