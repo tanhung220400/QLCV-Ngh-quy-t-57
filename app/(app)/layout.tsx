@@ -3,12 +3,16 @@ import { after } from "next/server";
 import { getUser } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
 import { canCreateTask, isAdmin } from "@/lib/perm";
-import { Nav } from "@/components/Nav";
+import { Nav, type NavNode } from "@/components/Nav";
 import { runScan } from "@/lib/scan";
 import { flushSms } from "@/lib/sms";
 import { OfflineSync } from "@/components/OfflineSync";
+import { menuTree, type MenuNode } from "@/lib/modules";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
+
+const slim = (n: MenuNode): NavNode => ({ id: n.id, ten: n.ten, href: n.href, icon: n.bieu_tuong, mau: n.mau, loai: n.loai, con: n.con.map(slim) });
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!hasDatabase()) redirect("/cai-dat-ban-dau");
@@ -20,7 +24,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   if (user.doi_mat_khau) redirect("/doi-mat-khau");
   const sql = await db();
-  const unread = (await sql`SELECT count(*)::int AS n FROM thong_bao WHERE id_nguoi_nhan = ${user.id} AND NOT da_doc`)[0].n as number;
+  const [unreadRow, tree, cfg] = await Promise.all([
+    sql`SELECT count(*)::int AS n FROM thong_bao WHERE id_nguoi_nhan = ${user.id} AND NOT da_doc`,
+    menuTree(sql, user),
+    getSettings(),
+  ]);
+  const unread = unreadRow[0].n as number;
 
   after(async () => {
     try {
@@ -31,42 +40,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   });
 
-  const q = new Set(user.quyen);
-  const items = [
-    { href: "/", label: "Tổng quan", icon: "home" },
-    { href: "/viec", label: "Công việc", icon: "list" },
-    ...(canCreateTask(user) ? [{ href: "/viec/moi", label: "Giao việc", icon: "plus" }] : []),
-    ...(q.has("ct.xem") ? [{ href: "/chi-tieu", label: "Chỉ tiêu", icon: "target" }] : []),
-    ...(q.has("bc.xem") ? [{ href: "/bao-cao", label: "Báo cáo", icon: "chart" }] : []),
-    ...(q.has("bc.tra_cuu") ? [{ href: "/tra-cuu", label: "Tra cứu, tổng hợp", icon: "search" }] : []),
-    { href: "/thong-bao", label: "Thông báo", icon: "bell" },
-    { href: "/tai-khoan", label: "Tài khoản", icon: "user" },
-    ...(isAdmin(user) ? [{ href: "/quan-tri", label: "Quản trị", icon: "cog" }] : []),
-  ];
-  const mobile = [
-    { href: "/", label: "Tổng quan", icon: "home" },
-    { href: "/viec", label: "Việc", icon: "list" },
-    canCreateTask(user)
-      ? { href: "/viec/moi", label: "Giao việc", icon: "plus" }
-      : q.has("bc.tra_cuu")
-        ? { href: "/tra-cuu", label: "Tra cứu", icon: "search" }
-        : { href: "/tai-khoan", label: "Tài khoản", icon: "user" },
-    { href: "/thong-bao", label: "Thông báo", icon: "bell" },
-  ];
+  const me = {
+    ho_ten: user.ho_ten,
+    chuc_vu: user.chuc_vu || "",
+    don_vi: user.ten_don_vi || "",
+    ten_xa: cfg.ten_don_vi || "UBND xã",
+    admin: isAdmin(user),
+    traCuu: user.quyen.includes("bc.tra_cuu"),
+    giaoViec: canCreateTask(user),
+  };
 
   return (
     <div className="min-h-dvh">
-      <Nav items={items} mobile={mobile} unread={unread} user={{ ho_ten: user.ho_ten, chuc_vu: user.chuc_vu || "" }} />
-      <div className="lg:pl-64">
-      <main className="mx-auto max-w-6xl px-3 pt-4 pb-28 sm:px-5 lg:pb-10">
-        {user.uy_quyen_tu.length > 0 && (
-          <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-indigo-900">
-            Bạn đang được ủy quyền xử lý công việc thay cho {user.uy_quyen_tu.length} người.
-          </div>
-        )}
-        {children}
-      </main>
-      <OfflineSync />
+      <Nav tree={tree.map(slim)} unread={unread} me={me} />
+      <div className="lg:pl-72">
+        <main className="mx-auto max-w-6xl px-3 pt-5 pb-28 sm:px-5 lg:pb-12">
+          {user.uy_quyen_tu.length > 0 && (
+            <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-indigo-900">Bạn đang được ủy quyền xử lý công việc thay cho {user.uy_quyen_tu.length} người.</div>
+          )}
+          {children}
+        </main>
+        <OfflineSync />
       </div>
     </div>
   );

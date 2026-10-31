@@ -34,6 +34,8 @@ export const NHOM_QUYEN: { nhom: string; quyen: [string, string][] }[] = [
   {
     nhom: "Quản trị",
     quyen: [
+      ["qt.du_lieu", "Thêm, sửa, xóa mọi nội dung (công việc, chỉ tiêu, dữ liệu module), thùng rác"],
+      ["qt.mo_dun", "Thiết kế module, menu, trường nhập liệu"],
       ["qt.nguoi_dung", "Quản lý tài khoản, phân quyền"],
       ["qt.co_cau", "Quản lý cơ cấu tổ chức, danh mục, ngày nghỉ"],
       ["qt.cai_dat", "Cài đặt hệ thống, mẫu báo cáo, SMS"],
@@ -50,7 +52,12 @@ export const QUYEN_MAC_DINH: Record<string, string[]> = {
   truong_don_vi: ["cv.giao", "cv.duyet", "cv.quan_ly", "cv.xuat", "ct.xem", "ct.nhap_so_lieu", "ct.xac_nhan", "bc.xem", "bc.xuat", "bc.tra_cuu", "bc.dashboard"],
   cong_chuc: ["ct.xem", "ct.nhap_so_lieu", "bc.xem", "bc.tra_cuu"],
   truong_thon: ["ct.xem", "ct.nhap_so_lieu"],
-  quan_tri: ["qt.nguoi_dung", "qt.co_cau", "qt.cai_dat", "qt.nhat_ky"],
+  quan_tri: [
+    "cv.giao", "cv.nhap_nhanh", "cv.duyet", "cv.quan_ly", "cv.xuat",
+    "ct.xem", "ct.quan_ly", "ct.nhap_so_lieu", "ct.xac_nhan",
+    "bc.xem", "bc.xuat", "bc.danh_gia", "bc.tra_cuu", "bc.dashboard",
+    "qt.du_lieu", "qt.mo_dun", "qt.nguoi_dung", "qt.co_cau", "qt.cai_dat", "qt.nhat_ky",
+  ],
 };
 
 export type PhamVi = { loai: "toan_xa" | "linh_vuc" | "don_vi" | "ca_nhan"; linh_vuc: string[]; don_vi: number[] };
@@ -64,7 +71,7 @@ export const LOAI_PHAM_VI: Record<PhamVi["loai"], string> = {
 
 /** Phạm vi mặc định theo vai trò (chức vụ + đơn vị) */
 export function phamViMacDinh(vai_tro: string, id_don_vi: number | null, linh_vuc: string[]): PhamVi {
-  if (vai_tro === "tong_hop") return { loai: "toan_xa", linh_vuc: [], don_vi: [] };
+  if (vai_tro === "tong_hop" || vai_tro === "quan_tri") return { loai: "toan_xa", linh_vuc: [], don_vi: [] };
   if (vai_tro === "lanh_dao") return linh_vuc.length ? { loai: "linh_vuc", linh_vuc, don_vi: [] } : { loai: "toan_xa", linh_vuc: [], don_vi: [] };
   if (vai_tro === "truong_don_vi" && id_don_vi) return { loai: "don_vi", linh_vuc: [], don_vi: [id_don_vi] };
   return { loai: "ca_nhan", linh_vuc: [], don_vi: [] };

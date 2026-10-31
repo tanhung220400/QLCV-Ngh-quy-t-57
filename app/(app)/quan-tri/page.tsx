@@ -6,26 +6,32 @@ import { getSmsConfig, SU_KIEN_SMS, smsReady } from "@/lib/sms";
 import { db } from "@/lib/db";
 import { getCatalog, getSettings } from "@/lib/settings";
 import { ActionForm, Submit } from "@/components/ActionForm";
-import { saveUnitAction, saveUserAction, resetPasswordAction, importUsersAction, saveCatalogAction, saveHolidaysAction, saveSettingsAction, saveSmsAction, testSmsAction } from "@/app/actions/admin";
+import { catalogItemAction, trashAction, seedDemoAction } from "@/app/actions/admin";
+import { ModuleTree, ModuleForm, TemplateForm } from "@/components/ModuleAdmin";
+import { Icon } from "@/components/Icon";
+import type { MoDun } from "@/lib/modules";
+import { saveUnitAction, saveUserAction, resetPasswordAction, importUsersAction, saveHolidaysAction, saveSettingsAction, saveSmsAction, testSmsAction } from "@/app/actions/admin";
 import { VAI_TRO, LOAI_DON_VI } from "@/lib/const";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 const MUC: [string, string, string][] = [
+  ["mo_dun", "Module & menu", "qt.mo_dun"],
   ["nguoi_dung", "Cán bộ, phân quyền", "qt.nguoi_dung"],
   ["don_vi", "Cơ cấu tổ chức", "qt.co_cau"],
   ["danh_muc", "Danh mục", "qt.co_cau"],
   ["ngay_nghi", "Ngày nghỉ, lễ", "qt.co_cau"],
   ["cai_dat", "Cài đặt, mẫu báo cáo", "qt.cai_dat"],
   ["sms", "Tin nhắn SMS", "qt.cai_dat"],
+  ["thung_rac", "Thùng rác, dữ liệu", "qt.du_lieu"],
   ["nhat_ky", "Nhật ký thao tác", "qt.nhat_ky"],
 ];
 const DM: Record<string, string> = { linh_vuc: "Lĩnh vực", nguon_giao: "Nguồn giao việc", san_pham: "Sản phẩm đầu ra", nhom_chi_tieu: "Nhóm chỉ tiêu", don_vi_tinh: "Đơn vị tính", nguon_chi_tieu: "Nguồn chỉ tiêu" };
 
 export default async function Admin({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
-  const me = await requirePerm("qt.nguoi_dung", "qt.co_cau", "qt.cai_dat", "qt.nhat_ky");
+  const me = await requirePerm("qt.nguoi_dung", "qt.co_cau", "qt.cai_dat", "qt.nhat_ky", "qt.mo_dun", "qt.du_lieu");
   const allowed = MUC.filter((m) => me.quyen.includes(m[2]));
   const muc = allowed.some((m) => m[0] === sp.muc) ? sp.muc : allowed[0][0];
   const sql = await db();
@@ -83,24 +89,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
         </div>
       )}
 
-      {muc === "danh_muc" && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {await Promise.all(
-            Object.entries(DM).map(async ([k, l]) => (
-              <div key={k} className="card">
-                <h2 className="h2">{l}</h2>
-                <ActionForm action={saveCatalogAction} className="mt-2 space-y-2">
-                  <input type="hidden" name="loai" value={k} />
-                  <textarea name="ds" rows={8} className="input text-[15px]" defaultValue={(await getCatalog(k)).join("\n")} />
-                  <p className="text-sm text-slate-500">Mỗi dòng một mục.</p>
-                  <Submit className="btn btn-primary btn-sm">Lưu</Submit>
-                </ActionForm>
-              </div>
-            )),
-          )}
-        </div>
-      )}
-
+      {muc === "danh_muc" && <Catalogs open={sp.loai || "linh_vuc"} />}
+      {muc === "mo_dun" && <Modules deleted={!!sp.xoa} />}
+      {muc === "thung_rac" && <Trash />}
       {muc === "ngay_nghi" && <Holidays />}
       {muc === "cai_dat" && <Settings />}
       {muc === "nhat_ky" && <Logs q={sp.q || ""} />}
@@ -531,6 +522,199 @@ async function Sms() {
             {log.length === 0 && <li className="text-slate-500">Chưa có tin nào.</li>}
           </ul>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const LOAI_RAC: Record<string, string> = { cong_viec: "Công việc", chi_tieu: "Chỉ tiêu", ban_ghi: "Bản ghi", mo_dun: "Module", so_lieu: "Số liệu", binh_luan: "Trao đổi", tep: "Tệp" };
+
+async function Catalogs({ open }: { open: string }) {
+  const sql = await db();
+  return (
+    <div className="space-y-3">
+      <p className="text-slate-600">Thêm, đổi tên, xóa, sắp xếp từng mục. Đổi tên sẽ tự cập nhật các công việc, chỉ tiêu, cán bộ, bản ghi đang dùng tên cũ.</p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {await Promise.all(
+          Object.entries(DM).map(async ([k, l]) => {
+            const rows = await sql`SELECT id, ten FROM danh_muc WHERE loai = ${k} ORDER BY thu_tu, id`;
+            const used = new Map<string, number>();
+            const col: Record<string, [string, string][]> = {
+              linh_vuc: [["cong_viec", "linh_vuc"], ["chi_tieu", "linh_vuc"]],
+              nguon_giao: [["cong_viec", "nguon_giao"]],
+              san_pham: [["cong_viec", "san_pham"]],
+              nhom_chi_tieu: [["chi_tieu", "nhom"]],
+              don_vi_tinh: [["chi_tieu", "don_vi_tinh"]],
+              nguon_chi_tieu: [["chi_tieu", "nguon"]],
+            };
+            for (const [t, c] of col[k]) for (const r of await sql`SELECT ${sql(c)} AS v, count(*)::int AS n FROM ${sql(t)} GROUP BY 1`) used.set(r.v, (used.get(r.v) || 0) + r.n);
+            const list = rows.length ? rows : (await getCatalog(k)).map((ten, i) => ({ id: -i - 1, ten }));
+            return (
+              <details key={k} className="card" open={open === k}>
+                <summary className="flex cursor-pointer list-none items-center justify-between">
+                  <span className="h2">{l}</span>
+                  <span className="chip border-slate-200 bg-slate-50 text-slate-600">{list.length} mục</span>
+                </summary>
+                <ul className="mt-3 divide-y divide-slate-100">
+                  {list.map((r) => (
+                    <li key={r.id} className="flex items-center gap-1 py-1.5">
+                      {r.id > 0 ? (
+                        <>
+                          <ActionForm action={catalogItemAction} className="flex min-w-0 flex-1 items-center gap-2">
+                            <input type="hidden" name="loai" value={k} />
+                            <input type="hidden" name="id" value={r.id} />
+                            <input type="hidden" name="op" value="sua" />
+                            <input name="ten" defaultValue={r.ten} className="input min-h-9 border-transparent px-2 py-1 hover:border-slate-300" aria-label={`Tên: ${r.ten}`} />
+                            <Submit className="btn btn-soft btn-sm">Lưu</Submit>
+                          </ActionForm>
+                          <span className="w-10 text-right text-sm text-slate-400" title="Số nội dung đang dùng">{used.get(r.ten) || ""}</span>
+                          {(["len", "xuong"] as const).map((op) => (
+                            <ActionForm key={op} action={catalogItemAction}>
+                              <input type="hidden" name="loai" value={k} />
+                              <input type="hidden" name="id" value={r.id} />
+                              <input type="hidden" name="op" value={op} />
+                              <button className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title={op === "len" ? "Lên" : "Xuống"}>
+                                <Icon name={op === "len" ? "up" : "down"} className="h-4 w-4" />
+                              </button>
+                            </ActionForm>
+                          ))}
+                          <ActionForm action={catalogItemAction} confirm={`Xóa “${r.ten}” khỏi danh mục?`}>
+                            <input type="hidden" name="loai" value={k} />
+                            <input type="hidden" name="id" value={r.id} />
+                            <input type="hidden" name="op" value="xoa" />
+                            <button className="rounded-lg p-1.5 text-red-500 hover:bg-red-50" title="Xóa">
+                              <Icon name="trash" className="h-4 w-4" />
+                            </button>
+                          </ActionForm>
+                        </>
+                      ) : (
+                        <span className="px-2 py-1">{r.ten}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <ActionForm action={catalogItemAction} className="mt-3 flex gap-2">
+                  <input type="hidden" name="loai" value={k} />
+                  <input type="hidden" name="op" value="them" />
+                  <input name="ten" className="input" placeholder={`Thêm ${l.toLowerCase()} mới`} required />
+                  <Submit className="btn btn-primary shrink-0">Thêm</Submit>
+                </ActionForm>
+              </details>
+            );
+          }),
+        )}
+      </div>
+    </div>
+  );
+}
+
+async function Modules({ deleted }: { deleted: boolean }) {
+  const sql = await db();
+  const rows = (await sql`SELECT m.*, (SELECT count(*)::int FROM mo_dun_ban_ghi b WHERE b.id_mo_dun = m.id) AS so_ban_ghi FROM mo_dun m ORDER BY thu_tu, id`) as unknown as (MoDun & { so_ban_ghi: number })[];
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1fr_400px]">
+      <div className="card">
+        <h2 className="h2">Cây menu, module</h2>
+        <p className="mb-2 text-sm text-slate-500">Dùng mũi tên để sắp xếp, con mắt để ẩn/hiện. Bấm tên để sửa thông tin, trường dữ liệu, vị trí.</p>
+        {deleted && <p className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">Đã xóa module vào Thùng rác.</p>}
+        <ModuleTree rows={rows} />
+      </div>
+      <div className="space-y-5">
+        <div className="card">
+          <h2 className="h2 mb-3">Thêm module mới</h2>
+          <ModuleForm all={rows} />
+        </div>
+        <div className="card">
+          <h2 className="h2">Tạo nhanh từ mẫu</h2>
+          <p className="mb-3 text-sm text-slate-500">Mẫu có sẵn trường dữ liệu theo nhiệm vụ Nghị quyết 57 và quản lý địa bàn cấp xã.</p>
+          <TemplateForm all={rows} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function Trash() {
+  const sql = await db();
+  const rows = await sql`SELECT t.id, t.loai, t.tieu_de, t.ly_do, t.xoa_luc, t.trang_thai, n.ho_ten FROM thung_rac t LEFT JOIN nguoi_dung n ON n.id = t.id_nguoi_xoa ORDER BY t.xoa_luc DESC LIMIT 200`;
+  const demo = (await sql`SELECT gia_tri FROM cai_dat WHERE khoa = 'demo_nq57'`)[0];
+  return (
+    <div className="space-y-5">
+      <div className="card">
+        <h2 className="h2">Thùng rác</h2>
+        <p className="text-sm text-slate-500">Nội dung bị xóa được giữ lại đầy đủ (kèm việc con, số liệu, tệp) để khôi phục khi cần.</p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="tbl min-w-[640px]">
+            <thead>
+              <tr>
+                <th>Nội dung</th>
+                <th>Người xóa</th>
+                <th>Thời gian</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className={r.trang_thai === "trong_thung" ? "" : "text-slate-400"}>
+                  <td>
+                    <span className="chip mr-2 border-slate-200 bg-slate-50 text-slate-600">{LOAI_RAC[r.loai] || r.loai}</span>
+                    <span className="font-medium">{r.tieu_de}</span>
+                    {r.ly_do && <div className="text-sm text-slate-500">Lý do: {r.ly_do}</div>}
+                  </td>
+                  <td>{r.ho_ten}</td>
+                  <td className="whitespace-nowrap">{fmtDateTime(r.xoa_luc)}</td>
+                  <td className="whitespace-nowrap">
+                    {r.trang_thai === "trong_thung" ? (
+                      <div className="flex gap-1">
+                        <ActionForm action={trashAction}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <input type="hidden" name="op" value="khoi_phuc" />
+                          <Submit className="btn btn-soft btn-sm">Khôi phục</Submit>
+                        </ActionForm>
+                        <ActionForm action={trashAction} confirm="Xóa vĩnh viễn, không khôi phục được nữa?">
+                          <input type="hidden" name="id" value={r.id} />
+                          <input type="hidden" name="op" value="xoa_han" />
+                          <Submit className="btn btn-danger-soft btn-sm">Xóa hẳn</Submit>
+                        </ActionForm>
+                      </div>
+                    ) : r.trang_thai === "da_khoi_phuc" ? (
+                      "Đã khôi phục"
+                    ) : (
+                      "Đã xóa hẳn"
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {!rows.length && (
+                <tr>
+                  <td colSpan={4} className="py-6 text-center text-slate-500">
+                    Thùng rác trống.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="card">
+        <h2 className="h2">Dữ liệu mẫu Nghị quyết 57</h2>
+        <p className="mt-1 text-slate-600">
+          Nạp bộ dữ liệu mẫu để chạy thử: các công việc, chỉ tiêu chuyển đổi số theo Nghị quyết 57 (có số liệu từng tháng), bản ghi cho các module Tổ công nghệ số, Bình dân học vụ số, Hạ tầng số,
+          Sáng kiến, Sản phẩm lên sàn, Phản ánh kiến nghị. Dữ liệu mẫu có dấu “[Mẫu]” để dễ nhận biết và có thể xóa sau.
+        </p>
+        {demo ? (
+          <p className="mt-2 text-emerald-700">Đã nạp dữ liệu mẫu lúc {fmtDateTime(demo.gia_tri?.luc)}.</p>
+        ) : null}
+        <ActionForm action={seedDemoAction} className="mt-3 flex flex-wrap gap-2" confirm="Nạp dữ liệu mẫu Nghị quyết 57 vào phần mềm?">
+          <Submit name="op" value="nap" className="btn btn-primary">
+            {demo ? "Nạp thêm dữ liệu mẫu" : "Nạp dữ liệu mẫu"}
+          </Submit>
+          {demo && (
+            <Submit name="op" value="xoa" className="btn btn-danger-soft">
+              Xóa toàn bộ dữ liệu mẫu
+            </Submit>
+          )}
+        </ActionForm>
       </div>
     </div>
   );

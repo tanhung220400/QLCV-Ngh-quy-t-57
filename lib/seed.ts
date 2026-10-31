@@ -3,6 +3,7 @@ import { db } from "./db";
 import { hashPassword } from "./auth";
 import { seedCatalogs, NGAY_NGHI_MAC_DINH, saveSettings } from "./settings";
 import { writeLog } from "./log";
+import { seedDemoNQ57 } from "./seedNq57";
 import { addWorkingDays, fromVN, vnDate, addDays } from "./time";
 
 export const DEMO_PASSWORD = "Demo@2026";
@@ -17,7 +18,10 @@ export async function seedAll(o: { ten_xa: string; ho_ten: string; username: str
     const [admin] = await tx`INSERT INTO nguoi_dung (ho_ten, ten_dang_nhap, mat_khau, id_don_vi, chuc_vu, vai_tro)
       VALUES (${o.ho_ten}, ${o.username}, ${await hashPassword(o.password)}, ${vp.id}, 'Cán bộ CNTT', 'quan_tri') RETURNING id`;
     await writeLog(tx, admin.id, "khoi_tao", "he_thong", null, null, { ten_xa: o.ten_xa, du_lieu_mau: o.demo });
-    if (o.demo) await seedDemo(tx, ld.id, vp.id);
+    if (o.demo) {
+      await seedDemo(tx, ld.id, vp.id);
+      await seedDemoNQ57(tx, admin.id);
+    }
   });
   await saveSettings({ ten_don_vi: o.ten_xa.toUpperCase().startsWith("UBND") ? o.ten_xa : `UBND ${o.ten_xa}` });
 }

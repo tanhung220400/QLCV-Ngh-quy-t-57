@@ -239,3 +239,27 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
   after(() => flushSms().catch(() => {}));
   return { ok: true, message: `Đã nhập ${rows.length} chỉ tiêu.`, redirect: `/chi-tieu?nam=${rows[0].nam}` };
 }
+
+/** Quản trị dữ liệu: xóa hẳn chỉ tiêu hoặc một dòng số liệu (vào thùng rác) */
+export async function adminKpiAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getUser();
+  if (!user || !user.quyen.includes("qt.du_lieu")) return { error: "Không có quyền." };
+  const { trashKpi, trashSimple } = await import("@/lib/trash");
+  const id = Number(str(fd, "id"));
+  const sql = await db();
+  if (str(fd, "op") === "xoa_so_lieu") {
+    const r = (await sql`SELECT s.ky, s.gia_tri, c.ten, c.id AS id_ct FROM chi_tieu_so_lieu s JOIN chi_tieu c ON c.id = s.id_chi_tieu WHERE s.id = ${id}`)[0];
+    if (!r) return { error: "Không tìm thấy số liệu." };
+    await sql.begin(async (tx) => {
+      await trashSimple(tx, "chi_tieu_so_lieu", "so_lieu", id, user.id, `Số liệu ${periodLabel(r.ky)} (${r.gia_tri}) — ${r.ten}`, null);
+      // nếu xóa dòng đang hiệu lực thì dòng gần nhất cùng kỳ trở lại hiệu lực
+      await tx`UPDATE chi_tieu_so_lieu SET hieu_luc = TRUE WHERE id = (SELECT id FROM chi_tieu_so_lieu WHERE id_chi_tieu = ${r.id_ct} AND ky = ${r.ky} ORDER BY thoi_gian DESC LIMIT 1)
+               AND NOT EXISTS (SELECT 1 FROM chi_tieu_so_lieu WHERE id_chi_tieu = ${r.id_ct} AND ky = ${r.ky} AND hieu_luc)`;
+    });
+    return { ok: true, message: "Đã xóa số liệu." };
+  }
+  const k = (await sql`SELECT id_cha FROM chi_tieu WHERE id = ${id}`)[0];
+  if (!k) return { error: "Không tìm thấy chỉ tiêu." };
+  await sql.begin((tx) => trashKpi(tx, id, user.id, str(fd, "ly_do") || null));
+  return { redirect: k.id_cha ? `/chi-tieu/${k.id_cha}` : "/chi-tieu" };
+}

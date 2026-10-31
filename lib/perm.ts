@@ -46,7 +46,7 @@ export async function identities(user: User): Promise<Identity[]> {
 export const seesAll = (i: Identity) => i.pham_vi.loai === "toan_xa";
 
 /** Danh sách đơn vị (kể cả đơn vị con) và lĩnh vực mà các danh tính được xem */
-async function scopeSets(ids: Identity[]) {
+export async function scopeSets(ids: Identity[]) {
   const units = await allUnits();
   const donVi = new Set<number>();
   const linhVuc = new Set<string>();
@@ -127,6 +127,8 @@ export type TaskPerms = {
   duyet: boolean; // duyệt kết quả, duyệt gia hạn
   quan_ly: boolean; // sửa, tạm dừng, hủy, giao lại người chủ trì
   viec_con: boolean;
+  /** Quản trị dữ liệu: sửa mọi trường, xóa vào thùng rác */
+  admin: boolean;
 };
 
 export async function taskPerms(user: User, t: TaskRow): Promise<TaskPerms> {
@@ -140,8 +142,9 @@ export async function taskPerms(user: User, t: TaskRow): Promise<TaskPerms> {
   const unitHead = ids.some((i) => i.vai_tro === "truong_don_vi") && t.id_don_vi_chu_tri != null && donVi.includes(t.id_don_vi_chu_tri);
   const sql = await db();
   const member = (await sql`SELECT 1 FROM cong_viec_thanh_vien WHERE id_cong_viec = ${t.id} AND id_nguoi_dung IN ${sql(pid)} LIMIT 1`).length > 0;
-  const xem = inScope || isOwner || isDoer || isAssigner || member;
   const q = new Set(user.quyen);
+  const admin = q.has("qt.du_lieu");
+  const xem = admin || inScope || isOwner || isDoer || isAssigner || member;
   const s = t.trang_thai;
   const open = !["hoan_thanh", "huy"].includes(s);
   const working = ["da_nhan", "dang_thuc_hien"].includes(s);
@@ -153,9 +156,10 @@ export async function taskPerms(user: User, t: TaskRow): Promise<TaskPerms> {
     cap_nhat: working && (isOwner || isDoer),
     bao_cao: working && (isOwner || isDoer),
     xin_gia_han: open && s !== "tra_lai" && s !== "tam_dung" && (isOwner || isDoer),
-    duyet: isAssigner || (q.has("cv.duyet") && inScope),
-    quan_ly: isAssigner || (q.has("cv.quan_ly") && inScope),
+    duyet: admin || isAssigner || (q.has("cv.duyet") && inScope),
+    quan_ly: admin || isAssigner || (q.has("cv.quan_ly") && inScope),
     viec_con: open && (isOwner || isDoer || isAssigner || unitHead),
+    admin,
   };
 }
 

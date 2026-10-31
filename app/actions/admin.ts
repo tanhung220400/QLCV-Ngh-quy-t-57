@@ -270,3 +270,116 @@ export async function testSmsAction(_: ActionState, fd: FormData): Promise<Actio
   await sql`INSERT INTO sms_hang_doi (id_nguoi_nhan, sdt, noi_dung, loai, trang_thai, so_lan, loi, gui_luc) VALUES (${u.id}, ${sdt}, 'Tin thử nghiệm', 'thu_nghiem', ${r.ok ? "da_gui" : "loi"}, 1, ${r.error ?? null}, now())`;
   return r.ok ? { ok: true, message: `Đã gửi tin thử tới ${sdt}.` } : { error: `Gửi không thành công: ${r.error}` };
 }
+
+// ===================== Danh mục: thêm, sửa tên, xóa, sắp xếp từng mục =====================
+/** Bảng, cột đang dùng giá trị của từng loại danh mục (để đổi tên đồng bộ) */
+const DUNG_DANH_MUC: Record<string, [string, string][]> = {
+  linh_vuc: [
+    ["cong_viec", "linh_vuc"],
+    ["chi_tieu", "linh_vuc"],
+  ],
+  nguon_giao: [["cong_viec", "nguon_giao"]],
+  san_pham: [["cong_viec", "san_pham"]],
+  nhom_chi_tieu: [["chi_tieu", "nhom"]],
+  don_vi_tinh: [["chi_tieu", "don_vi_tinh"]],
+  nguon_chi_tieu: [["chi_tieu", "nguon"]],
+};
+
+export async function catalogItemAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await need("qt.co_cau");
+  if (!u) return { error: "Không có quyền." };
+  const loai = str(fd, "loai");
+  if (!DUNG_DANH_MUC[loai]) return { error: "Danh mục không hợp lệ." };
+  const op = str(fd, "op");
+  const id = Number(str(fd, "id")) || 0;
+  const ten = str(fd, "ten").replace(/\s+/g, " ");
+  const sql = await db();
+  // danh mục chưa lưu vào CSDL thì lưu mặc định trước
+  if (!(await sql`SELECT 1 FROM danh_muc WHERE loai = ${loai} LIMIT 1`).length) {
+    const { DANH_MUC_MAC_DINH } = await import("@/lib/const");
+    for (const [i, t] of (DANH_MUC_MAC_DINH[loai] || []).entries()) await sql`INSERT INTO danh_muc (loai, ten, thu_tu) VALUES (${loai}, ${t}, ${i}) ON CONFLICT DO NOTHING`;
+  }
+  if (op === "them") {
+    if (!ten) return { error: "Nhập tên." };
+    if ((await sql`SELECT 1 FROM danh_muc WHERE loai = ${loai} AND lower(ten) = lower(${ten})`).length) return { error: `“${ten}” đã có trong danh mục.` };
+    const n = (await sql`SELECT coalesce(max(thu_tu), 0)::int + 1 AS n FROM danh_muc WHERE loai = ${loai}`)[0].n;
+    await sql`INSERT INTO danh_muc (loai, ten, thu_tu) VALUES (${loai}, ${ten}, ${n})`;
+    await writeLog(sql, u.id, "them_danh_muc", "danh_muc", null, null, { loai, ten });
+    return { ok: true, message: `Đã thêm “${ten}”.`, reset: true };
+  }
+  const row = (await sql`SELECT * FROM danh_muc WHERE id = ${id} AND loai = ${loai}`)[0];
+  if (!row) return { error: "Không tìm thấy mục." };
+  if (op === "sua") {
+    if (!ten) return { error: "Nhập tên." };
+    if (ten === row.ten) return { ok: true };
+    if ((await sql`SELECT 1 FROM danh_muc WHERE loai = ${loai} AND lower(ten) = lower(${ten}) AND id <> ${id}`).length) return { error: `“${ten}” đã có trong danh mục.` };
+    let n = 0;
+    await sql.begin(async (tx) => {
+      await tx`UPDATE danh_muc SET ten = ${ten} WHERE id = ${id}`;
+      for (const [t, c] of DUNG_DANH_MUC[loai]) n += (await tx`UPDATE ${tx(t)} SET ${tx(c)} = ${ten} WHERE ${tx(c)} = ${row.ten}`).count;
+      if (loai === "linh_vuc") {
+        n += (await tx`UPDATE nguoi_dung SET linh_vuc_phu_trach = array_replace(linh_vuc_phu_trach, ${row.ten}, ${ten}) WHERE ${row.ten} = ANY(linh_vuc_phu_trach)`).count;
+        await tx`UPDATE nguoi_dung SET pham_vi = jsonb_set(pham_vi, '{linh_vuc}', (SELECT coalesce(jsonb_agg(CASE WHEN x = ${row.ten} THEN ${ten} ELSE x END), '[]'::jsonb) FROM jsonb_array_elements_text(pham_vi->'linh_vuc') x))
+                 WHERE pham_vi IS NOT NULL AND jsonb_typeof(pham_vi->'linh_vuc') = 'array' AND pham_vi->'linh_vuc' ? ${row.ten}`;
+        // giá trị trong các module nhập liệu có trường kiểu lĩnh vực
+        const fs = await tx`SELECT id_mo_dun, khoa FROM mo_dun_truong WHERE kieu = 'linh_vuc'`;
+        for (const f of fs) n += (await tx`UPDATE mo_dun_ban_ghi SET du_lieu = jsonb_set(du_lieu, ${"{" + f.khoa + "}"}::text[], to_jsonb(${ten}::text)) WHERE id_mo_dun = ${f.id_mo_dun} AND du_lieu->>${f.khoa} = ${row.ten}`).count;
+      }
+      await writeLog(tx, u.id, "doi_ten_danh_muc", "danh_muc", id, { loai, ten: row.ten }, { loai, ten, cap_nhat: n });
+    });
+    return { ok: true, message: `Đã đổi tên thành “${ten}”${n ? `, cập nhật ${n} nội dung đang dùng` : ""}.` };
+  }
+  if (op === "xoa") {
+    let used = 0;
+    for (const [t, c] of DUNG_DANH_MUC[loai]) used += (await sql`SELECT count(*)::int AS n FROM ${sql(t)} WHERE ${sql(c)} = ${row.ten}`)[0].n;
+    await sql`DELETE FROM danh_muc WHERE id = ${id}`;
+    await writeLog(sql, u.id, "xoa_danh_muc", "danh_muc", id, { loai, ten: row.ten }, null);
+    return { ok: true, message: `Đã xóa “${row.ten}”.${used ? ` ${used} nội dung cũ vẫn giữ tên này; chỉ không chọn được cho nội dung mới.` : ""}` };
+  }
+  if (op === "len" || op === "xuong") {
+    await sql.begin(async (tx) => {
+      const ids = (await tx`SELECT id FROM danh_muc WHERE loai = ${loai} ORDER BY thu_tu, id`).map((r) => r.id as number);
+      const i = ids.indexOf(id);
+      const j = i + (op === "len" ? -1 : 1);
+      if (j < 0 || j >= ids.length) return;
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      for (const [k, x] of ids.entries()) await tx`UPDATE danh_muc SET thu_tu = ${k} WHERE id = ${x}`;
+    });
+    return { ok: true };
+  }
+  return { error: "Thao tác không hợp lệ." };
+}
+
+// ===================== Thùng rác =====================
+export async function trashAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await need("qt.du_lieu");
+  if (!u) return { error: "Không có quyền." };
+  const { restore, purge } = await import("@/lib/trash");
+  const id = Number(str(fd, "id"));
+  const sql = await db();
+  try {
+    if (str(fd, "op") === "khoi_phuc") {
+      const r = await sql.begin((tx) => restore(tx, id, u.id));
+      return { ok: true, message: `Đã khôi phục “${r.tieu_de}”.` };
+    }
+    await sql.begin((tx) => purge(tx, id, u.id));
+    return { ok: true, message: "Đã xóa vĩnh viễn." };
+  } catch (e) {
+    const msg = (e as Error).message;
+    return { error: /foreign key|khóa ngoại/i.test(msg) ? "Không khôi phục được vì dữ liệu liên quan (cán bộ, đơn vị, mục cha) đã bị xóa. Hãy khôi phục mục cha trước." : msg };
+  }
+}
+
+// ===================== Dữ liệu mẫu Nghị quyết 57 =====================
+export async function seedDemoAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await need("qt.du_lieu");
+  if (!u) return { error: "Không có quyền." };
+  const { seedDemoNQ57, removeDemoNQ57 } = await import("@/lib/seedNq57");
+  const sql = await db();
+  if (str(fd, "op") === "xoa") {
+    const n = await sql.begin((tx) => removeDemoNQ57(tx, u.id));
+    return { ok: true, message: `Đã xóa ${n} nội dung mẫu.` };
+  }
+  const r = await sql.begin((tx) => seedDemoNQ57(tx, u.id));
+  return { ok: true, message: `Đã nạp ${r.cong_viec} công việc, ${r.chi_tieu} chỉ tiêu, ${r.ban_ghi} bản ghi mẫu.` };
+}

@@ -9,7 +9,8 @@ import { canCreateTask, identities, assignableUnits, taskPerms, type TaskRow } f
 import { notify, writeLog } from "@/lib/log";
 import { fromVN, fmtDue } from "@/lib/time";
 import { recomputePercent } from "@/lib/tasks";
-import { TRANG_THAI } from "@/lib/const";
+import { TRANG_THAI, UU_TIEN } from "@/lib/const";
+import { trashTask, trashSimple } from "@/lib/trash";
 import type { ActionState } from "@/components/ActionForm";
 
 type Tx = postgres.TransactionSql;
@@ -195,6 +196,7 @@ export async function taskAction(_: ActionState, fd: FormData): Promise<ActionSt
   const members = (await sql`SELECT id_nguoi_dung FROM cong_viec_thanh_vien WHERE id_cong_viec = ${id}`).map((r) => r.id_nguoi_dung as number);
   let msg = "Đã cập nhật.";
   let error: string | null = null;
+  let redir: string | null = null;
 
   await sql.begin(async (tx) => {
     const setStatus = async (st: string, extra?: Record<string, unknown>) => {
@@ -360,8 +362,66 @@ export async function taskAction(_: ActionState, fd: FormData): Promise<ActionSt
         msg = `Đã giao cho ${name}.`;
         break;
       }
+      case "xoa": {
+        if (!p.admin) return void (error = "Chỉ quản trị dữ liệu mới xóa được công việc.");
+        await trashTask(tx, id, user.id, str(fd, "ly_do") || null);
+        if (t.id_cha) await recomputePercent(tx, t.id_cha);
+        redir = t.id_cha ? `/viec/${t.id_cha}` : "/viec?xoa=1";
+        break;
+      }
+      case "xoa_binh_luan": {
+        if (!p.admin) return void (error = deny.error);
+        const bid = Number(str(fd, "id_binh_luan"));
+        const b = (await tx`SELECT noi_dung FROM binh_luan WHERE id = ${bid} AND id_cong_viec = ${id}`)[0];
+        if (!b) return void (error = "Không tìm thấy nội dung trao đổi.");
+        await trashSimple(tx, "binh_luan", "binh_luan", bid, user.id, `Trao đổi ở “${t.ten.slice(0, 60)}”: ${String(b.noi_dung).slice(0, 60)}`, null);
+        msg = "Đã xóa nội dung trao đổi.";
+        break;
+      }
+      case "sua_admin": {
+        // Quản trị dữ liệu: sửa mọi thông tin kể cả trạng thái, người giao, người chủ trì
+        if (!p.admin) return void (error = deny.error);
+        const ten = str(fd, "ten");
+        const due = parseDue(fd);
+        if (!ten || !due) return void (error = "Tên và hạn không được để trống.");
+        const chu = Number(str(fd, "id_chu_tri")) || t.id_chu_tri;
+        const giao = Number(str(fd, "id_nguoi_giao")) || t.id_nguoi_giao;
+        const thuc = Number(str(fd, "id_nguoi_thuc_hien")) || null;
+        const ok = await tx`SELECT id, id_don_vi FROM nguoi_dung WHERE id IN ${tx([chu, giao, ...(thuc ? [thuc] : [])])}`;
+        if (!ok.some((r) => r.id === chu) || !ok.some((r) => r.id === giao)) return void (error = "Người giao hoặc người chủ trì không hợp lệ.");
+        const st = TRANG_THAI[str(fd, "trang_thai")] ? str(fd, "trang_thai") : t.trang_thai;
+        const pct = Math.max(0, Math.min(100, Number(str(fd, "phan_tram")) || 0));
+        const moi = {
+          ten,
+          mo_ta: str(fd, "mo_ta") || null,
+          nguon_giao: str(fd, "nguon_giao") || t.nguon_giao,
+          so_hieu_vb: str(fd, "so_hieu_vb") || null,
+          cuoc_hop: str(fd, "cuoc_hop") || null,
+          linh_vuc: str(fd, "linh_vuc") || t.linh_vuc,
+          san_pham: str(fd, "san_pham") || t.san_pham,
+          uu_tien: UU_TIEN[str(fd, "uu_tien")] ? str(fd, "uu_tien") : t.uu_tien,
+          han: due.han,
+          han_co_gio: due.coGio,
+          trang_thai: st,
+          phan_tram: st === "hoan_thanh" ? 100 : pct,
+          phan_tram_tay: true,
+          id_nguoi_giao: giao,
+          id_chu_tri: chu,
+          id_don_vi_chu_tri: chu !== t.id_chu_tri ? (ok.find((r) => r.id === chu)?.id_don_vi ?? null) : t.id_don_vi_chu_tri,
+          id_nguoi_thuc_hien: thuc,
+          ngay_hoan_thanh: st === "hoan_thanh" ? (t.ngay_hoan_thanh ?? new Date()) : null,
+          ngay_nhan: st === "moi_giao" ? null : (t.ngay_nhan ?? new Date()),
+        };
+        const cu = Object.fromEntries(Object.keys(moi).map((k) => [k, t[k]]));
+        await tx`UPDATE cong_viec SET ${tx(moi as never)}, cap_nhat_luc = now() WHERE id = ${id}`;
+        await writeLog(tx, user.id, "sua_quan_tri", "cong_viec", id, cu, moi);
+        await sysComment(tx, id, user.id, `Quản trị cập nhật thông tin công việc${st !== t.trang_thai ? ` (trạng thái: ${TRANG_THAI[st]})` : ""}`);
+        if (t.id_cha) await recomputePercent(tx, t.id_cha);
+        msg = "Đã lưu thay đổi.";
+        break;
+      }
       case "sua": {
-        if (!p.quan_ly || ["hoan_thanh", "huy"].includes(t.trang_thai)) return void (error = deny.error);
+        if (!p.quan_ly || (["hoan_thanh", "huy"].includes(t.trang_thai) && !p.admin)) return void (error = deny.error);
         const ten = str(fd, "ten");
         const sp = str(fd, "san_pham");
         const due = parseDue(fd);
@@ -457,6 +517,7 @@ export async function taskAction(_: ActionState, fd: FormData): Promise<ActionSt
     }
   });
   if (error) return { error };
+  if (redir) return { redirect: redir };
   sendSmsLater();
   return { ok: true, message: msg, reset: ["binh_luan", "checklist_them", "xin_gia_han", "tra_lai"].includes(op) };
 }

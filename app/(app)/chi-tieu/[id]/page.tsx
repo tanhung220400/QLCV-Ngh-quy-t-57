@@ -8,7 +8,7 @@ import { loadKpis, fmtNum, periodLabel, currentPeriod } from "@/lib/kpi";
 import { getSettings } from "@/lib/settings";
 import { KpiBar, KpiStatus } from "@/components/Charts";
 import { ActionForm, Submit } from "@/components/ActionForm";
-import { addDataAction, confirmDataAction, savePlansAction, deleteKpiAction } from "@/app/actions/kpi";
+import { addDataAction, confirmDataAction, savePlansAction, deleteKpiAction, adminKpiAction } from "@/app/actions/kpi";
 import { LOAI_CHI_TIEU, KY_CAP_NHAT, TRANG_THAI } from "@/lib/const";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { FileUpload } from "@/components/FileUpload";
@@ -197,6 +197,13 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
                         </a>
                       ))}
                     {d.hieu_luc && enter && (d.id === highlight || d.so_tep === 0) && <FileUpload doiTuong="so_lieu" idDoiTuong={d.id} blob={!!process.env.BLOB_READ_WRITE_TOKEN} />}
+                    {user.quyen.includes("qt.du_lieu") && (
+                      <ActionForm action={adminKpiAction} confirm="Xóa dòng số liệu này? Có thể khôi phục trong Thùng rác." className="mt-1">
+                        <input type="hidden" name="op" value="xoa_so_lieu" />
+                        <input type="hidden" name="id" value={d.id} />
+                        <button className="text-sm text-red-600 no-underline hover:underline">Xóa</button>
+                      </ActionForm>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -293,6 +300,14 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
             <input name="ly_do" className="input" placeholder="Lý do hủy" required />
             <Submit className="btn btn-danger">Hủy chỉ tiêu</Submit>
           </ActionForm>
+          {user.quyen.includes("qt.du_lieu") && (
+            <ActionForm action={adminKpiAction} className="mt-3 flex flex-wrap gap-2" confirm="Xóa hẳn chỉ tiêu (kèm phần phân rã, số liệu) vào Thùng rác?">
+              <input type="hidden" name="op" value="xoa" />
+              <input type="hidden" name="id" value={id} />
+              <input name="ly_do" className="input max-w-xs flex-1" placeholder="Lý do xóa (không bắt buộc)" />
+              <Submit className="btn btn-danger-soft">Xóa hẳn (quản trị)</Submit>
+            </ActionForm>
+          )}
         </details>
       )}
 

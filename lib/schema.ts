@@ -1,5 +1,5 @@
 // Mô hình dữ liệu theo mục 8 của đặc tả. Chạy lại nhiều lần không sao (IF NOT EXISTS).
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS don_vi (
@@ -290,4 +290,81 @@ CREATE OR REPLACE FUNCTION bo_dau(t TEXT) RETURNS TEXT AS $$
     'àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ',
     'aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyyd')
 $$ LANGUAGE sql IMMUTABLE;
+
+-- ===== Phiên bản 3: module tự tạo, thùng rác =====
+CREATE TABLE IF NOT EXISTS mo_dun (
+  id SERIAL PRIMARY KEY,
+  ma TEXT NOT NULL UNIQUE,
+  ten TEXT NOT NULL,
+  mo_ta TEXT,
+  bieu_tuong TEXT NOT NULL DEFAULT 'folder',
+  mau TEXT NOT NULL DEFAULT 'blue',
+  loai TEXT NOT NULL DEFAULT 'du_lieu',          -- he_thong / nhom / du_lieu / lien_ket
+  duong_dan TEXT,
+  id_cha INT REFERENCES mo_dun(id),
+  thu_tu INT NOT NULL DEFAULT 0,
+  hien BOOLEAN NOT NULL DEFAULT TRUE,
+  vai_tro_xem TEXT[] NOT NULL DEFAULT '{}',       -- rỗng = mọi người
+  vai_tro_nhap TEXT[] NOT NULL DEFAULT '{}',      -- rỗng = mọi người xem được
+  pham_vi TEXT NOT NULL DEFAULT 'toan_xa',        -- toan_xa / don_vi
+  tao_luc TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS mo_dun_truong (
+  id SERIAL PRIMARY KEY,
+  id_mo_dun INT NOT NULL REFERENCES mo_dun(id) ON DELETE CASCADE,
+  khoa TEXT NOT NULL,
+  ten TEXT NOT NULL,
+  kieu TEXT NOT NULL DEFAULT 'van_ban',
+  bat_buoc BOOLEAN NOT NULL DEFAULT FALSE,
+  tuy_chon TEXT[] NOT NULL DEFAULT '{}',
+  goi_y TEXT,
+  hien_danh_sach BOOLEAN NOT NULL DEFAULT TRUE,
+  thu_tu INT NOT NULL DEFAULT 0,
+  UNIQUE (id_mo_dun, khoa)
+);
+
+CREATE TABLE IF NOT EXISTS mo_dun_ban_ghi (
+  id SERIAL PRIMARY KEY,
+  id_mo_dun INT NOT NULL REFERENCES mo_dun(id),
+  du_lieu JSONB NOT NULL DEFAULT '{}',
+  id_don_vi INT REFERENCES don_vi(id),
+  id_nguoi_tao INT REFERENCES nguoi_dung(id),
+  id_nguoi_sua INT REFERENCES nguoi_dung(id),
+  tao_luc TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cap_nhat_luc TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS bg_md ON mo_dun_ban_ghi(id_mo_dun);
+
+CREATE TABLE IF NOT EXISTS thung_rac (
+  id SERIAL PRIMARY KEY,
+  loai TEXT NOT NULL,           -- cong_viec / chi_tieu / ban_ghi / mo_dun / so_lieu / binh_luan / tep / don_vi / nguoi_dung
+  id_goc INT NOT NULL,
+  tieu_de TEXT NOT NULL,
+  du_lieu JSONB NOT NULL,       -- ảnh chụp toàn bộ dòng dữ liệu để khôi phục
+  id_nguoi_xoa INT,
+  ly_do TEXT,
+  xoa_luc TIMESTAMPTZ NOT NULL DEFAULT now(),
+  trang_thai TEXT NOT NULL DEFAULT 'trong_thung'  -- trong_thung / da_khoi_phuc / da_xoa_han
+);
+
+-- Lĩnh vực bổ sung theo Nghị quyết 57 và nhiệm vụ cấp xã (thêm nếu chưa có)
+INSERT INTO danh_muc (loai, ten, thu_tu) VALUES
+  ('linh_vuc', 'Chuyển đổi số, chính quyền số', 20),
+  ('linh_vuc', 'Hạ tầng số, an toàn thông tin', 21),
+  ('linh_vuc', 'Dữ liệu số, Đề án 06', 22),
+  ('linh_vuc', 'Kinh tế số, thương mại điện tử', 23),
+  ('linh_vuc', 'Xã hội số, kỹ năng số', 24),
+  ('linh_vuc', 'Đổi mới sáng tạo, sáng kiến', 25),
+  ('linh_vuc', 'Tư pháp, hộ tịch', 26),
+  ('linh_vuc', 'Lao động, thương binh và xã hội', 27),
+  ('linh_vuc', 'Văn hóa, thể thao, du lịch', 28),
+  ('linh_vuc', 'Thông tin, truyền thông', 29),
+  ('linh_vuc', 'Tài nguyên nước, khoáng sản', 30),
+  ('linh_vuc', 'Phòng chống thiên tai, tìm kiếm cứu nạn', 31),
+  ('linh_vuc', 'Dân tộc, tôn giáo', 32),
+  ('linh_vuc', 'Thanh tra, tiếp công dân, khiếu nại tố cáo', 33),
+  ('linh_vuc', 'Thi đua, khen thưởng', 34),
+  ('linh_vuc', 'Công tác Đảng, đoàn thể', 35)
+ON CONFLICT (loai, ten) DO NOTHING;
 `;

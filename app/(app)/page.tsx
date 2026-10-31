@@ -11,6 +11,8 @@ import { TaskCard } from "@/components/TaskCard";
 import { ActionForm, Submit } from "@/components/ActionForm";
 import { taskAction } from "@/app/actions/task";
 import { fmtDue, vnDate, workingDaysUntil } from "@/lib/time";
+import { menuTree, type MenuNode } from "@/lib/modules";
+import { Tile } from "@/components/Nav";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,27 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const extPending = await sql`
     SELECT g.id, cv.id AS id_cv, cv.ten, g.han_moi, n.ho_ten FROM gia_han g JOIN cong_viec cv ON cv.id = g.id_cong_viec JOIN nguoi_dung n ON n.id = g.id_nguoi_xin
     WHERE g.trang_thai_duyet = 'cho_duyet' AND cv.id_nguoi_giao IN ${sql(ids.map((i) => i.id))} ORDER BY g.tao_luc`;
+
+  // Truy cập nhanh các module nhập liệu
+  const flat = (ns: MenuNode[]): MenuNode[] => ns.flatMap((n) => [n, ...flat(n.con)]);
+  const mods = flat(await menuTree(sql, user)).filter((n) => n.loai === "du_lieu" || n.loai === "lien_ket");
+  const counts = mods.length ? Object.fromEntries((await sql`SELECT id_mo_dun, count(*)::int AS n FROM mo_dun_ban_ghi WHERE id_mo_dun IN ${sql(mods.map((m) => m.id))} GROUP BY 1`).map((r) => [r.id_mo_dun, r.n])) : {};
+  const quick = mods.length ? (
+    <section>
+      <h2 className="h2 mb-2">Truy cập nhanh</h2>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        {mods.slice(0, 12).map((m) => (
+          <Link key={m.id} href={m.href} className="card card-link flex items-center gap-3 p-3 sm:p-4">
+            <Tile icon={m.bieu_tuong} mau={m.mau} size="lg" />
+            <span className="min-w-0">
+              <span className="line-clamp-2 leading-snug font-semibold text-slate-800">{m.ten}</span>
+              {m.loai === "du_lieu" && <span className="text-sm text-slate-500">{counts[m.id] || 0} bản ghi</span>}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  ) : null;
 
   const deny = sp.khong_quyen ? (
     <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">Tài khoản của bạn chưa được phân quyền vào mục vừa chọn. Liên hệ quản trị nếu cần.</p>
@@ -74,6 +97,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
             </div>
           )}
         </section>
+        {quick}
       </div>
     );
   }
@@ -234,6 +258,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           </div>
         </section>
       )}
+      {quick}
     </div>
   );
 }

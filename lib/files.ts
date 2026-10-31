@@ -21,5 +21,15 @@ export async function canAccessObject(user: User, doiTuong: string, id: number, 
     const ids = (await identities(user)).map((i) => i.id);
     return ids.includes(r.id_nguoi_nhap) || (await kpiRights(user, r as never)).enter;
   }
+  if (doiTuong === "ban_ghi") {
+    const { recordRights, recordScope } = await import("./records");
+    const r = (await sql`SELECT bg.*, m.ma FROM mo_dun_ban_ghi bg JOIN mo_dun m ON m.id = bg.id_mo_dun WHERE bg.id = ${id}`)[0];
+    if (!r) return false;
+    const m = (await sql`SELECT * FROM mo_dun WHERE id = ${r.id_mo_dun}`)[0] as never;
+    const sc = (await recordScope(sql, user, m)).q;
+    if (!(await sql`SELECT 1 FROM mo_dun_ban_ghi bg WHERE bg.id = ${id} AND (${sc})`).length) return false;
+    const rt = recordRights(user, m, r as never);
+    return write ? rt.sua : rt.xem;
+  }
   return false;
 }

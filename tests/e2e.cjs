@@ -15,6 +15,7 @@ const day = (n) => {
   const newPage = async (viewport = { width: 1280, height: 900 }) => {
     const ctx = await browser.newContext({ viewport, locale: "vi-VN", timezoneId: "Asia/Ho_Chi_Minh" });
     const page = await ctx.newPage();
+    page.on("dialog", (d) => d.accept());
     page.on("pageerror", (e) => errors.push(`pageerror ${page.url()}: ${e.message}`));
     page.on("console", (m) => m.type() === "error" && !/favicon|ERR_|Failed to load resource/.test(m.text()) && errors.push(`console ${page.url()}: ${m.text().slice(0, 200)}`));
     page.on("response", (r) => r.status() >= 500 && errors.push(`HTTP ${r.status()} ${r.url()}`));
@@ -51,7 +52,7 @@ const day = (n) => {
   await page.click('button[type="submit"]');
   await page.waitForURL(BASE + "/", { timeout: 60000, waitUntil: "commit" });
   ok("khởi tạo + dữ liệu mẫu", true);
-  for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", "/chi-tieu", "/bao-cao", "/quan-tri", "/quan-tri?muc=don_vi", "/quan-tri?muc=danh_muc", "/quan-tri?muc=ngay_nghi", "/quan-tri?muc=cai_dat", "/quan-tri?muc=nhat_ky", "/thong-bao", "/tai-khoan"])
+  for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", "/chi-tieu", "/bao-cao", "/quan-tri", "/quan-tri?muc=don_vi", "/quan-tri?muc=danh_muc", "/quan-tri?muc=ngay_nghi", "/quan-tri?muc=cai_dat", "/quan-tri?muc=nhat_ky", "/quan-tri?muc=mo_dun", "/quan-tri?muc=thung_rac", "/quan-tri?muc=sms", "/m/nghi-quyet-57", "/m/to-cong-nghe-so", "/m/binh-dan-hoc-vu-so", "/m/ha-tang-so-thon", "/m/sang-kien-doi-moi", "/m/san-pham-so-ocop", "/m/phan-anh-kien-nghi", "/m/phan-anh-kien-nghi/moi", "/thong-bao", "/tai-khoan"])
     await check(page, p, "quản trị");
   await ctx.close();
 
@@ -322,6 +323,141 @@ const day = (n) => {
   ok("xuất Excel kết quả tra cứu", xr.status() === 200 && (await xr.body()).length > 1000);
   await ctx.close();
 
+
+  // 13. Quản trị: module tự tạo, nhập liệu, Excel, thùng rác, danh mục, dữ liệu mẫu NQ57
+  ({ ctx, page } = await newPage());
+  await page.goto(BASE + "/dang-nhap");
+  await page.fill('input[name="ten_dang_nhap"]', "quantri");
+  await page.fill('input[name="mat_khau"]', "Quantri@2026");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+  await page.goto(BASE + "/", { waitUntil: "networkidle" });
+  const side = await page.locator("aside").innerText();
+  ok("menu nhóm theo module (NQ57, địa bàn)", side.includes("NGHỊ QUYẾT 57") || side.includes("Nghị quyết 57"), side.replace(/\n/g, " | ").slice(0, 200));
+  ok("menu có module nhập liệu", side.includes("Tổ công nghệ số cộng đồng") && side.includes("Phản ánh, kiến nghị"));
+  const tcn = await check(page, "/m/to-cong-nghe-so", "module");
+  ok("dữ liệu mẫu NQ57 trong module", (tcn.match(/Tổ công nghệ số cộng đồng Thôn/g) || []).length >= 2);
+  const home = await check(page, "/", "trang chủ");
+  ok("trang chủ có truy cập nhanh", home.includes("Truy cập nhanh"));
+  const nqTasks = await check(page, "/viec?tab=tat_ca", "quản trị");
+  ok("công việc mẫu NQ57", nqTasks.includes("Bình dân học vụ số") || nqTasks.includes("VNeID"));
+  const nqKpi = await check(page, "/chi-tieu?mo=tat_ca", "quản trị");
+  ok("chỉ tiêu mẫu NQ57", nqKpi.includes("nộp trực tuyến toàn trình") && nqKpi.includes("thanh toán không dùng tiền mặt"));
+  // Tạo module mới trong nhóm Quản lý địa bàn
+  await page.goto(BASE + "/quan-tri?muc=mo_dun");
+  const addForm = page.locator('form:has(button:has-text("Tạo module"))');
+  await addForm.locator('input[name="ten"]').fill("Hộ kinh doanh cá thể");
+  await addForm.locator('select[name="id_cha"]').selectOption({ label: "Quản lý địa bàn (Nhóm menu)" });
+  await addForm.locator('select[name="bieu_tuong"]').selectOption("store");
+  await addForm.locator('select[name="mau"]').selectOption("orange");
+  await addForm.locator('button:has-text("Tạo module")').click();
+  await page.waitForURL(/quan-tri\/mo-dun\/\d+\?moi=1/, { waitUntil: "commit" });
+  ok("tạo module mới", true);
+  const fieldForm = page.locator('form:has(button:has-text("Thêm trường"))');
+  await fieldForm.locator('input[name="ten"]').fill("Số lao động");
+  await fieldForm.locator('select[name="kieu"]').selectOption("so");
+  await fieldForm.locator('button:has-text("Thêm trường")').click();
+  await page.waitForSelector("text=Đã thêm trường “Số lao động”");
+  await fieldForm.locator('input[name="ten"]').fill("Ngành nghề");
+  await fieldForm.locator('select[name="kieu"]').selectOption("lua_chon");
+  await fieldForm.locator('textarea[name="tuy_chon"]').fill("Ăn uống\nTạp hóa\nDịch vụ");
+  await fieldForm.locator('button:has-text("Thêm trường")').click();
+  await page.waitForSelector("text=Đã thêm trường “Ngành nghề”");
+  ok("thêm trường dữ liệu cho module", true);
+  await page.goto(BASE + "/m/ho-kinh-doanh-ca-the/moi");
+  await page.fill('input[name="f_ten"]', "Quán cơm Bình Dân");
+  await page.fill('input[name="f_so_lao_dong"]', "3");
+  await page.selectOption('select[name="f_nganh_nghe"]', "Ăn uống");
+  await page.click('button:has-text("Lưu")');
+  await page.waitForURL(/\/m\/ho-kinh-doanh-ca-the\/\d+\?luu=1/, { waitUntil: "commit" });
+  const recUrl = page.url().split("?")[0];
+  const rec = await page.locator("main").innerText();
+  ok("nhập bản ghi vào module mới", rec.includes("Quán cơm Bình Dân") && rec.includes("Ăn uống"));
+  ok("module mới hiện trên menu", (await page.locator("aside").innerText()).includes("Hộ kinh doanh cá thể"));
+  // Nhập Excel
+  const ExcelJS = require("/vercel/app/node_modules/exceljs");
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("x");
+  ws.addRow(["Tên, nội dung *", "Số lao động", "Ngành nghề"]);
+  ws.addRow(["Tạp hóa Minh Anh", 2, "Tạp hóa"]);
+  ws.addRow(["Tiệm sửa xe Hùng", 1, "Dịch vụ"]);
+  await wb.xlsx.writeFile("/tmp/nhap.xlsx");
+  await page.goto(BASE + "/m/ho-kinh-doanh-ca-the");
+  await page.click("summary:has-text('Nhập từ Excel')");
+  await page.setInputFiles('input[name="file"]', "/tmp/nhap.xlsx");
+  await page.click('button:has-text("Nhập dữ liệu")');
+  await page.waitForSelector("text=Đã nhập 2 bản ghi");
+  await page.reload();
+  const list = await page.locator("main").innerText();
+  ok("nhập bản ghi từ Excel", list.includes("Tạp hóa Minh Anh") && list.includes("Tiệm sửa xe Hùng"));
+  ok("thống kê nhanh trong module", list.includes("Tổng: Số lao động") && list.includes("6"));
+  const xm = await page.request.get(BASE + "/api/m/ho-kinh-doanh-ca-the/xuat");
+  ok("xuất Excel module", xm.status() === 200 && (await xm.body()).length > 1000);
+  const xs = await page.request.get(BASE + "/api/m/ho-kinh-doanh-ca-the/xuat?mau=1");
+  ok("tải mẫu nhập Excel", xs.status() === 200);
+  const sTxt = await check(page, "/m/ho-kinh-doanh-ca-the?q=" + encodeURIComponent("tap hoa"), "tìm không dấu");
+  ok("tìm kiếm không dấu trong module", sTxt.includes("Tạp hóa Minh Anh") && !sTxt.includes("Quán cơm Bình Dân"));
+  // Xóa bản ghi -> thùng rác -> khôi phục
+  await page.goto(recUrl);
+  await page.click("summary:has-text('Xóa bản ghi')");
+  await page.click('button:has-text("Xóa")');
+  await page.waitForURL(/xoa=1/, { waitUntil: "commit" });
+  await page.waitForTimeout(500);
+  ok("xóa bản ghi", !(await page.locator("main").innerText()).includes("Quán cơm Bình Dân"));
+  await page.goto(BASE + "/quan-tri?muc=thung_rac");
+  await page.locator('tr:has-text("Quán cơm Bình Dân") button:has-text("Khôi phục")').click();
+  await page.waitForSelector("text=Đã khôi phục");
+  const back = await check(page, recUrl, "khôi phục");
+  ok("khôi phục bản ghi từ thùng rác", back.includes("Quán cơm Bình Dân"));
+  // Quản trị xóa công việc (kèm việc con) và khôi phục
+  await page.goto(BASE + "/viec?tab=tat_ca");
+  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại thôn");
+  await page.waitForURL(/\/viec\/\d+$/, { waitUntil: "commit" });
+  const delUrl = page.url();
+  await page.click("summary:has-text('Quản trị dữ liệu')");
+  await page.locator('form:has(button:has-text("Xóa công việc")) input[name="ly_do"]').fill("Kiểm thử xóa");
+  await page.click('button:has-text("Xóa công việc")');
+  await page.waitForURL(/viec\?xoa=1/, { waitUntil: "commit" });
+  const gr = await page.goto(delUrl);
+  const gone = await page.locator("body").innerText();
+  ok("quản trị xóa công việc", gr.status() === 404 || /không tìm thấy|could not be found/i.test(gone), `HTTP ${gr.status()}`);
+  await page.goto(BASE + "/quan-tri?muc=thung_rac");
+  ok("thùng rác ghi việc con", (await page.locator("main").innerText()).includes("kèm 3 việc con"));
+  await page.locator('tr:has-text("Bình dân học vụ số") button:has-text("Khôi phục")').first().click();
+  await page.waitForSelector("text=Đã khôi phục");
+  const back2 = await check(page, delUrl, "khôi phục việc");
+  ok("khôi phục công việc kèm việc con", back2.includes("Bình dân học vụ số") && back2.includes("Lớp tại"));
+  // Quản trị sửa toàn bộ (đổi trạng thái việc đã hoàn thành)
+  await page.click("summary:has-text('Quản trị dữ liệu')");
+  await page.selectOption('form:has(button:has-text("Lưu (quản trị)")) select[name="trang_thai"]', "tam_dung");
+  await page.click('button:has-text("Lưu (quản trị)")');
+  await page.waitForSelector("text=Đã lưu thay đổi.");
+  ok("quản trị sửa toàn bộ thông tin việc", (await page.locator("main").innerText()).includes("Tạm dừng"));
+  // Danh mục: thêm lĩnh vực, đổi tên lĩnh vực đang dùng
+  await page.goto(BASE + "/quan-tri?muc=danh_muc");
+  const lvBox = page.locator("details:has(summary:has-text('Lĩnh vực'))").first();
+  await lvBox.locator('form:has(button:has-text("Thêm")) input[name="ten"]').fill("Lĩnh vực kiểm thử mới");
+  await lvBox.locator('button:has-text("Thêm")').click();
+  await page.waitForSelector("text=Đã thêm “Lĩnh vực kiểm thử mới”");
+  ok("admin thêm lĩnh vực", true);
+  const row = lvBox.locator('form:has(input[name="ten"][value="Đất đai"])');
+  await row.locator('input[name="ten"]').fill("Đất đai, địa chính");
+  await row.locator('button:has-text("Lưu")').click();
+  await page.waitForSelector("text=Đã đổi tên thành “Đất đai, địa chính”");
+  const rn = await page.locator("main").innerText();
+  ok("đổi tên lĩnh vực cập nhật nội dung đang dùng", /cập nhật \d+ nội dung/.test(rn), rn.match(/Đã đổi tên[^\n]*/)?.[0]);
+  await page.goto(BASE + "/viec/moi");
+  ok("lĩnh vực mới có trong biểu mẫu giao việc", (await page.locator('select[name="linh_vuc"] option').allInnerTexts()).includes("Lĩnh vực kiểm thử mới"));
+  // API nạp dữ liệu mẫu cần khóa
+  const n1 = await page.request.post(BASE + "/api/quan-tri/nap-mau");
+  ok("API nạp mẫu chặn khi không có khóa", n1.status() === 401);
+  const n2 = await page.request.post(BASE + "/api/quan-tri/nap-mau", { headers: { "x-setup-key": "khoitao" } });
+  ok("API nạp mẫu nhận khóa đúng", n2.status() === 200 && (await n2.text()).includes("da_co"));
+  await page.screenshot({ path: "/tmp/shot-admin.jpg", type: "jpeg", quality: 45 });
+  await page.goto(BASE + "/m/ha-tang-so-thon", { waitUntil: "networkidle" });
+  await page.screenshot({ path: "/tmp/shot-module.jpg", type: "jpeg", quality: 45, fullPage: true });
+  await ctx.close();
+
   // PCT kinh tế không thấy chỉ tiêu lĩnh vực y tế
   ({ ctx, page } = await newPage());
   await login(page, "pct.kinhte");
@@ -335,12 +471,17 @@ const day = (n) => {
   // 9. Giao diện điện thoại: không tràn ngang
   ({ ctx, page } = await newPage({ width: 390, height: 844 }));
   await login(page, "tp.kinhte");
-  for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", `/viec/${taskId}`, "/viec/moi", "/chi-tieu", "/bao-cao", "/thong-bao", "/tai-khoan"]) {
+  for (const p of ["/", "/viec", "/viec?xem=kanban", "/viec?xem=lich", `/viec/${taskId}`, "/viec/moi", "/chi-tieu", "/bao-cao", "/thong-bao", "/tai-khoan", "/m/to-cong-nghe-so", "/m/quan-ly-dia-ban", "/m/binh-dan-hoc-vu-so/moi"]) {
     await page.goto(BASE + p, { waitUntil: "networkidle" });
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     const wide = over > 1 ? await page.evaluate(() => [...document.querySelectorAll("body *")].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1).slice(-3).map((e) => e.tagName + "." + String(e.className).slice(0, 60)).join(" | ")) : "";
     ok(`điện thoại không tràn ngang ${p}`, over <= 1, `dư ${over}px ${wide}`);
   }
+  await page.goto(BASE + "/");
+  await page.click('nav button:has-text("Menu")');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: "/tmp/shot-mobile-menu.jpg", type: "jpeg", quality: 45 });
+  ok("menu điện thoại có module", (await page.locator("text=Tổ công nghệ số cộng đồng").count()) > 0);
   await page.goto(BASE + "/");
   await page.screenshot({ path: "/tmp/shot-mobile-home.jpg", type: "jpeg", quality: 45 });
   await page.goto(BASE + `/viec/${taskId}`);

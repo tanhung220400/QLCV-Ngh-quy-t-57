@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { SwRegister } from "@/components/SwRegister";
+
+const font = Be_Vietnam_Pro({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-be-vietnam", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Giao việc & Chỉ tiêu xã",
@@ -11,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1d4ed8",
+  themeColor: "#2563eb",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -19,7 +22,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi">
+    <html lang="vi" className={font.variable}>
       <body>
         {children}
         <SwRegister />

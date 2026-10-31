@@ -87,6 +87,13 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
   const needOpts = p.viec_con || p.quan_ly;
   const opts = needOpts ? await taskFormOptions(user) : null;
   const linhVuc = await getCatalog("linh_vuc");
+  const adminData = p.admin
+    ? {
+        people: await sql`SELECT n.id, n.ho_ten, d.ten AS don_vi FROM nguoi_dung n LEFT JOIN don_vi d ON d.id = n.id_don_vi WHERE n.trang_thai = 'hoat_dong' OR n.id IN ${sql([t.id_chu_tri, t.id_nguoi_giao, t.id_nguoi_thuc_hien ?? -1])} ORDER BY n.ho_ten`,
+        nguon: await getCatalog("nguon_giao"),
+        sanPham: await getCatalog("san_pham"),
+      }
+    : null;
   const hasSub = subs.length + checklist.length > 0;
   const c = dueColor(t as never, holidays, cfg.nguong_vang);
   const blob = !!process.env.BLOB_READ_WRITE_TOKEN;
@@ -282,6 +289,91 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
               <Submit className="btn btn-primary">Gửi đề nghị</Submit>
             </ActionForm>
             <p className="mt-2 text-sm text-slate-500">Số lần gia hạn được lưu để phục vụ đánh giá.</p>
+          </details>
+        )}
+
+        {p.admin && adminData && (
+          <details className="card border-violet-200">
+            <summary className="h2 cursor-pointer text-violet-800">Quản trị dữ liệu: sửa toàn bộ, xóa</summary>
+            <p className="mt-1 text-sm text-slate-500">Dành cho tài khoản có quyền quản trị dữ liệu. Mọi thay đổi được ghi nhật ký.</p>
+            <ActionForm action={taskAction} className="mt-3 space-y-3">
+              <Hidden id={id} op="sua_admin" />
+              <div>
+                <label className="label req">Tên công việc</label>
+                <input name="ten" defaultValue={t.ten} className="input" required />
+              </div>
+              <textarea name="mo_ta" defaultValue={t.mo_ta || ""} className="input" rows={2} placeholder="Mô tả" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label">Trạng thái</label>
+                  <select name="trang_thai" className="input" defaultValue={t.trang_thai}>
+                    {Object.entries(TRANG_THAI).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Tiến độ (%)</label>
+                  <input name="phan_tram" type="number" min={0} max={100} defaultValue={t.phan_tram} className="input" />
+                </div>
+                {(["id_nguoi_giao", "id_chu_tri", "id_nguoi_thuc_hien"] as const).map((k) => (
+                  <div key={k}>
+                    <label className="label">{k === "id_nguoi_giao" ? "Người giao" : k === "id_chu_tri" ? "Người chủ trì" : "Công chức thực hiện"}</label>
+                    <select name={k} className="input" defaultValue={t[k] ?? ""}>
+                      {k === "id_nguoi_thuc_hien" && <option value="">— Không —</option>}
+                      {adminData.people.map((u) => (
+                        <option key={u.id} value={u.id}>{u.ho_ten}{u.don_vi ? ` — ${u.don_vi}` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                <div>
+                  <label className="label">Nguồn giao</label>
+                  <select name="nguon_giao" className="input" defaultValue={t.nguon_giao}>
+                    {[...new Set([t.nguon_giao, ...adminData.nguon])].map((o) => (<option key={o}>{o}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Số hiệu văn bản</label>
+                  <input name="so_hieu_vb" defaultValue={t.so_hieu_vb || ""} className="input" />
+                </div>
+                <div>
+                  <label className="label">Cuộc họp</label>
+                  <input name="cuoc_hop" defaultValue={t.cuoc_hop || ""} className="input" />
+                </div>
+                <div>
+                  <label className="label">Lĩnh vực</label>
+                  <select name="linh_vuc" className="input" defaultValue={t.linh_vuc}>
+                    {[...new Set([t.linh_vuc, ...linhVuc])].map((o) => (<option key={o}>{o}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Sản phẩm đầu ra</label>
+                  <select name="san_pham" className="input" defaultValue={t.san_pham}>
+                    {[...new Set([t.san_pham, ...adminData.sanPham])].map((o) => (<option key={o}>{o}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Mức ưu tiên</label>
+                  <select name="uu_tien" className="input" defaultValue={t.uu_tien}>
+                    {Object.entries(UU_TIEN).map(([k, v]) => (<option key={k} value={k}>{v}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label req">Hạn</label>
+                  <div className="flex gap-2">
+                    <input type="date" name="han_ngay" className="input" defaultValue={vnDate(t.han)} required />
+                    <input type="time" name="han_gio" className="input w-32" defaultValue={t.han_co_gio ? vnTime(t.han) : ""} />
+                  </div>
+                </div>
+              </div>
+              <Submit>Lưu (quản trị)</Submit>
+            </ActionForm>
+            <ActionForm action={taskAction} confirm={`Xóa công việc “${t.ten}”${subs.length ? ` và ${subs.length} việc con` : ""}? Có thể khôi phục trong Thùng rác.`} className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+              <Hidden id={id} op="xoa" />
+              <input name="ly_do" className="input max-w-xs flex-1" placeholder="Lý do xóa (không bắt buộc)" />
+              <Submit className="btn btn-danger">Xóa công việc</Submit>
+            </ActionForm>
           </details>
         )}
 
@@ -532,6 +624,13 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
                 <b className="text-slate-800">{b.ho_ten}</b> · {fmtDateTime(b.thoi_gian)}
               </div>
               <div className={`mt-0.5 break-words whitespace-pre-line ${b.loai === "he_thong" ? "text-slate-600 italic" : ""}`}>{b.noi_dung}</div>
+              {p.admin && (
+                <ActionForm action={taskAction} confirm="Xóa nội dung trao đổi này?" className="mt-1">
+                  <Hidden id={id} op="xoa_binh_luan" />
+                  <input type="hidden" name="id_binh_luan" value={b.id} />
+                  <button className="text-sm text-red-600 hover:underline">Xóa</button>
+                </ActionForm>
+              )}
             </li>
           ))}
           {comments.length === 0 && <li className="text-slate-500">Chưa có trao đổi.</li>}
