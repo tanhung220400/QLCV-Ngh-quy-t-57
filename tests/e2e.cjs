@@ -21,6 +21,9 @@ const day = (n) => {
       } catch {}
     });
     const page = await ctx.newPage();
+    // chờ trang tải xong JavaScript trước khi thao tác (như người dùng thật)
+    const go = page.goto.bind(page);
+    page.goto = (u, o) => go(u, { waitUntil: "networkidle", ...(o || {}) });
     page.on("dialog", (d) => d.accept());
     page.on("pageerror", (e) => errors.push(`pageerror ${page.url()}: ${e.message}`));
     page.on("console", (m) => m.type() === "error" && !/favicon|ERR_|Failed to load resource/.test(m.text()) && errors.push(`console ${page.url()}: ${m.text().slice(0, 200)}`));
