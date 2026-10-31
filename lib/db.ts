@@ -40,7 +40,8 @@ function makeClient() {
   const schema = dbSchema();
   return postgres(url, {
     max: Number(process.env.DB_POOL_MAX) || 3,
-    ...(schema ? { connection: { search_path: schema } } : {}),
+    // Tự hủy giao dịch bỏ dở (hàm serverless bị dừng giữa chừng) để không giữ khóa mãi
+    connection: { ...(schema ? { search_path: schema } : {}), idle_in_transaction_session_timeout: 20000 } as never,
     idle_timeout: 20,
     connect_timeout: 15,
     prepare: false, // tương thích PgBouncer/Neon pooler
@@ -60,7 +61,15 @@ export function rawSql(): postgres.Sql {
 
 async function migrate() {
   const s = rawSql();
+  // Kiểm tra nhanh, không khóa: đã đúng phiên bản thì bỏ qua
+  try {
+    const q = await s`SELECT gia_tri FROM cai_dat WHERE khoa = 'schema_version'`;
+    if (q.length && Number(q[0].gia_tri) >= SCHEMA_VERSION) return;
+  } catch {
+    /* chưa có bảng: tiếp tục tạo */
+  }
   await s.begin(async (tx) => {
+    await tx`SET LOCAL lock_timeout = '25s'`;
     await tx`SELECT pg_advisory_xact_lock(570057)`;
     const schema = dbSchema();
     if (schema) {
@@ -84,7 +93,7 @@ async function checkSearchPath() {
   const r = await rawSql()`SELECT current_schema() AS s`;
   if (r[0].s !== schema)
     throw new Error(
-      `Kết nối không giữ được schema "${schema}" (đang là "${r[0].s}"). Trên Supabase hãy dùng chuỗi kết nối Session pooler (cổng 5432) hoặc Direct connection, không dùng Transaction pooler (cổng 6543).`,
+      `Kết nối không giữ được schema "${schema}" (đang là "${r[0].s}"). Kiểm tra lại chuỗi kết nối cơ sở dữ liệu (Supabase: Transaction pooler cổng 6543 hoặc Session pooler cổng 5432).`,
     );
 }
 
