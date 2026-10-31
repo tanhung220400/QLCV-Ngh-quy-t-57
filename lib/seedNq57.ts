@@ -240,7 +240,8 @@ export async function removeDemoNQ57(tx: Tx, uid: number) {
   // kèm các kỳ sau do hệ thống tự sinh từ việc định kỳ mẫu
   const cvSet = new Set(mk.cong_viec);
   for (let i = 0; i < 60; i++) {
-    const more = (await tx`SELECT id FROM cong_viec WHERE id_goc_dinh_ky IN ${tx([...cvSet, -1])} AND NOT (id IN ${tx([...cvSet, -1])})`).map((r) => r.id as number);
+    const cur: number[] = [...cvSet, -1];
+    const more = (await tx`SELECT id FROM cong_viec WHERE id_goc_dinh_ky IN ${tx(cur)} AND NOT (id IN ${tx(cur)})`).map((r) => r.id as number);
     if (!more.length) break;
     more.forEach((x) => cvSet.add(x));
   }
