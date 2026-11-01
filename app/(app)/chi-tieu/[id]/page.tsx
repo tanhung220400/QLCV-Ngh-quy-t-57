@@ -8,7 +8,7 @@ import { loadKpis, fmtNum, periodLabel, currentPeriod } from "@/lib/kpi";
 import { getSettings } from "@/lib/settings";
 import { KpiBar, KpiStatus } from "@/components/Charts";
 import { ActionForm, Submit } from "@/components/ActionForm";
-import { addDataAction, confirmDataAction, savePlansAction, deleteKpiAction, adminKpiAction } from "@/app/actions/kpi";
+import { addDataAction, confirmDataAction, savePlansAction, deleteKpiAction, adminKpiAction, updateKpiUnitsAction } from "@/app/actions/kpi";
 import { LOAI_CHI_TIEU, KY_CAP_NHAT, TRANG_THAI } from "@/lib/const";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { FileUpload } from "@/components/FileUpload";
@@ -93,7 +93,14 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
         <div className="text-sm text-slate-500">
           {k.nhom} · {k.nguon}
         </div>
-        <h1 className="mt-1 text-2xl font-bold">{k.ten}</h1>
+        <div className="mt-1 flex flex-wrap items-start justify-between gap-2">
+          <h1 className="text-2xl font-bold">{k.ten}</h1>
+          {manage && !k.id_cha && (
+            <a href="#don-vi" className="btn btn-outline btn-sm shrink-0">
+              Cập nhật đơn vị phụ trách
+            </a>
+          )}
+        </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
             <div className="text-sm text-slate-500">Thực hiện / Kế hoạch năm</div>
@@ -350,16 +357,23 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
         </div>
       </div>
 
-      {(kids.length > 0 || manage) && (
-        <div className="card">
+      {(kids.length > 0 || (manage && !k.id_cha)) && (
+        <div className="card scroll-mt-20" id="don-vi">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="h2">Đơn vị phụ trách ({kids.length})</h2>
-            {manage && !k.id_cha && (
-              <Link href={`/chi-tieu/moi?cha=${id}`} className="btn btn-outline btn-sm">
-                + Giao thêm đơn vị
-              </Link>
-            )}
+            <h2 className="h2">Đơn vị phụ trách ({kids.length || (k.id_don_vi_phu_trach ? 1 : 0)})</h2>
           </div>
+          {!kids.length && (
+            <p className="mt-1 text-slate-600">
+              {k.ten_don_vi ? (
+                <>
+                  Đang giao cho <b>{k.ten_don_vi}</b>
+                  {k.ten_phu_trach ? ` · ${k.ten_phu_trach}` : ""}.
+                </>
+              ) : (
+                "Chưa giao đơn vị."
+              )}
+            </p>
+          )}
           {kids.length > 0 && k.loai === "cong_don" && Math.abs(sumKids - Number(k.ke_hoach_nam)) > 1e-6 && (
             <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
               Tổng các phần ({fmtNum(sumKids)}) chưa khớp chỉ tiêu xã ({fmtNum(k.ke_hoach_nam)}), còn {fmtNum(Number(k.ke_hoach_nam) - sumKids)} {k.don_vi_tinh} chưa giao.
@@ -383,6 +397,29 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
               </Link>
             ))}
           </div>
+          {manage && !k.id_cha && opts && (
+            <details className="mt-3 rounded-xl border border-brand-200 bg-brand-50/40 p-3" open={!!sp.don_vi}>
+              <summary className="cursor-pointer font-semibold text-brand-700">Cập nhật đơn vị phụ trách</summary>
+              <p className="mt-2 text-sm text-slate-600">
+                Tích để thêm đơn vị, bỏ tích để thôi giao. Chọn một đơn vị khác thay cho đơn vị hiện tại để đổi đơn vị. Khi giao từ 2 đơn vị trở lên, mỗi đơn vị có phần riêng để nhập số liệu, phần mềm tự tổng hợp toàn phường. Đơn vị bị bỏ: số liệu cũ vẫn lưu trong lịch sử nhưng không tính vào toàn phường.
+              </p>
+              <ActionForm action={updateKpiUnitsAction} confirm="Cập nhật đơn vị phụ trách cho chỉ tiêu này?" className="mt-2 space-y-2">
+                <input type="hidden" name="id" value={id} />
+                <div className="grid max-h-72 gap-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {opts.units.map((u) => {
+                    const dang = kids.length ? kids.some((c) => c.id_don_vi_phu_trach === u.id) : k.id_don_vi_phu_trach === u.id;
+                    return (
+                      <label key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-slate-50">
+                        <input type="checkbox" name="don_vi_nhieu" value={u.id} defaultChecked={dang} className="h-4 w-4 accent-brand-600" />
+                        <span className={`text-[15px] ${dang ? "font-semibold" : ""}`}>{u.ten}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <Submit>Cập nhật đơn vị phụ trách</Submit>
+              </ActionForm>
+            </details>
+          )}
         </div>
       )}
 

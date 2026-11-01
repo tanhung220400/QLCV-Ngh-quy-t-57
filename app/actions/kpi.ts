@@ -104,6 +104,99 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
   return { redirect: `/chi-tieu/${idCha && !id ? idCha : newId}` };
 }
 
+type Q = Awaited<ReturnType<typeof db>>;
+
+/** Trưởng (hoặc người đứng đầu) đơn vị để giao phụ trách phần chỉ tiêu */
+async function truongDonVi(sql: Q, dv: number): Promise<number | null> {
+  const h = await sql`SELECT id FROM nguoi_dung WHERE (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv}) AND vai_tro IN ('truong_don_vi','truong_thon','lanh_dao') AND trang_thai = 'hoat_dong'
+                      ORDER BY CASE WHEN id_don_vi = ${dv} THEN 0 ELSE 1 END, CASE WHEN COALESCE(chuc_vu, '') ILIKE 'Phó%' THEN 1 ELSE 0 END, id LIMIT 1`;
+  return (h[0]?.id as number) ?? null;
+}
+
+/**
+ * Cập nhật đơn vị phụ trách của chỉ tiêu: thêm, bỏ, đổi đơn vị.
+ *  - 1 đơn vị, chỉ tiêu chưa chia phần: đổi đơn vị (số liệu đã nhập giữ nguyên).
+ *  - Nhiều đơn vị: mỗi đơn vị một phần; chỉ tiêu đang giao 1 đơn vị thì phần số liệu cũ chuyển sang phần của đơn vị đó.
+ *  - Đơn vị bị bỏ: phần của đơn vị chuyển sang “đã hủy” (lịch sử, số liệu vẫn lưu, không tính vào toàn phường).
+ */
+export async function updateKpiUnitsAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const user = await getUser();
+  if (!user) return { redirect: "/dang-nhap" };
+  if (!canManageKpi(user)) return { error: "Bạn không có quyền cập nhật đơn vị phụ trách." };
+  const id = Number(str(fd, "id"));
+  const sql = await db();
+  const k = (await sql`SELECT * FROM chi_tieu WHERE id = ${id} AND NOT huy`)[0];
+  if (!k) return { error: "Không tìm thấy chỉ tiêu." };
+  if (k.id_cha) return { error: "Đây là phần chỉ tiêu của một đơn vị. Cập nhật đơn vị phụ trách ở chỉ tiêu chung." };
+  const chon = [...new Set(fd.getAll("don_vi_nhieu").map(Number).filter(Boolean))];
+  if (!chon.length) return { error: "Chọn ít nhất một đơn vị phụ trách." };
+  const kids = await sql`SELECT id, id_don_vi_phu_trach AS dv, ten FROM chi_tieu WHERE id_cha = ${id} AND NOT huy ORDER BY thu_tu, id`;
+  const tenDv = new Map((await sql`SELECT id, ten FROM don_vi`).map((r) => [r.id as number, r.ten as string]));
+  const them: string[] = [];
+  const bo: string[] = [];
+  const thongBao: { uid: number; ten: string; idCt: number }[] = [];
+  await sql.begin(async (tx) => {
+    // chỉ tiêu một đơn vị, chưa chia phần, chọn một đơn vị: đổi đơn vị
+    if (!kids.length && chon.length === 1) {
+      if (chon[0] === k.id_don_vi_phu_trach) return;
+      const pt = await truongDonVi(tx as never, chon[0]);
+      await tx`UPDATE chi_tieu SET id_don_vi_phu_trach = ${chon[0]}, id_phu_trach = ${pt} WHERE id = ${id}`;
+      if (k.id_don_vi_phu_trach) bo.push(tenDv.get(k.id_don_vi_phu_trach) || "");
+      them.push(tenDv.get(chon[0]) || "");
+      if (pt) thongBao.push({ uid: pt, ten: k.ten, idCt: id });
+      await writeLog(tx, user.id, "doi_don_vi_chi_tieu", "chi_tieu", id, { don_vi: k.id_don_vi_phu_trach }, { don_vi: chon[0] });
+      return;
+    }
+    const n = chon.length;
+    const khCon = k.loai === "cong_don" ? Math.round((Number(k.ke_hoach_nam) / n) * 100) / 100 : Number(k.ke_hoach_nam);
+    let thuTu = kids.length;
+    const coPhan = new Map<number, number>(kids.map((c) => [c.dv as number, c.id as number]));
+    const taoPhan = async (dv: number) => {
+      const pt = await truongDonVi(tx as never, dv);
+      const { id: _id, tao_luc: _t, ...goc } = k;
+      void _id;
+      void _t;
+      const con = { ...goc, ten: `${k.ten} — ${tenDv.get(dv) ?? ""}`, ke_hoach_nam: khCon, id_don_vi_phu_trach: dv, id_phu_trach: pt, id_cha: id, thu_tu: ++thuTu, huy: false };
+      const [r] = await tx`INSERT INTO chi_tieu ${tx(con as never)} RETURNING id`;
+      them.push(tenDv.get(dv) || "");
+      if (pt) thongBao.push({ uid: pt, ten: con.ten, idCt: r.id });
+      return r.id as number;
+    };
+    // chỉ tiêu đang giao 1 đơn vị (chưa chia phần): tạo phần cho đơn vị cũ và chuyển số liệu đã nhập sang phần đó
+    if (!kids.length && k.id_don_vi_phu_trach) {
+      const cu = k.id_don_vi_phu_trach as number;
+      const nTb = thongBao.length;
+      const pid = await taoPhan(cu);
+      them.pop();
+      thongBao.length = nTb; // đơn vị cũ không cần báo “được giao”
+      await tx`UPDATE chi_tieu_so_lieu SET id_chi_tieu = ${pid} WHERE id_chi_tieu = ${id}`;
+      await tx`UPDATE chi_tieu SET id_don_vi_phu_trach = NULL, id_phu_trach = NULL WHERE id = ${id}`;
+      coPhan.set(cu, pid);
+      if (!chon.includes(cu)) {
+        await tx`UPDATE chi_tieu SET huy = TRUE WHERE id = ${pid}`;
+        bo.push(tenDv.get(cu) || "");
+      }
+    }
+    for (const dv of chon) if (!coPhan.has(dv)) await taoPhan(dv);
+    for (const [dv, cid] of coPhan)
+      if (!chon.includes(dv) && kids.some((c) => c.id === cid)) {
+        await tx`UPDATE chi_tieu SET huy = TRUE WHERE id = ${cid}`;
+        bo.push(tenDv.get(dv) || "");
+      }
+    // chỉ tiêu cộng dồn: chia đều lại kế hoạch cho các phần khi đổi số đơn vị
+    if (k.loai === "cong_don" && (them.length || bo.length)) await tx`UPDATE chi_tieu SET ke_hoach_nam = ${khCon} WHERE id_cha = ${id} AND NOT huy`;
+    await writeLog(tx, user.id, "cap_nhat_don_vi_chi_tieu", "chi_tieu", id, { don_vi: [...coPhan.keys()] }, { don_vi: chon, them, bo });
+  });
+  for (const t of thongBao)
+    await notify(sql, [t.uid], "giao_chi_tieu", `Được giao phụ trách chỉ tiêu: ${t.ten}`, `Năm ${k.nam}`, "chi_tieu", t.idCt, `giaoct:${t.idCt}`, user.id);
+  after(() => flushSms().catch(() => {}));
+  if (!them.length && !bo.length) return { ok: true, message: "Không có thay đổi." };
+  return {
+    ok: true,
+    message: [them.length && `Đã giao thêm: ${them.join(", ")}.`, bo.length && `Đã bỏ: ${bo.join(", ")} (số liệu cũ vẫn lưu trong lịch sử).`, k.loai === "cong_don" && "Kế hoạch năm đã chia đều lại cho các đơn vị, sửa từng phần nếu cần."].filter(Boolean).join(" "),
+  };
+}
+
 export async function deleteKpiAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const user = await getUser();
   if (!user || !canManageKpi(user)) return { error: "Không có quyền." };

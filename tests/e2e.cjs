@@ -975,6 +975,42 @@ const day = (n) => {
   ok("số hồ sơ toàn trình / một phần / trực tiếp theo đơn vị", hsTxt.includes("8/10 hồ sơ toàn trình = 80%") && hsTxt.includes("2/10 hồ sơ toàn trình = 20%"), hsTxt.slice(0, 600));
   ok("tỷ lệ toàn trình toàn phường = tổng toàn trình ÷ tổng hồ sơ", hsTxt.includes("Toàn phường: 10 hồ sơ toàn trình / 20 hồ sơ tiếp nhận") && hsTxt.includes("50% toàn trình"), hsTxt.slice(0, 600));
   ok("bảng toàn phường theo kỳ", hsTxt.includes("Toàn phường theo kỳ") && /2\/2/.test(hsTxt));
+  // cập nhật đơn vị phụ trách: thêm Trung tâm, bỏ Phòng Văn hóa
+  const capNhatDv = async (url, them, bo) => {
+    await page.goto(url + "?don_vi=1");
+    const f = page.locator('form:has(button:has-text("Cập nhật đơn vị phụ trách"))');
+    for (const t of them) await f.locator(`label:has-text("${t}") input`).check();
+    for (const t of bo) await f.locator(`label:has-text("${t}") input`).uncheck();
+    await f.locator('button:has-text("Cập nhật đơn vị phụ trách")').click();
+    await page.waitForSelector("text=/Đã giao thêm|Đã bỏ|Không có thay đổi/");
+    await page.reload({ waitUntil: "networkidle" });
+    return (await page.locator("#don-vi").innerText()).replace(/\s+/g, " ");
+  };
+  let dvTxt = await capNhatDv(ctUrl, ["Trung tâm Phục vụ hành chính công"], ["Phòng Văn hóa - Xã hội"]);
+  ok("cập nhật đơn vị phụ trách: thêm, bỏ đơn vị", dvTxt.includes("Đơn vị phụ trách (2)") && dvTxt.includes("Trung tâm Phục vụ hành chính công") && !/— Phòng Văn hóa - Xã hội/.test(dvTxt), dvTxt.slice(0, 300));
+  const hs2 = (await page.locator("main").innerText()).replace(/\s+/g, " ");
+  ok("bỏ đơn vị thì không tính vào toàn phường", hs2.includes("Toàn phường: 8 hồ sơ toàn trình / 10 hồ sơ tiếp nhận"), hs2.slice(0, 400));
+  // chỉ tiêu đang giao 1 đơn vị, đã có số liệu: thêm đơn vị thì số liệu cũ chuyển sang phần của đơn vị cũ
+  await page.goto(BASE + "/chi-tieu?mo=tat_ca");
+  const bhyt = await page.evaluate(() => [...document.querySelectorAll("main a")].find((a) => a.textContent.includes("Tỷ lệ người dân tham gia bảo hiểm y tế"))?.getAttribute("href"));
+  dvTxt = await capNhatDv(BASE + bhyt, ["Phòng Kinh tế"], []);
+  ok("chuyển chỉ tiêu 1 đơn vị thành nhiều đơn vị", dvTxt.includes("Đơn vị phụ trách (2)") && dvTxt.includes("Phòng Văn hóa - Xã hội") && dvTxt.includes("Phòng Kinh tế"), dvTxt.slice(0, 300));
+  const bhTxt = (await page.locator("main").innerText()).replace(/\s+/g, " ");
+  ok("số liệu cũ chuyển sang phần của đơn vị cũ", /93,2/.test(bhTxt), bhTxt.slice(0, 500));
+  // đổi đơn vị của chỉ tiêu 1 đơn vị
+  await page.goto(BASE + "/chi-tieu/moi");
+  await page.fill('input[name="ten"]', "Chỉ tiêu đổi đơn vị kiểm thử");
+  await page.selectOption('select[name="linh_vuc"]', { index: 1 });
+  await page.fill('input[name="don_vi_tinh"]', "cuộc");
+  await page.fill('input[name="ke_hoach_nam"]', "10");
+  await page.check('label:has-text("Phòng Kinh tế") input[name="don_vi_nhieu"]');
+  await page.click('button:has-text("Thêm chỉ tiêu")');
+  await page.waitForURL(/chi-tieu\/\d+$/, { waitUntil: "commit" });
+  const doiUrl = page.url();
+  dvTxt = await capNhatDv(doiUrl, ["Phòng Văn hóa - Xã hội"], ["Phòng Kinh tế"]);
+  ok("đổi đơn vị phụ trách", dvTxt.includes("Đang giao cho Phòng Văn hóa - Xã hội") && dvTxt.includes("Đơn vị phụ trách (1)"), dvTxt.slice(0, 300));
+  await page.goto(BASE + "/chi-tieu?mo=tat_ca");
+  ok("danh sách chỉ tiêu có nút cập nhật đơn vị", (await page.locator('a[aria-label="Cập nhật đơn vị phụ trách: Chỉ tiêu đổi đơn vị kiểm thử"]').count()) === 1);
   // cài đặt người ký thay
   await page.goto(BASE + "/quan-tri?muc=cai_dat");
   await page.fill('input[name="nguoi_ky"]', "Trần Thị Châu");

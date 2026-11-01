@@ -129,6 +129,13 @@ export function KpiForm({
               ))}
             </select>
           </div>
+        ) : k ? (
+          <div className="sm:col-span-2 lg:col-span-3">
+            <input type="hidden" name="id_don_vi_phu_trach" value={String(k.id_don_vi_phu_trach ?? "")} />
+            <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              Đơn vị phụ trách: thay đổi hoặc thêm đơn vị ở mục <a href="#don-vi" className="font-semibold text-brand-700 underline">Cập nhật đơn vị phụ trách</a>.
+            </p>
+          </div>
         ) : (
           <fieldset className="sm:col-span-2 lg:col-span-3">
             <input type="hidden" name="co_don_vi_nhieu" value="1" />

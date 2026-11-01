@@ -6,6 +6,7 @@ import { loadKpis } from "@/lib/kpi";
 import { getSettings } from "@/lib/settings";
 import { KpiCount, KpiDot } from "@/components/Charts";
 import { vnDate } from "@/lib/time";
+import { Icon } from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -113,19 +114,26 @@ export default async function KpiList({ searchParams }: { searchParams: Promise<
               </summary>
               <ul className="divide-y divide-slate-100 border-t border-slate-100">
                 {list.map((k) => (
-                  <li key={k.id}>
-                    <Link href={`/chi-tieu/${k.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+                  <li key={k.id} className="flex items-center">
+                    <Link href={`/chi-tieu/${k.id}`} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 hover:bg-slate-50">
                       <KpiDot mau={k.mau} />
                       <span className="min-w-0 flex-1">
                         <span className="font-medium">{k.ten}</span>
                         {k.cho_xac_nhan > 0 && <span className="ml-2 text-sm font-semibold text-amber-700">· chờ xác nhận</span>}
-                        {k.so_phan_ra > 0 && <span className="ml-2 text-sm text-slate-500">· {k.so_phan_ra} phần phân rã</span>}
+                        <span className="block text-sm text-slate-500">
+                          {k.so_phan_ra > 0 ? `${k.so_phan_ra} đơn vị phụ trách` : k.ten_don_vi || k.ten_phu_trach || "Chưa giao đơn vị"}
+                        </span>
                       </span>
                       <span className="w-14 text-right font-semibold tabular-nums">{k.pct == null ? "–" : `${Math.round(k.pct)}%`}</span>
                       <span className="text-slate-400" aria-hidden>
                         ›
                       </span>
                     </Link>
+                    {manage && !k.id_cha && (
+                      <Link href={`/chi-tieu/${k.id}?don_vi=1#don-vi`} className="mr-2 shrink-0 rounded-lg px-2 py-1 text-sm text-brand-700 hover:bg-brand-50" title="Cập nhật đơn vị phụ trách" aria-label={`Cập nhật đơn vị phụ trách: ${k.ten}`}>
+                        <Icon name="users" className="h-[18px] w-[18px]" />
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
