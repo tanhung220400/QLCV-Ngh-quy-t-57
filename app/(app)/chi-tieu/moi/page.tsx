@@ -17,7 +17,7 @@ export default async function NewKpi({ searchParams }: { searchParams: Promise<R
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <h1 className="h1">{parent ? `Phân rã: ${parent.ten}` : "Thêm chỉ tiêu"}</h1>
-      {parent && <p className="text-slate-600">Giao một phần chỉ tiêu xuống đơn vị hoặc thôn. Với chỉ tiêu cộng dồn, tổng các phần nên bằng chỉ tiêu xã ({String(parent.ke_hoach_nam)} {parent.don_vi_tinh}).</p>}
+      {parent && <p className="text-slate-600">Giao một phần chỉ tiêu xuống đơn vị hoặc khu phố. Với chỉ tiêu cộng dồn, tổng các phần nên bằng chỉ tiêu xã ({String(parent.ke_hoach_nam)} {parent.don_vi_tinh}).</p>}
       <div className="card">
         <KpiForm parent={parent} {...o} />
       </div>

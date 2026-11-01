@@ -74,7 +74,7 @@ export function BulkImport({ units, people, linhVuc, leaders, showGiao, defaultD
           onChange={(e) => setText(e.target.value)}
           rows={8}
           className="input font-mono text-sm"
-          placeholder={"1. Rà soát hộ nghèo năm 2026 | Phòng Văn hóa - Xã hội | 15/11/2026 | Báo cáo\n2. Kiểm tra công trình xây dựng thôn Đông | Phòng Kinh tế | 10/11/2026 | Biên bản"}
+          placeholder={"1. Rà soát hộ nghèo năm 2026 | Phòng Văn hóa - Xã hội | 15/11/2026 | Báo cáo\n2. Kiểm tra công trình xây dựng khu phố Đông | Phòng Kinh tế | 10/11/2026 | Biên bản"}
         />
         <div className="grid gap-3 sm:grid-cols-3">
           <div>

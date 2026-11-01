@@ -34,8 +34,8 @@ async function seedDemo(tx: Tx, ld: number, vp: number) {
   const kt = await unit("Phòng Kinh tế", "phong", 2);
   const vh = await unit("Phòng Văn hóa - Xã hội", "phong", 3);
   const hcc = await unit("Trung tâm Phục vụ hành chính công", "trung_tam", 4);
-  const th1 = await unit("Thôn Đông", "thon", 5);
-  const th2 = await unit("Thôn Tây", "thon", 6);
+  const th1 = await unit("Khu phố Đông", "thon", 5);
+  const th2 = await unit("Khu phố Tây", "thon", 6);
   const user = async (ho_ten: string, u: string, dv: number, chuc_vu: string, vai_tro: string, lv: string[] = []) =>
     (await tx`INSERT INTO nguoi_dung (ho_ten, ten_dang_nhap, mat_khau, id_don_vi, chuc_vu, vai_tro, linh_vuc_phu_trach, sdt)
       VALUES (${ho_ten}, ${u}, ${pw}, ${dv}, ${chuc_vu}, ${vai_tro}, ${lv}, ${"09" + String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}) RETURNING id`)[0].id as number;
@@ -67,9 +67,9 @@ async function seedDemo(tx: Tx, ld: number, vp: number) {
   };
   const tasks: T[] = [
     { ten: "Rà soát, thống kê diện tích đất công do xã quản lý", nguon: "Văn bản của tỉnh", vb: "125/UBND-TNMT", lv: "Đất đai", uu: "khan", han: -4, sp: "Báo cáo", giao: pkt, chu: tkt, dv: kt, st: "dang_thuc_hien", pct: 60, thuc: k1 },
-    { ten: "Lập kế hoạch giải phóng mặt bằng tuyến đường liên thôn", nguon: "Kết luận họp", hop: "Giao ban UBND tuần 42", lv: "Xây dựng, giao thông", han: 12, sp: "Kế hoạch", giao: ctx, chu: tkt, dv: kt, st: "dang_thuc_hien", pct: 30, ph: [t1] },
+    { ten: "Lập kế hoạch giải phóng mặt bằng tuyến đường liên khu phố", nguon: "Kết luận họp", hop: "Giao ban UBND tuần 42", lv: "Xây dựng, giao thông", han: 12, sp: "Kế hoạch", giao: ctx, chu: tkt, dv: kt, st: "dang_thuc_hien", pct: 30, ph: [t1] },
     { ten: "Báo cáo tình hình sản xuất vụ Đông", nguon: "Kế hoạch năm", lv: "Nông nghiệp, môi trường", han: 2, sp: "Báo cáo", giao: pkt, chu: k2, dv: kt, st: "da_nhan", dk: "thang" },
-    { ten: "Kiểm tra công trình xây dựng không phép tại thôn Đông", nguon: "Chỉ đạo trực tiếp", lv: "Xây dựng, giao thông", uu: "hoa_toc", han: 1, sp: "Biên bản", giao: ctx, chu: k1, dv: kt, st: "moi_giao", ph: [t1] },
+    { ten: "Kiểm tra công trình xây dựng không phép tại khu phố Đông", nguon: "Chỉ đạo trực tiếp", lv: "Xây dựng, giao thông", uu: "hoa_toc", han: 1, sp: "Biên bản", giao: ctx, chu: k1, dv: kt, st: "moi_giao", ph: [t1] },
     { ten: "Tổng hợp số liệu thu ngân sách quý III", nguon: "Văn bản của tỉnh", vb: "88/STC-NS", lv: "Kinh tế, tài chính", han: -12, sp: "Số liệu", giao: pkt, chu: tkt, dv: kt, st: "hoan_thanh", xong: -14 },
     { ten: "Tuyên truyền vận động người dân tham gia BHYT hộ gia đình", nguon: "Nghị quyết HĐND xã", lv: "Giáo dục, y tế", han: 20, sp: "Báo cáo", giao: pvx, chu: tvh, dv: vh, st: "dang_thuc_hien", pct: 45, thuc: v1 },
     { ten: "Chuẩn bị hồ sơ công nhận xã đạt chuẩn văn hóa", nguon: "Kế hoạch năm", lv: "Văn hóa - xã hội", han: -2, sp: "Tờ trình", giao: pvx, chu: tvh, dv: vh, st: "cho_duyet", pct: 100 },
@@ -78,7 +78,7 @@ async function seedDemo(tx: Tx, ld: number, vp: number) {
     { ten: "Triển khai thanh toán không dùng tiền mặt tại Trung tâm HCC", nguon: "Nghị quyết HĐND xã", lv: "Khoa học, công nghệ, chuyển đổi số", han: -7, sp: "Báo cáo", giao: ctx, chu: thc, dv: hcc, st: "dang_thuc_hien", pct: 70 },
     { ten: "Xây dựng báo cáo kết quả thực hiện Nghị quyết 57 quý IV", nguon: "Văn bản của tỉnh", vb: "57-NQ/TW", lv: "Khoa học, công nghệ, chuyển đổi số", han: 25, sp: "Báo cáo", giao: bt, chu: vph, dv: vp, st: "moi_giao" },
     { ten: "Chuẩn bị nội dung kỳ họp HĐND xã cuối năm", nguon: "Kết luận họp", hop: "Họp Thường trực HĐND tháng 10", lv: "Nội vụ, xây dựng chính quyền", han: 15, sp: "Tờ trình", giao: bt, chu: vph, dv: vp, st: "dang_thuc_hien", pct: 25 },
-    { ten: "Xử lý điểm tập kết rác tự phát ven kênh thôn Tây", nguon: "Chỉ đạo trực tiếp", lv: "Nông nghiệp, môi trường", uu: "khan", han: -1, sp: "Báo cáo", giao: pkt, chu: k2, dv: kt, st: "dang_thuc_hien", pct: 50 },
+    { ten: "Xử lý điểm tập kết rác tự phát ven kênh khu phố Tây", nguon: "Chỉ đạo trực tiếp", lv: "Nông nghiệp, môi trường", uu: "khan", han: -1, sp: "Báo cáo", giao: pkt, chu: k2, dv: kt, st: "dang_thuc_hien", pct: 50 },
     { ten: "Cập nhật số liệu dân số, lao động trên hệ thống của tỉnh", nguon: "Văn bản của tỉnh", vb: "301/UBND-VX", lv: "Văn hóa - xã hội", han: -20, sp: "Số liệu", giao: pvx, chu: v1, dv: vh, st: "hoan_thanh", xong: -18 },
     { ten: "Kiểm tra an toàn phòng cháy tại chợ xã", nguon: "Kết luận họp", hop: "Giao ban UBND tuần 42", lv: "An ninh, quốc phòng", han: 6, sp: "Biên bản", giao: ctx, chu: tkt, dv: kt, st: "tra_lai" },
   ];
@@ -152,8 +152,8 @@ async function seedDemo(tx: Tx, ld: number, vp: number) {
         VALUES (${r.id}, ${`${nam}-${String(m).padStart(2, "0")}`}, ${v}, ${k.pt}, TRUE, ${k.pt === v1 ? tvh : k.pt}, ${fromVN(`${nam}-${String(m).padStart(2, "0")}-25`, "10:00")})`;
     }
   }
-  // Phân rã chỉ tiêu thu ngân sách xuống thôn
-  for (const [ten, dv, kh] of [["Thu ngân sách - Thôn Đông", th1, 4000], ["Thu ngân sách - Thôn Tây", th2, 3000]] as const) {
+  // Phân rã chỉ tiêu thu ngân sách xuống khu phố
+  for (const [ten, dv, kh] of [["Thu ngân sách - Khu phố Đông", th1, 4000], ["Thu ngân sách - Khu phố Tây", th2, 3000]] as const) {
     await tx`INSERT INTO chi_tieu (ten, linh_vuc, nguon, nhom, don_vi_tinh, loai, chieu_tot, ke_hoach_nam, nam, han, id_phu_trach, id_don_vi_phu_trach, id_lanh_dao, ky_cap_nhat, id_cha)
       VALUES (${ten}, 'Kinh tế, tài chính', 'Nghị quyết HĐND xã', 'Kinh tế', 'triệu đồng', 'cong_don', 'cao', ${kh}, ${nam}, ${`${nam}-12-31`}, ${dv === th1 ? t1 : null}, ${dv}, ${pkt}, 'thang', ${kpiIds[0]})`;
   }

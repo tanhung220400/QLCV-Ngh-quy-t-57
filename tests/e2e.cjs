@@ -363,7 +363,7 @@ const day = (n) => {
   const sideAll = await page.locator("aside").textContent();
   ok("menu có module nhập liệu", sideAll.includes("Tổ công nghệ số cộng đồng") && sideAll.includes("Phản ánh, kiến nghị"));
   const tcn = await check(page, "/m/to-cong-nghe-so", "module");
-  ok("dữ liệu mẫu NQ57 trong module", (tcn.match(/Tổ công nghệ số cộng đồng Thôn/g) || []).length >= 2);
+  ok("dữ liệu mẫu NQ57 trong module", (tcn.match(/Tổ công nghệ số cộng đồng Khu phố/g) || []).length >= 2);
   const home = await check(page, "/", "trang chủ");
   ok("trang chủ có truy cập nhanh", home.includes("Truy cập nhanh"));
   const nqTasks = await check(page, "/viec?tab=tat_ca", "quản trị");
@@ -438,7 +438,7 @@ const day = (n) => {
   ok("khôi phục bản ghi từ thùng rác", back.includes("Quán cơm Bình Dân"));
   // Quản trị xóa công việc (kèm việc con) và khôi phục
   await page.goto(BASE + "/viec?tab=tat_ca");
-  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại thôn");
+  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại khu phố");
   await page.waitForURL(/\/viec\/\d+$/, { waitUntil: "commit" });
   const delUrl = page.url().replace(BASE, "");
   await page.click("summary:has-text('Quản trị dữ liệu')");
@@ -507,7 +507,7 @@ const day = (n) => {
   ok("tiêu đề nhóm nổi bật", (await page.locator("aside div.uppercase, aside span.uppercase").allInnerTexts()).some((t) => /điều hành/i.test(t)));
   // Quay lại
   await page.goto(BASE + "/viec", { waitUntil: "networkidle" });
-  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại thôn");
+  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại khu phố");
   await page.waitForURL(/\/viec\/\d+$/, { waitUntil: "commit" });
   await page.click('button:has-text("Quay lại")');
   await page.waitForURL((u) => u.pathname === "/viec", { waitUntil: "commit" });
@@ -553,7 +553,7 @@ const day = (n) => {
   ok("mục Công việc năm cũ chứa việc năm cũ", oldList.includes("Tổng hợp số liệu thu ngân sách quý III") && oldList.includes(`Công việc năm ${curY - 1}`));
   // Nút sửa/xóa nổi bật ở trang chi tiết
   await page.goto(BASE + "/viec?tab=tat_ca", { waitUntil: "networkidle" });
-  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại thôn");
+  await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại khu phố");
   await page.waitForURL(/\/viec\/\d+$/, { waitUntil: "commit" });
   await page.click('a:has-text("✎ Sửa")');
   await page.waitForSelector('button:has-text("Lưu (quản trị)")', { state: "visible" });

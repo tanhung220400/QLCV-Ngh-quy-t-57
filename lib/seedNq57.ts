@@ -36,7 +36,7 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
   let thon = (await tx`SELECT id, ten FROM don_vi WHERE loai = 'thon' AND hoat_dong ORDER BY thu_tu, id`) as unknown as { id: number; ten: string }[];
   if (thon.length < 3) {
     const n = (await tx`SELECT coalesce(max(thu_tu), 0)::int AS n FROM don_vi`)[0].n as number;
-    for (const [i, ten] of ["Thôn Bắc", "Thôn Nam", "Thôn Trung"].slice(0, 3 - thon.length).entries()) {
+    for (const [i, ten] of ["Khu phố Bắc", "Khu phố Nam", "Khu phố Trung"].slice(0, 3 - thon.length).entries()) {
       if ((await tx`SELECT 1 FROM don_vi WHERE ten = ${ten}`).length) continue;
       const [r] = await tx`INSERT INTO don_vi (ten, loai, thu_tu) VALUES (${ten}, 'thon', ${n + i + 1}) RETURNING id, ten`;
       mk.don_vi.push(r.id);
@@ -65,8 +65,8 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
     { ten: "Kiện toàn Ban Chỉ đạo phát triển khoa học, công nghệ, đổi mới sáng tạo và chuyển đổi số của xã", lv: L.cds, ng: NQ, vb: "57-NQ/TW", han: -25, sp: "Quyết định", giao: bithu, chu: vph, st: "hoan_thanh", xong: -28 },
     { ten: "Ban hành Kế hoạch thực hiện Nghị quyết 57-NQ/TW năm 2026 của xã", mo: "Cụ thể hóa nhiệm vụ, chỉ tiêu, phân công cơ quan chủ trì, thời hạn hoàn thành", lv: L.cds, ng: NQ, vb: "57-NQ/TW", han: -18, sp: "Kế hoạch", giao: bithu, chu: vph, st: "hoan_thanh", xong: -20 },
     { ten: "Báo cáo kết quả thực hiện Nghị quyết 57 theo Bộ chỉ số giám sát (định kỳ tháng)", lv: L.cds, ng: "Văn bản của tỉnh", vb: "3158-CV/VPTW", han: 5, sp: "Báo cáo", giao: chutich, chu: vph, st: "dang_thuc_hien", pc: 40, dk: "thang" },
-    { ten: "Thành lập, kiện toàn Tổ công nghệ số cộng đồng ở 100% thôn", lv: L.xhs, ng: NQ, han: -6, sp: "Quyết định", giao: chutich, chu: H(1), st: "dang_thuc_hien", pc: 80, ph: villageHeads.map((v) => v.id).slice(0, 3) },
-    { ten: "Tổ chức các lớp “Bình dân học vụ số” cho người dân tại thôn", mo: "Hướng dẫn cài đặt, sử dụng VNeID mức 2, dịch vụ công trực tuyến, thanh toán không dùng tiền mặt, nhận diện lừa đảo trên mạng", lv: L.xhs, ng: NQ, han: 15, sp: "Báo cáo", giao: pct[1]?.id ?? chutich, chu: H(1), st: "dang_thuc_hien", pc: 35, con: [["Lớp tại " + T(0).ten, S(2), 3, "hoan_thanh"], ["Lớp tại " + T(1).ten, S(2), 8, "dang_thuc_hien"], ["Lớp tại " + T(2).ten, S(3), 14, "da_nhan"]] },
+    { ten: "Thành lập, kiện toàn Tổ công nghệ số cộng đồng ở 100% khu phố", lv: L.xhs, ng: NQ, han: -6, sp: "Quyết định", giao: chutich, chu: H(1), st: "dang_thuc_hien", pc: 80, ph: villageHeads.map((v) => v.id).slice(0, 3) },
+    { ten: "Tổ chức các lớp “Bình dân học vụ số” cho người dân tại khu phố", mo: "Hướng dẫn cài đặt, sử dụng VNeID mức 2, dịch vụ công trực tuyến, thanh toán không dùng tiền mặt, nhận diện lừa đảo trên mạng", lv: L.xhs, ng: NQ, han: 15, sp: "Báo cáo", giao: pct[1]?.id ?? chutich, chu: H(1), st: "dang_thuc_hien", pc: 35, con: [["Lớp tại " + T(0).ten, S(2), 3, "hoan_thanh"], ["Lớp tại " + T(1).ten, S(2), 8, "dang_thuc_hien"], ["Lớp tại " + T(2).ten, S(3), 14, "da_nhan"]] },
     { ten: "Phổ cập kỹ năng số cho cán bộ, công chức xã (AI cơ bản, an toàn thông tin)", lv: L.xhs, ng: NQ, han: 22, sp: "Báo cáo", giao: chutich, chu: vph, st: "da_nhan" },
     { ten: "Số hóa hồ sơ, kết quả giải quyết thủ tục hành chính còn hiệu lực", mo: "Đạt 100% hồ sơ tiếp nhận mới được số hóa; số hóa lùi dữ liệu hộ tịch từ năm 2015", lv: L.dl, ng: NQ, han: 30, sp: "Số liệu", giao: chutich, chu: H(2), st: "dang_thuc_hien", pc: 55 },
     { ten: "Rà soát, làm sạch dữ liệu dân cư phục vụ Đề án 06", lv: L.dl, ng: "Văn bản của tỉnh", vb: "06/QĐ-TTg", han: -3, sp: "Số liệu", giao: chutich, chu: S(0), st: "dang_thuc_hien", pc: 70, uu: "khan" },
@@ -75,7 +75,7 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
     { ten: "Triển khai thanh toán không dùng tiền mặt tại chợ, trường học, trạm y tế", lv: L.kts, ng: NQ, han: 26, sp: "Báo cáo", giao: pct[0]?.id ?? chutich, chu: H(0), st: "dang_thuc_hien", pc: 30 },
     { ten: "Hỗ trợ hộ sản xuất, hợp tác xã đưa sản phẩm OCOP lên sàn thương mại điện tử", lv: L.kts, ng: NQ, han: 35, sp: "Báo cáo", giao: pct[0]?.id ?? chutich, chu: S(1), st: "da_nhan" },
     { ten: "Gắn mã QR truy xuất nguồn gốc cho nông sản chủ lực", lv: L.kts, ng: "Kế hoạch năm", han: -9, sp: "Báo cáo", giao: pct[0]?.id ?? chutich, chu: S(1), st: "hoan_thanh", xong: -10 },
-    { ten: "Khảo sát hiện trạng sóng di động, cáp quang tại các thôn (mô hình Thôn số)", lv: L.hts, ng: NQ, han: 2, sp: "Báo cáo", giao: chutich, chu: S(4), st: "dang_thuc_hien", pc: 75 },
+    { ten: "Khảo sát hiện trạng sóng di động, cáp quang tại các khu phố (mô hình Khu phố số)", lv: L.hts, ng: NQ, han: 2, sp: "Báo cáo", giao: chutich, chu: S(4), st: "dang_thuc_hien", pc: 75 },
     { ten: "Lắp đặt camera an ninh tại các trục đường chính, điểm giao cắt", lv: L.hts, ng: "Nghị quyết HĐND xã", han: 45, sp: "Báo cáo", giao: chutich, chu: H(0), st: "moi_giao" },
     { ten: "Rà soát, bảo đảm an toàn thông tin cho máy tính, mạng nội bộ của UBND xã", lv: L.hts, ng: NQ, han: -1, sp: "Biên bản", giao: chutich, chu: S(4), st: "cho_duyet", pc: 100 },
     { ten: "Phát động phong trào thi đua sáng kiến, đổi mới sáng tạo năm 2026", lv: L.dmst, ng: NQ, han: -14, sp: "Kế hoạch", giao: bithu, chu: vph, st: "hoan_thanh", xong: -15 },
@@ -105,9 +105,9 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
       await tx`INSERT INTO binh_luan (id_cong_viec, id_nguoi_dung, noi_dung, loai, thoi_gian) VALUES (${r.id}, ${t.chu}, ${`Cập nhật tiến độ ${t.pc}%: đang triển khai theo kế hoạch.`}, 'tien_do', now() - interval '2 days')`;
     await writeLog(tx, t.giao, "giao_viec", "cong_viec", r.id, null, { ten: t.ten, du_lieu_mau: "nq57" });
   }
-  // checklist cho kế hoạch Thôn số
+  // checklist cho kế hoạch Khu phố số
   const ts = mk.cong_viec[tasks.findIndex((t) => t.ten.startsWith("Khảo sát hiện trạng sóng"))] ?? null;
-  if (ts) for (const [i, nd] of ["Lập phiếu khảo sát", "Khảo sát thực địa từng thôn", "Tổng hợp, đề xuất nhà mạng bổ sung trạm BTS"].entries()) await tx`INSERT INTO checklist (id_cong_viec, noi_dung, da_xong, thu_tu) VALUES (${ts}, ${nd}, ${i < 2}, ${i})`;
+  if (ts) for (const [i, nd] of ["Lập phiếu khảo sát", "Khảo sát thực địa từng khu phố", "Tổng hợp, đề xuất nhà mạng bổ sung trạm BTS"].entries()) await tx`INSERT INTO checklist (id_cong_viec, noi_dung, da_xong, thu_tu) VALUES (${ts}, ${nd}, ${i < 2}, ${i})`;
 
   // ---------- Chỉ tiêu ----------
   const nam = Number(today.slice(0, 4));
@@ -120,7 +120,7 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
     { ten: "Tỷ lệ người dân từ 14 tuổi có tài khoản VNeID mức 2", lv: L.dl, dvt: "%", loai: "ty_le", kh: 90, pt: H(3), ld: pct[0]?.id ?? chutich, f: (m) => 68 + m * 1.9 },
     { ten: "Tỷ lệ giao dịch thanh toán không dùng tiền mặt", lv: L.kts, dvt: "%", loai: "ty_le", kh: 80, pt: H(0), ld: pct[0]?.id ?? chutich, f: (m) => 45 + m * 1.8, nguon: "Kế hoạch thực hiện Nghị quyết 57" },
     { ten: "Số người dân được phổ cập kỹ năng số (Bình dân học vụ số)", lv: L.xhs, dvt: "người", loai: "cong_don", kh: 3000, pt: H(1), ld: pct[1]?.id ?? chutich, f: (m) => 180 + (m % 3) * 60 },
-    { ten: "Số thôn có Tổ công nghệ số cộng đồng hoạt động hiệu quả", lv: L.xhs, dvt: "tổ", loai: "cong_don", kh: Math.max(3, thon.length), pt: H(1), ld: pct[1]?.id ?? chutich, f: (m) => (m <= 3 ? 1 : 0) },
+    { ten: "Số khu phố có Tổ công nghệ số cộng đồng hoạt động hiệu quả", lv: L.xhs, dvt: "tổ", loai: "cong_don", kh: Math.max(3, thon.length), pt: H(1), ld: pct[1]?.id ?? chutich, f: (m) => (m <= 3 ? 1 : 0) },
     { ten: "Số sản phẩm OCOP, nông sản được đưa lên sàn thương mại điện tử", lv: L.kts, dvt: "sản phẩm", loai: "cong_don", kh: 15, pt: S(1), ld: pct[0]?.id ?? chutich, f: (m) => (m % 2 ? 1 : 2) },
     { ten: "Tỷ lệ hộ gia đình có đường truyền cáp quang", lv: L.hts, dvt: "%", loai: "ty_le", kh: 95, pt: S(4), ld: chutich, f: (m) => 82 + m * 0.9 },
     { ten: "Số sáng kiến, giải pháp đổi mới sáng tạo được công nhận", lv: L.dmst, dvt: "sáng kiến", loai: "cong_don", kh: 10, pt: vph, ld: bithu, f: (m) => (m % 3 === 0 ? 2 : 0) },
@@ -178,7 +178,7 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
       so_thanh_vien: 5 + (i % 3),
       so_luot_ho_tro: 120 + i * 37,
       trang_thai: ["Hoạt động tốt", "Hoạt động", "Hoạt động tốt", "Chưa hiệu quả"][i % 4],
-      ghi_chu: "Gồm trưởng thôn, đoàn viên thanh niên, công an viên, hội viên phụ nữ.",
+      ghi_chu: "Gồm trưởng khu phố, đoàn viên thanh niên, công an viên, hội viên phụ nữ.",
     })),
   );
   await add(
@@ -196,7 +196,7 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
     "ha-tang-so-thon",
     thon.map((t, i) => ({
       thon: t.id,
-      song_4g5g: ["4G toàn thôn", "5G", "4G một phần", "4G toàn thôn"][i % 4],
+      song_4g5g: ["4G toàn khu phố", "5G", "4G một phần", "4G toàn khu phố"][i % 4],
       cap_quang: [92, 97, 78, 88][i % 4],
       wifi_cong_cong: i % 2 === 0,
       camera: [6, 10, 2, 4][i % 4],
@@ -206,7 +206,7 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
   );
   await add("sang-kien-doi-moi", [
     { ten: "Ứng dụng mã QR tra cứu thủ tục hành chính tại bộ phận một cửa", tac_gia: "Trung tâm Phục vụ hành chính công", linh_vuc: L.cchc, nam, cap_cong_nhan: "Cấp phường", hieu_qua: "Giảm 30% thời gian hướng dẫn người dân." },
-    { ten: "Bản đồ số các điểm tập kết rác, camera an ninh của thôn", tac_gia: names[2], linh_vuc: L.hts, nam, cap_cong_nhan: "Chưa công nhận" },
+    { ten: "Bản đồ số các điểm tập kết rác, camera an ninh của khu phố", tac_gia: names[2], linh_vuc: L.hts, nam, cap_cong_nhan: "Chưa công nhận" },
     { ten: "Nhóm Zalo “Hỏi nhanh - Đáp gọn” hỗ trợ dịch vụ công", tac_gia: names[3], linh_vuc: L.cds, nam: nam - 1, cap_cong_nhan: "Cấp tỉnh", hieu_qua: "Hơn 1.200 lượt hỏi đáp được trả lời trong ngày." },
     { ten: "Sổ tay điện tử quy trình nội bộ cho công chức mới", tac_gia: names[4], linh_vuc: L.dmst, nam, cap_cong_nhan: "Cấp phường" },
   ]);
@@ -218,9 +218,9 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
     { san_pham: "Nấm sò sạch", chu_the: `Hộ ${names[7]}`, thon: T(1).id, ocop: "Chưa xếp hạng", san_tmdt: ["Postmart"], ma_qr: false },
   ]);
   await add("phan-anh-kien-nghi", [
-    { nguoi_phan_anh: names[0], sdt: "0912000111", thon: T(0).id, noi_dung: "Đèn chiếu sáng đường liên thôn bị hỏng 3 bóng.", kenh: "Zalo", linh_vuc: "Xây dựng, giao thông", ngay_nhan: d(-12), can_bo: S(0), trang_thai: "Đã xử lý", ket_qua: "Đã thay bóng đèn ngày " + d(-9).split("-").reverse().join("/") },
+    { nguoi_phan_anh: names[0], sdt: "0912000111", thon: T(0).id, noi_dung: "Đèn chiếu sáng đường liên khu phố bị hỏng 3 bóng.", kenh: "Zalo", linh_vuc: "Xây dựng, giao thông", ngay_nhan: d(-12), can_bo: S(0), trang_thai: "Đã xử lý", ket_qua: "Đã thay bóng đèn ngày " + d(-9).split("-").reverse().join("/") },
     { nguoi_phan_anh: names[1], sdt: "0912000222", thon: T(1).id, noi_dung: "Đề nghị hướng dẫn đăng ký khai sinh trực tuyến cho con.", kenh: "Cổng dịch vụ công", linh_vuc: "Tư pháp, hộ tịch", ngay_nhan: d(-5), can_bo: S(3), trang_thai: "Đã xử lý" },
-    { nguoi_phan_anh: names[4], thon: T(2).id, noi_dung: "Sóng điện thoại yếu ở khu vực cuối thôn, khó dùng VNeID.", kenh: "Trực tiếp", linh_vuc: L.hts, ngay_nhan: d(-3), can_bo: S(4), trang_thai: "Đang xử lý" },
+    { nguoi_phan_anh: names[4], thon: T(2).id, noi_dung: "Sóng điện thoại yếu ở khu vực cuối khu phố, khó dùng VNeID.", kenh: "Trực tiếp", linh_vuc: L.hts, ngay_nhan: d(-3), can_bo: S(4), trang_thai: "Đang xử lý" },
     { nguoi_phan_anh: names[6], sdt: "0912000333", thon: T(0).id, noi_dung: "Rác thải tồn đọng tại điểm tập kết gần chợ.", kenh: "Ứng dụng phản ánh", linh_vuc: "Nông nghiệp, môi trường", ngay_nhan: d(-1), trang_thai: "Mới tiếp nhận" },
     { nguoi_phan_anh: names[7], thon: T(1).id, noi_dung: "Tranh chấp ranh giới đất giữa hai hộ liền kề.", kenh: "Điện thoại", linh_vuc: "Đất đai", ngay_nhan: d(-8), can_bo: S(0), trang_thai: "Chuyển cấp trên" },
   ]);
