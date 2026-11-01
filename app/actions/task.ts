@@ -11,7 +11,7 @@ import { fromVN, fmtDue } from "@/lib/time";
 import { recomputePercent } from "@/lib/tasks";
 import { TRANG_THAI, UU_TIEN } from "@/lib/const";
 import { trashTask, trashSimple } from "@/lib/trash";
-import { kiemTraGiao } from "@/lib/giaoViec";
+import { kiemTraGiao, truongDonVi } from "@/lib/giaoViec";
 import type { ActionState } from "@/components/ActionForm";
 
 type Tx = postgres.TransactionSql;
@@ -34,14 +34,7 @@ async function allowedAssignees(user: User): Promise<{ all: boolean; units: numb
 }
 
 /** Người đứng đầu đơn vị: cấp trưởng (đơn vị chính hoặc kiêm nhiệm), rồi cấp phó, theo vai trò */
-async function unitHead(sql: Tx, dv: number): Promise<number | null> {
-  const r = await sql`SELECT id, CASE WHEN id_don_vi = ${dv} THEN chuc_vu ELSE chuc_vu_kiem_nhiem END AS cv, vai_tro FROM nguoi_dung
-    WHERE (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv}) AND trang_thai = 'hoat_dong'`;
-  const { bacChucVu } = await import("@/lib/canBo");
-  const role: Record<string, number> = { truong_don_vi: 0, truong_thon: 1, lanh_dao: 2 };
-  r.sort((a, b) => bacChucVu(a.cv) - bacChucVu(b.cv) || (role[a.vai_tro] ?? 3) - (role[b.vai_tro] ?? 3) || a.id - b.id);
-  return r[0]?.id ?? null;
-}
+const unitHead = (sql: Tx, dv: number) => truongDonVi(sql, dv);
 
 function parseDue(fd: FormData): { han: Date; coGio: boolean } | null {
   const ngay = str(fd, "han_ngay");

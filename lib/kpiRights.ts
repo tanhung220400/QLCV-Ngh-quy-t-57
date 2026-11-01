@@ -18,7 +18,7 @@ export async function kpiRights(user: User, k: { id_phu_trach: number | null; id
   const owner = pid.includes(k.id_phu_trach ?? -1);
   return {
     manage,
-    enter: manage || (q.has("ct.nhap_so_lieu") && owner) || (q.has("ct.xac_nhan") && ofUnit),
+    enter: manage || (q.has("ct.nhap_so_lieu") && (owner || ofUnit)) || (q.has("ct.xac_nhan") && ofUnit),
     confirm: manage || (q.has("ct.xac_nhan") && (ofUnit || pid.includes(k.id_lanh_dao ?? -1))),
   };
 }

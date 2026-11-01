@@ -47,3 +47,17 @@ export async function nguoiDuocGiao(sql: Q, user: User, idViecTren: number | nul
   const tren = (await chuoiTren(sql, idViecTren)).filter((x) => x !== user.id);
   return new Set(all.filter((n) => !lyDoKhongGiao(giao, n, units, tren)).map((n) => n.id));
 }
+
+/**
+ * Người đứng đầu đơn vị: ưu tiên cấp trưởng, rồi cấp phó, rồi cán bộ (theo chức vụ tại đơn vị đó);
+ * cùng bậc thì ưu tiên người có đơn vị chính là đơn vị này, rồi vai trò trưởng đơn vị. Chỉ xét tài khoản đang hoạt động.
+ */
+export async function truongDonVi(sql: Q, dv: number | null | undefined): Promise<number | null> {
+  if (!dv) return null;
+  const r = await sql`SELECT id, vai_tro, id_don_vi = ${dv} AS chinh, CASE WHEN id_don_vi = ${dv} THEN chuc_vu ELSE chuc_vu_kiem_nhiem END AS cv
+                      FROM nguoi_dung WHERE (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv}) AND trang_thai = 'hoat_dong' AND ten_dang_nhap <> 'admin'`;
+  const { bacChucVu } = await import("./canBo");
+  const role: Record<string, number> = { truong_don_vi: 0, truong_thon: 1, lanh_dao: 2 };
+  r.sort((a, b) => bacChucVu(a.cv) - bacChucVu(b.cv) || Number(b.chinh) - Number(a.chinh) || (role[a.vai_tro] ?? 3) - (role[b.vai_tro] ?? 3) || a.id - b.id);
+  return (r[0]?.id as number) ?? null;
+}

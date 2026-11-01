@@ -4,6 +4,7 @@ import { notify, writeLog } from "./log";
 import { workingDaysUntil, vnDate, vnTime, isWorkingDay, fmtDue } from "./time";
 import { nextDue } from "./tasks";
 import { loadKpis, currentPeriod, periodLabel } from "./kpi";
+import { truongDonVi } from "./giaoViec";
 
 /**
  * Quét hạn và gửi nhắc việc (mục 4.3), tạo việc định kỳ, nhắc chốt số liệu chỉ tiêu.
@@ -37,7 +38,9 @@ export async function runScan(force = false) {
     return specific.length ? specific : leaders.filter((l) => !l.linh_vuc_phu_trach.length).map((l) => l.id);
   };
   const unitHeads = async (dv: number | null) =>
-    dv ? ((await sql`SELECT id FROM nguoi_dung WHERE id_don_vi = ${dv} AND vai_tro = 'truong_don_vi' AND trang_thai = 'hoat_dong'`).map((r) => r.id) as number[]) : [];
+    dv
+      ? [...new Set([await truongDonVi(sql, dv), ...((await sql`SELECT id FROM nguoi_dung WHERE id_don_vi = ${dv} AND vai_tro = 'truong_don_vi' AND trang_thai = 'hoat_dong'`).map((r) => r.id) as number[])].filter((x): x is number => !!x))]
+      : [];
 
   const tasks = await sql`
     SELECT id, ten, trang_thai, han, han_co_gio, linh_vuc, id_chu_tri, id_nguoi_thuc_hien, id_nguoi_giao, id_don_vi_chu_tri, tao_luc

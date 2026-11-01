@@ -7,6 +7,7 @@ import { canManageKpi, canSeeKpi } from "@/lib/perm";
 import { kpiRights } from "@/lib/kpiRights";
 import { notify, writeLog } from "@/lib/log";
 import { periodLabel } from "@/lib/kpi";
+import { truongDonVi as dauDonVi } from "@/lib/giaoViec";
 import type { ActionState } from "@/components/ActionForm";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -64,9 +65,12 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
   const miss = [!v.ten && "tên", !v.nguon && "nguồn", !v.nhom && "nhóm", !v.don_vi_tinh && "đơn vị tính", Number.isNaN(kh) && "kế hoạch năm", !v.nam && "năm", !/^\d{4}-\d{2}-\d{2}$/.test(v.han) && "ngày hết hạn", !v.id_phu_trach && !v.id_don_vi_phu_trach && nhieu.length < 2 && "người hoặc đơn vị phụ trách"].filter(Boolean);
   if (miss.length) return { error: `Còn thiếu: ${miss.join(", ")}.` };
   if (v.loai === "dat_khong") v.ke_hoach_nam = 1;
+  if (v.id_phu_trach && v.id_don_vi_phu_trach) {
+    const thuoc = await sql`SELECT 1 FROM nguoi_dung WHERE id = ${v.id_phu_trach as number} AND (id_don_vi = ${v.id_don_vi_phu_trach as number} OR id_don_vi_kiem_nhiem = ${v.id_don_vi_phu_trach as number})`;
+    if (!thuoc.length) v.id_phu_trach = null;
+  }
   if (!v.id_phu_trach && v.id_don_vi_phu_trach) {
-    const h = await sql`SELECT id FROM nguoi_dung WHERE id_don_vi = ${v.id_don_vi_phu_trach} AND vai_tro IN ('truong_don_vi','truong_thon') AND trang_thai = 'hoat_dong' LIMIT 1`;
-    v.id_phu_trach = h[0]?.id ?? null;
+    v.id_phu_trach = await dauDonVi(sql, v.id_don_vi_phu_trach as number);
   }
   let newId = id;
   if (id) {
@@ -92,8 +96,8 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
     let i = 0;
     for (const dv of nhieu) {
       if (co.includes(dv)) continue;
-      const h = await sql`SELECT id FROM nguoi_dung WHERE (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv}) AND vai_tro IN ('truong_don_vi','truong_thon','lanh_dao') AND trang_thai = 'hoat_dong'
-                          ORDER BY CASE WHEN id_don_vi = ${dv} THEN 0 ELSE 1 END, CASE WHEN chuc_vu ILIKE 'Phó%' THEN 1 ELSE 0 END, id LIMIT 1`;
+      const pt = await dauDonVi(sql, dv);
+      const h = pt ? [{ id: pt }] : [];
       const con = { ...v, ten: `${v.ten} — ${ten.get(dv) ?? ""}`, ke_hoach_nam: khCon, id_don_vi_phu_trach: dv, id_phu_trach: h[0]?.id ?? null, id_cha: newId, thu_tu: ++i };
       const [r] = await sql`INSERT INTO chi_tieu ${sql(con as never)} RETURNING id`;
       await writeLog(sql, user.id, "tao_chi_tieu", "chi_tieu", r.id, null, con);
@@ -107,11 +111,7 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
 type Q = Awaited<ReturnType<typeof db>>;
 
 /** Trưởng (hoặc người đứng đầu) đơn vị để giao phụ trách phần chỉ tiêu */
-async function truongDonVi(sql: Q, dv: number): Promise<number | null> {
-  const h = await sql`SELECT id FROM nguoi_dung WHERE (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv}) AND vai_tro IN ('truong_don_vi','truong_thon','lanh_dao') AND trang_thai = 'hoat_dong'
-                      ORDER BY CASE WHEN id_don_vi = ${dv} THEN 0 ELSE 1 END, CASE WHEN COALESCE(chuc_vu, '') ILIKE 'Phó%' THEN 1 ELSE 0 END, id LIMIT 1`;
-  return (h[0]?.id as number) ?? null;
-}
+const truongDonVi = (sql: Q, dv: number) => dauDonVi(sql, dv);
 
 /**
  * Cập nhật đơn vị phụ trách của chỉ tiêu: thêm, bỏ, đổi đơn vị.
@@ -266,8 +266,9 @@ export async function addDataAction(_: ActionState, fd: FormData): Promise<Actio
     newId = row.id;
     await writeLog(tx, user.id, old.length ? "sua_so_lieu" : "nhap_so_lieu", "chi_tieu", id, old[0] ?? null, { ky, gia_tri: v, id_so_lieu: row.id, ...(hs ? { ho_so: hs } : {}) });
     if (!autoConfirm) {
+      const dau = await dauDonVi(tx, r.k.id_don_vi_phu_trach);
       const heads = await tx`SELECT id FROM nguoi_dung WHERE id_don_vi = ${r.k.id_don_vi_phu_trach ?? -1} AND vai_tro = 'truong_don_vi' AND trang_thai = 'hoat_dong'`;
-      await notify(tx, heads.map((h) => h.id as number), "xac_nhan_so_lieu", `Chờ xác nhận số liệu: ${r.k.ten}`, `${periodLabel(ky)}: ${v} ${r.k.don_vi_tinh}`, "chi_tieu", id, undefined, user.id);
+      await notify(tx, [...new Set([dau, ...heads.map((h) => h.id as number)].filter((x): x is number => !!x && x !== user.id))], "xac_nhan_so_lieu", `Chờ xác nhận số liệu: ${r.k.ten}`, `${periodLabel(ky)}: ${v} ${r.k.don_vi_tinh}`, "chi_tieu", id, undefined, user.id);
     }
   });
   const ve = Number(str(fd, "ve")) || id;
@@ -364,7 +365,8 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
   if (errs.length) return { error: `Chưa nhập. Sửa các lỗi sau rồi tải lại:\n${errs.slice(0, 15).join("\n")}` };
   await sql.begin(async (tx) => {
     for (const r of rows) {
-      const h = await tx`SELECT id FROM nguoi_dung WHERE id_don_vi = ${r.id_don_vi_phu_trach as number} AND vai_tro IN ('truong_don_vi','truong_thon') AND trang_thai = 'hoat_dong' LIMIT 1`;
+      const pt = await dauDonVi(tx, r.id_don_vi_phu_trach as number);
+      const h = pt ? [{ id: pt }] : [];
       const [x] = await tx`INSERT INTO chi_tieu ${tx({ ...r, id_phu_trach: h[0]?.id ?? null } as never)} RETURNING id`;
       await notify(tx, [h[0]?.id], "giao_chi_tieu", `Được giao phụ trách chỉ tiêu: ${r.ten}`, null, "chi_tieu", x.id, `giaoct:${x.id}`, user.id);
     }
