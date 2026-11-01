@@ -1,7 +1,7 @@
 import postgres from "postgres";
 import { after } from "next/server";
 import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema";
-import { seedModules, ensureSystemModules, renameKhuPho } from "./modules";
+import { seedModules, ensureSystemModules, renameKhuPho, doiCapCongNhan } from "./modules";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -88,6 +88,7 @@ async function migrate() {
     await seedModules(tx);
     await ensureSystemModules(tx);
     if (v < 6) await renameKhuPho(tx);
+    if (v < 9) await doiCapCongNhan(tx);
     await tx`INSERT INTO cai_dat (khoa, gia_tri) VALUES ('schema_version', ${tx.json(SCHEMA_VERSION)})
              ON CONFLICT (khoa) DO UPDATE SET gia_tri = EXCLUDED.gia_tri`;
   });

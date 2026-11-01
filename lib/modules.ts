@@ -154,7 +154,7 @@ export const MAU_MODULE_NQ57: ModuleMau[] = [
       { khoa: "don_vi", ten: "Đơn vị", kieu: "don_vi" },
       { khoa: "linh_vuc", ten: "Lĩnh vực", kieu: "linh_vuc" },
       { khoa: "nam", ten: "Năm", kieu: "so" },
-      { khoa: "cap_cong_nhan", ten: "Cấp công nhận", kieu: "lua_chon", tuy_chon: ["Cấp xã", "Cấp tỉnh", "Chưa công nhận"] },
+      { khoa: "cap_cong_nhan", ten: "Cấp công nhận", kieu: "lua_chon", tuy_chon: ["Cấp phường", "Cấp tỉnh", "Chưa công nhận"] },
       { khoa: "hieu_qua", ten: "Hiệu quả mang lại", kieu: "doan_van", hien_danh_sach: false },
     ],
   },
@@ -219,6 +219,16 @@ export async function renameKhuPho(tx: Q) {
   await tx`UPDATE mo_dun_truong SET ten = 'Khu phố' WHERE ten IN ('Thôn, tổ dân phố', 'Thôn/tổ dân phố')`;
   await tx`UPDATE mo_dun SET mo_ta = replace(replace(mo_ta, 'thôn, tổ dân phố', 'khu phố'), 'Thôn, tổ dân phố', 'Khu phố') WHERE mo_ta ILIKE '%thôn, tổ dân phố%'`;
   await tx`UPDATE nguoi_dung SET chuc_vu = 'Trưởng khu phố' WHERE chuc_vu IN ('Trưởng thôn', 'Trưởng thôn, tổ dân phố')`;
+}
+
+/** Trường “Cấp công nhận”: đổi lựa chọn “Cấp xã” thành “Cấp phường” (danh sách lựa chọn và dữ liệu đã nhập) */
+export async function doiCapCongNhan(tx: Q) {
+  const fs = await tx`SELECT id, id_mo_dun, khoa FROM mo_dun_truong WHERE 'Cấp xã' = ANY(tuy_chon)`;
+  for (const f of fs) {
+    await tx`UPDATE mo_dun_truong SET tuy_chon = array_replace(tuy_chon, 'Cấp xã', 'Cấp phường') WHERE id = ${f.id}`;
+    await tx`UPDATE mo_dun_ban_ghi SET du_lieu = jsonb_set(du_lieu, ${"{" + f.khoa + "}"}::text[], '"Cấp phường"'::jsonb)
+             WHERE id_mo_dun = ${f.id_mo_dun} AND du_lieu->>${f.khoa} = 'Cấp xã'`;
+  }
 }
 
 /** Tạo menu mặc định: module hệ thống, nhóm, module mẫu Nghị quyết 57 (chạy một lần khi nâng cấp) */

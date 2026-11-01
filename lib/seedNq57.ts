@@ -205,10 +205,10 @@ export async function seedDemoNQ57(tx: Tx, uid: number) {
     })),
   );
   await add("sang-kien-doi-moi", [
-    { ten: "Ứng dụng mã QR tra cứu thủ tục hành chính tại bộ phận một cửa", tac_gia: "Trung tâm Phục vụ hành chính công", linh_vuc: L.cchc, nam, cap_cong_nhan: "Cấp xã", hieu_qua: "Giảm 30% thời gian hướng dẫn người dân." },
+    { ten: "Ứng dụng mã QR tra cứu thủ tục hành chính tại bộ phận một cửa", tac_gia: "Trung tâm Phục vụ hành chính công", linh_vuc: L.cchc, nam, cap_cong_nhan: "Cấp phường", hieu_qua: "Giảm 30% thời gian hướng dẫn người dân." },
     { ten: "Bản đồ số các điểm tập kết rác, camera an ninh của thôn", tac_gia: names[2], linh_vuc: L.hts, nam, cap_cong_nhan: "Chưa công nhận" },
     { ten: "Nhóm Zalo “Hỏi nhanh - Đáp gọn” hỗ trợ dịch vụ công", tac_gia: names[3], linh_vuc: L.cds, nam: nam - 1, cap_cong_nhan: "Cấp tỉnh", hieu_qua: "Hơn 1.200 lượt hỏi đáp được trả lời trong ngày." },
-    { ten: "Sổ tay điện tử quy trình nội bộ cho công chức mới", tac_gia: names[4], linh_vuc: L.dmst, nam, cap_cong_nhan: "Cấp xã" },
+    { ten: "Sổ tay điện tử quy trình nội bộ cho công chức mới", tac_gia: names[4], linh_vuc: L.dmst, nam, cap_cong_nhan: "Cấp phường" },
   ]);
   await add("san-pham-so-ocop", [
     { san_pham: "Gạo thơm hữu cơ", chu_the: "HTX Nông nghiệp xã", thon: T(0).id, ocop: "4 sao", san_tmdt: ["Postmart", "Shopee"], ma_qr: true, lien_ket: "https://postmart.vn" },

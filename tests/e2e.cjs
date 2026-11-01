@@ -1011,6 +1011,12 @@ const day = (n) => {
   ok("đổi đơn vị phụ trách", dvTxt.includes("Đang giao cho Phòng Văn hóa - Xã hội") && dvTxt.includes("Đơn vị phụ trách (1)"), dvTxt.slice(0, 300));
   await page.goto(BASE + "/chi-tieu?mo=tat_ca");
   ok("danh sách chỉ tiêu có nút cập nhật đơn vị", (await page.locator('a[aria-label="Cập nhật đơn vị phụ trách: Chỉ tiêu đổi đơn vị kiểm thử"]').count()) === 1);
+  // Cấp công nhận: “Cấp phường”
+  await page.goto(BASE + "/m/sang-kien-doi-moi", { waitUntil: "networkidle" });
+  const sk = await page.locator("main").innerText();
+  await page.goto(BASE + "/m/sang-kien-doi-moi/moi", { waitUntil: "networkidle" });
+  const skOpt = (await page.locator('select[name="f_cap_cong_nhan"] option').allTextContents()).join("|");
+  ok("cấp công nhận: Cấp phường thay Cấp xã", sk.includes("Cấp phường") && !sk.includes("Cấp xã") && skOpt.includes("Cấp phường") && !skOpt.includes("Cấp xã"), skOpt);
   // cài đặt người ký thay
   await page.goto(BASE + "/quan-tri?muc=cai_dat");
   await page.fill('input[name="nguoi_ky"]', "Trần Thị Châu");
