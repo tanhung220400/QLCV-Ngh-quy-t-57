@@ -84,7 +84,16 @@ export async function createTaskAction(_: ActionState, fd: FormData): Promise<Ac
 
   const phoi = fd.getAll("phoi_hop").map(Number).filter(Boolean);
   const theo = fd.getAll("theo_doi").map(Number).filter(Boolean);
-  const kpis = fd.getAll("chi_tieu").map(Number).filter(Boolean);
+  const kpis = fd.get("gan_ct") === "0" ? [] : fd.getAll("chi_tieu").map(Number).filter(Boolean);
+  if (phoi.some((x) => theo.includes(x))) return { error: "Người theo dõi và người phối hợp không được trùng nhau." };
+  {
+    const { coTheTheoDoi } = await import("@/lib/theoDoi");
+    const sqlTd = await db();
+    const cvs = phoi.length + theo.length ? await sqlTd`SELECT id, chuc_vu FROM nguoi_dung WHERE id IN ${sqlTd([...phoi, ...theo])}` : [];
+    const duTD = new Set(cvs.filter((r) => coTheTheoDoi(r.chuc_vu)).map((r) => r.id as number));
+    if (theo.some((x) => !duTD.has(x))) return { error: "Người theo dõi phải là Phó Chủ tịch hoặc người đứng đầu đơn vị." };
+    if (phoi.some((x) => duTD.has(x))) return { error: "Phó Chủ tịch, người đứng đầu đơn vị chọn ở mục Người theo dõi, không chọn làm người phối hợp." };
+  }
   const dinh_ky = ["tuan", "thang", "quy"].includes(str(fd, "dinh_ky")) ? str(fd, "dinh_ky") : null;
   const checklist = str(fd, "checklist").split("\n").map((s) => s.trim()).filter(Boolean);
   const nhom = targets.length > 1 ? randomUUID() : null;
@@ -524,6 +533,15 @@ export async function taskAction(_: ActionState, fd: FormData): Promise<ActionSt
         const uid = Number(str(fd, "id_nguoi"));
         const vt = str(fd, "vai_tro") === "theo_doi" ? "theo_doi" : "phoi_hop";
         if (!uid) return void (error = "Chọn người.");
+        {
+          const { coTheTheoDoi } = await import("@/lib/theoDoi");
+          const n = (await tx`SELECT chuc_vu FROM nguoi_dung WHERE id = ${uid}`)[0];
+          const du = coTheTheoDoi(n?.chuc_vu);
+          if (vt === "theo_doi" && !du) return void (error = "Người theo dõi phải là Phó Chủ tịch hoặc người đứng đầu đơn vị.");
+          if (vt === "phoi_hop" && du) return void (error = "Phó Chủ tịch, người đứng đầu đơn vị được thêm với vai trò Người theo dõi.");
+          const co = await tx`SELECT vai_tro FROM cong_viec_thanh_vien WHERE id_cong_viec = ${id} AND id_nguoi_dung = ${uid}`;
+          if (co.some((r) => r.vai_tro !== vt)) return void (error = "Người này đã có vai trò khác trong công việc (theo dõi và phối hợp không được trùng).");
+        }
         await tx`INSERT INTO cong_viec_thanh_vien VALUES (${id}, ${uid}, ${vt}) ON CONFLICT DO NOTHING`;
         await writeLog(tx, user.id, "them_thanh_vien", "cong_viec", id, null, { id_nguoi: uid, vai_tro: vt });
         await notify(tx, [uid], "phoi_hop", `${vt === "phoi_hop" ? "Phối hợp" : "Theo dõi"}: ${t.ten}`, null, "cong_viec", id, undefined, user.id);

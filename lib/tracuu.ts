@@ -45,6 +45,10 @@ export type BoLoc = {
   tu_khoa: string[][]; // mỗi nhóm là các từ đồng nghĩa (HOẶC), các nhóm kết hợp VÀ
   nhom_theo?: "don_vi" | "linh_vuc" | "nguoi" | "trang_thai" | "thang";
   hieu: string[]; // diễn giải cho người dùng kiểm tra
+  /** phần nội dung còn lại (không dấu) sau khi bỏ thời gian, trạng thái, đơn vị, cán bộ... */
+  con_lai: string;
+  /** người dùng nói rõ chỉ tìm công việc */
+  chi_viec: boolean;
 };
 
 // ---------- Từ điển (viết không dấu) ----------
@@ -301,7 +305,7 @@ export function hieuCauHoi(q: string, dm: DanhMucTC, now = new Date()): BoLoc {
   let t = ` ${boDau(q)} `.trim();
   for (const [re, rep] of BO_TRUOC) t = t.replace(re, rep as string).replace(/\s+/g, " ").trim();
   t = t.replace(/\b(phu|hop) (hop|dong|tac|le|phap)\b/g, "$1$2");
-  const f: BoLoc = { doi_tuong: "cong_viec", trang_thai: [], kpi: [], don_vi: [], linh_vuc: [], nguoi: [], nguon: [], uu_tien: [], moc: "han", tu_khoa: [], hieu: [] };
+  const f: BoLoc = { doi_tuong: "cong_viec", trang_thai: [], kpi: [], don_vi: [], linh_vuc: [], nguoi: [], nguon: [], uu_tien: [], moc: "han", tu_khoa: [], hieu: [], con_lai: "", chi_viec: /\b(viec|cong viec|nhiem vu)\b/.test(boDau(q)) };
 
   // Đối tượng
   const ct = findPhrase(t, DOI_TUONG_CT);
@@ -427,6 +431,7 @@ export function hieuCauHoi(q: string, dm: DanhMucTC, now = new Date()): BoLoc {
   }
 
   // Từ khóa nội dung còn lại, mở rộng bằng từ đồng nghĩa
+  f.con_lai = t.replace(/\b(chamsoc|treem|trehoa|phuhop|hopdong|hoptac|hople|hopphap)\b/g, (w) => ({ chamsoc: "cham soc", treem: "tre em", trehoa: "tre hoa", phuhop: "phu hop", hopdong: "hop dong", hoptac: "hop tac", hople: "hop le", hopphap: "hop phap" })[w] || w);
   for (const g of DONG_NGHIA) {
     const hit = findPhrase(t, g);
     if (hit) {
@@ -457,11 +462,11 @@ export function hieuCauHoi(q: string, dm: DanhMucTC, now = new Date()): BoLoc {
 
 export const GOI_Y = [
   "Việc quá hạn của phòng kinh tế tháng này",
+  "Người dân phản ánh đèn đường hỏng",
   "Tổng hợp việc hoàn thành đúng hạn quý 3 theo từng đơn vị",
-  "Những việc sắp đến hạn tuần này",
   "Chỉ tiêu có nguy cơ không đạt",
-  "Việc về hộ nghèo đang làm",
+  "Kết quả hướng dẫn người dân cài VNeID",
+  "Ô nhiễm môi trường, rác thải",
   "Ai đang bị trễ deadline",
-  "Viec chua nhan tu ket luan hop",
-  "Chỉ tiêu lĩnh vực giáo dục, y tế",
+  "Chuyển đổi số",
 ];

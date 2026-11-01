@@ -370,10 +370,19 @@ const day = (n) => {
     ["việc quá hạn của phòng kinh tế", "Phòng Kinh tế"],
     ["tong hop viec hoan thanh nam nay theo tung don vi", "Tổng hợp theo từng đơn vị"],
     ["chỉ tiêu có nguy cơ không đạt", "Có nguy cơ không đạt"],
-    ["việc về hộ nghèo", "ho ngheo"],
+    ["việc về hộ nghèo", "hộ nghèo"],
   ]) {
     const txt = await check(page, "/tra-cuu?q=" + encodeURIComponent(q), "tra cứu");
     ok(`tra cứu hiểu “${q}”`, txt.includes(expect) && !/Không tìm thấy/.test(txt), txt.match(/Tổng số việc\s*\d+|Chỉ tiêu năm \d+\s*\d+/)?.[0] || "");
+  }
+  {
+    // tìm theo hàm ý, đồng nghĩa, trong toàn bộ dữ liệu (kể cả dữ liệu module)
+    const t1 = (await check(page, "/tra-cuu?q=" + encodeURIComponent("đèn đường bị hư"), "tra cứu hàm ý")).replace(/\s+/g, " ");
+    ok("tra cứu theo đồng nghĩa, hàm ý trong dữ liệu module", /Đèn chiếu sáng đường liên khu phố bị hỏng/.test(t1) && /đèn chiếu sáng/.test(t1), t1.slice(0, 400));
+    const t2 = (await check(page, "/tra-cuu?q=" + encodeURIComponent("dinh danh dien tu"), "tra cứu không dấu")).replace(/\s+/g, " ");
+    ok("tra cứu không dấu, từ đồng nghĩa (định danh điện tử → VNeID)", /VNeID/.test(t2), t2.slice(0, 400));
+    const xe = await page.request.get(BASE + "/api/tra-cuu/xuat?q=" + encodeURIComponent("chuyển đổi số"));
+    ok("xuất Excel tra cứu toàn bộ dữ liệu", xe.status() === 200 && (await xe.body()).length > 5000);
   }
   const xr = await page.request.get(BASE + "/api/tra-cuu/xuat?q=" + encodeURIComponent("việc quá hạn theo từng đơn vị"));
   ok("xuất Excel kết quả tra cứu", xr.status() === 200 && (await xr.body()).length > 1000);
@@ -937,7 +946,16 @@ const day = (n) => {
     ({ ctx, page } = await newPage({ width: 1280, height: 800 }));
     await login(page, u);
     await page.goto(BASE + "/viec/moi");
-    const t = await page.locator('select[name="phoi_hop"] option').evaluateAll((es) => es.map((e) => e.textContent));
+    await page.click('button:has-text("Cá nhân")');
+    const t = await page.locator('label:has(input[type="checkbox"]) span').evaluateAll((es) => es.map((e) => e.textContent));
+    if (u === "chutich") {
+      await page.click("summary:has-text('Thêm chi tiết')").catch(() => {});
+      const td = await page.locator('select[name="theo_doi"] option').evaluateAll((es) => es.map((e) => e.textContent));
+      const ph = await page.locator('select[name="phoi_hop"] option').evaluateAll((es) => es.map((e) => e.textContent));
+      ok("người theo dõi: chỉ Phó Chủ tịch, người đứng đầu đơn vị", td.length > 0 && td.every((x) => /phó chủ tịch|chủ tịch|trưởng|giám đốc|chánh|bí thư|chủ nhiệm/i.test(x)) && td.some((x) => x.includes("Hoàng Văn Khánh")), td.join(" | "));
+      ok("người phối hợp không trùng người theo dõi", ph.length > 0 && !ph.some((x) => td.includes(x)) && ph.some((x) => x.includes("Vũ Thị Lan")), ph.join(" | "));
+      ok("gắn chỉ tiêu tùy chọn (mặc định không gắn)", (await page.locator('input[name="gan_ct"][value="0"]').isChecked()) && (await page.locator('select[name="chi_tieu"]').count()) === 0);
+    }
     await ctx.close();
     return t.join(" | ");
   };
@@ -961,7 +979,9 @@ const day = (n) => {
   await page.goto(BASE + "/viec?tab=tat_ca&q=" + encodeURIComponent("Lập kế hoạch giải phóng mặt bằng"));
   await page.click("a:has-text('Lập kế hoạch giải phóng mặt bằng')");
   await page.waitForURL(/\/viec\/\d+/);
-  const sub = await page.locator('details:has(summary:has-text("Thêm việc con")) select[name="phoi_hop"] option').evaluateAll((es) => es.map((e) => e.textContent));
+  await page.click("summary:has-text('Thêm việc con')");
+  await page.locator('details:has(summary:has-text("Thêm việc con")) button:has-text("Cá nhân")').click();
+  const sub = await page.locator('details:has(summary:has-text("Thêm việc con")) label:has(input[type="checkbox"]) span').evaluateAll((es) => es.map((e) => e.textContent));
   ok("việc con: không giao ngược cho người đã giao (chủ tịch)", sub.length > 0 && !sub.join("|").includes("Trần Thị Châu") && sub.join("|").includes("Vũ Thị Lan"), sub.join(" | "));
   // giao lại: chỉ cán bộ cấp dưới trong đơn vị
   const gl = await page.locator('form:has(input[name="op"][value="giao_lai"]) select option').allInnerTexts();

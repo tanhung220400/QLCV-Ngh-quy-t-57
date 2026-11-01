@@ -571,6 +571,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
                   compact
                   units={opts.units}
                   people={opts.people}
+                  allPeople={opts.allPeople}
                   linhVuc={opts.linhVuc}
                   nguon={opts.nguon}
                   sanPham={opts.sanPham}

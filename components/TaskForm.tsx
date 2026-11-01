@@ -2,12 +2,14 @@
 import { useMemo, useState } from "react";
 import { ActionForm, Submit } from "./ActionForm";
 import { createTaskAction } from "@/app/actions/task";
+import { coTheTheoDoi } from "@/lib/theoDoi";
 
 type Opt = { id: number; ten: string; don_vi?: string | null; id_don_vi?: number | null; chuc_vu?: string | null };
 
 export function TaskForm({
   units,
   people,
+  allPeople,
   linhVuc,
   nguon,
   sanPham,
@@ -20,6 +22,8 @@ export function TaskForm({
 }: {
   units: Opt[];
   people: Opt[];
+  /** toàn bộ cán bộ (để chọn người theo dõi là Phó Chủ tịch, người đứng đầu đơn vị) */
+  allPeople?: Opt[];
   linhVuc: string[];
   nguon: string[];
   sanPham: string[];
@@ -31,6 +35,12 @@ export function TaskForm({
   compact?: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
+  const [ganCT, setGanCT] = useState(false);
+  const [phoiHop, setPhoiHop] = useState<string[]>([]);
+  const [theoDoi, setTheoDoi] = useState<string[]>([]);
+  const dsTheoDoi = useMemo(() => (allPeople || people).filter((p) => coTheTheoDoi(p.chuc_vu)), [allPeople, people]);
+  const dsPhoiHop = useMemo(() => people.filter((p) => !coTheTheoDoi(p.chuc_vu)), [people]);
+  const chon = (e: React.ChangeEvent<HTMLSelectElement>) => [...e.target.selectedOptions].map((o) => o.value);
   const [q, setQ] = useState("");
   const [mode, setMode] = useState<"nguoi" | "don_vi">("don_vi");
   const list = useMemo(() => {
@@ -183,26 +193,30 @@ export function TaskForm({
             </>
           )}
           <div>
-            <label className="label">Người phối hợp</label>
-            <select name="phoi_hop" multiple className="input h-32">
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
+            <label className="label">Người theo dõi</label>
+            <select name="theo_doi" multiple className="input h-32" value={theoDoi} onChange={(e) => setTheoDoi(chon(e))}>
+              {dsTheoDoi.map((p) => (
+                <option key={p.id} value={p.id} disabled={phoiHop.includes(String(p.id))}>
                   {p.ten}
-                  {p.don_vi ? ` — ${p.don_vi}` : ""}
+                  {p.chuc_vu ? ` — ${p.chuc_vu}` : ""}
+                  {p.don_vi ? `, ${p.don_vi}` : ""}
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-sm text-slate-500">Giữ Ctrl (máy tính) để chọn nhiều.</p>
+            <p className="mt-1 text-sm text-slate-500">Phó Chủ tịch hoặc người đứng đầu đơn vị. Giữ Ctrl (máy tính) để chọn nhiều.</p>
           </div>
           <div>
-            <label className="label">Người theo dõi</label>
-            <select name="theo_doi" multiple className="input h-32">
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
+            <label className="label">Người phối hợp</label>
+            <select name="phoi_hop" multiple className="input h-32" value={phoiHop} onChange={(e) => setPhoiHop(chon(e))}>
+              {dsPhoiHop.map((p) => (
+                <option key={p.id} value={p.id} disabled={theoDoi.includes(String(p.id))}>
                   {p.ten}
+                  {p.chuc_vu ? ` — ${p.chuc_vu}` : ""}
+                  {p.don_vi ? `, ${p.don_vi}` : ""}
                 </option>
               ))}
             </select>
+            <p className="mt-1 text-sm text-slate-500">Cấp phó, cán bộ (không trùng với người theo dõi).</p>
           </div>
           <div>
             <label className="label">Lặp lại định kỳ</label>
@@ -213,16 +227,29 @@ export function TaskForm({
               <option value="quy">Hằng quý</option>
             </select>
           </div>
-          {kpis.length > 0 && (
+          {!idCha && (
             <div>
-              <label className="label">Gắn với chỉ tiêu</label>
-              <select name="chi_tieu" multiple className="input h-32">
-                {kpis.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.ten}
-                  </option>
+              <span className="label">Gắn với chỉ tiêu</span>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="gan_ct" value="0" checked={!ganCT} onChange={() => setGanCT(false)} className="h-5 w-5" /> Không gắn
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="gan_ct" value="1" checked={ganCT} onChange={() => setGanCT(true)} className="h-5 w-5" /> Gắn với chỉ tiêu
+                </label>
+              </div>
+              {ganCT &&
+                (kpis.length ? (
+                  <select name="chi_tieu" multiple className="input mt-2 h-32">
+                    {kpis.map((k) => (
+                      <option key={k.id} value={k.id}>
+                        {k.ten}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">Chưa có chỉ tiêu nào để gắn.</p>
                 ))}
-              </select>
             </div>
           )}
           <div className="sm:col-span-2">

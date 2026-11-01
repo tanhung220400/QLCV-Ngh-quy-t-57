@@ -25,6 +25,7 @@ export default async function NewTaskPage() {
         <TaskForm
           units={o.units}
           people={o.people}
+          allPeople={o.allPeople}
           linhVuc={o.linhVuc}
           nguon={o.nguon}
           sanPham={o.sanPham}
