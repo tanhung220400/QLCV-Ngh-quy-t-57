@@ -152,7 +152,7 @@ export async function traCuu(user: User, q: string): Promise<KetQuaCV | KetQuaCT
     tre_han: list.filter((t) => t.trang_thai === "hoan_thanh" && t.ngay_hoan_thanh && new Date(t.ngay_hoan_thanh) > new Date(t.han)).length,
     cho_duyet: list.filter((t) => t.trang_thai === "cho_duyet").length,
   });
-  const TT: Record<string, string> = { moi_giao: "Mới giao", da_nhan: "Đã nhận", dang_thuc_hien: "Đang thực hiện", cho_duyet: "Chờ duyệt", hoan_thanh: "Hoàn thành", tra_lai: "Trả lại", tam_dung: "Tạm dừng", huy: "Hủy" };
+  const TT: Record<string, string> = { moi_giao: "Mới giao", da_nhan: "Đã nhận", dang_thuc_hien: "Đang thực hiện", cho_duyet: "Chờ xác nhận", hoan_thanh: "Hoàn thành", tra_lai: "Trả lại", tam_dung: "Tạm dừng", huy: "Hủy" };
   const key = (t: TaskListItem & { tao_luc: Date }) => {
     switch (f.nhom_theo) {
       case "don_vi":

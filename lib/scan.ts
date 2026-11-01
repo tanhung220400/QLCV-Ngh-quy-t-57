@@ -42,6 +42,11 @@ export async function runScan(force = false) {
       ? [...new Set([await truongDonVi(sql, dv), ...((await sql`SELECT id FROM nguoi_dung WHERE id_don_vi = ${dv} AND vai_tro = 'truong_don_vi' AND trang_thai = 'hoat_dong'`).map((r) => r.id) as number[])].filter((x): x is number => !!x))]
       : [];
 
+  // Kết quả đã báo cáo quá 1 ngày mà người giao chưa xác nhận: nhắc mỗi ngày một lần
+  const choXn = await sql`SELECT id, ten, id_nguoi_giao, ngay_bao_cao FROM cong_viec WHERE trang_thai = 'cho_duyet' AND ngay_bao_cao < now() - interval '1 day'`;
+  for (const t of choXn)
+    await notify(sql, [t.id_nguoi_giao], "cho_duyet", `Chưa xác nhận kết quả: ${t.ten}`, `Người chủ trì đã báo cáo hoàn thành từ ${fmtDue(new Date(t.ngay_bao_cao), true)}. Đề nghị kiểm tra, xác nhận kết quả`, "cong_viec", t.id, `nhacxn:${t.id}:${today}`);
+
   const tasks = await sql`
     SELECT id, ten, trang_thai, han, han_co_gio, linh_vuc, id_chu_tri, id_nguoi_thuc_hien, id_nguoi_giao, id_don_vi_chu_tri, tao_luc
     FROM cong_viec WHERE trang_thai IN ('moi_giao', 'da_nhan', 'dang_thuc_hien')`;

@@ -270,28 +270,37 @@ export async function taskAction(_: ActionState, fd: FormData): Promise<ActionSt
         const files = (await tx`SELECT count(*)::int AS n FROM tep_dinh_kem WHERE doi_tuong = 'cong_viec' AND id_doi_tuong = ${id}`)[0].n;
         if (!files && fd.get("khong_tep") !== "1") return void (error = "Đính kèm sản phẩm hoặc ảnh minh chứng trước khi báo cáo (hoặc đánh dấu “không có tệp”).");
         const selfApprove = t.id_nguoi_giao === user.id;
-        await setStatus(selfApprove ? "hoan_thanh" : "cho_duyet", { ket_qua: kq, ngay_bao_cao: new Date(), ...(selfApprove ? { ngay_hoan_thanh: new Date(), phan_tram: 100 } : {}) });
+        await setStatus(selfApprove ? "hoan_thanh" : "cho_duyet", {
+          ket_qua: kq,
+          ngay_bao_cao: new Date(),
+          id_nguoi_xac_nhan: selfApprove ? user.id : null,
+          xac_nhan_luc: selfApprove ? new Date() : null,
+          y_kien_xac_nhan: null,
+          ...(selfApprove ? { ngay_hoan_thanh: new Date(), phan_tram: 100 } : {}),
+        });
         await sysComment(tx, id, user.id, `Báo cáo hoàn thành: ${kq}`);
-        if (!selfApprove) await notify(tx, [t.id_nguoi_giao], "cho_duyet", `Chờ duyệt kết quả: ${t.ten}`, kq, "cong_viec", id, undefined, user.id);
+        if (!selfApprove) await notify(tx, [t.id_nguoi_giao], "cho_duyet", `Chờ xác nhận kết quả: ${t.ten}`, kq, "cong_viec", id, undefined, user.id);
         if (t.id_cha) await recomputePercent(tx, t.id_cha);
-        msg = selfApprove ? "Đã hoàn thành." : "Đã gửi báo cáo, chờ người giao duyệt.";
+        msg = selfApprove ? "Đã hoàn thành." : "Đã gửi báo cáo, chờ người giao việc xác nhận kết quả.";
         break;
       }
       case "duyet": {
-        if (!p.duyet || t.trang_thai !== "cho_duyet") return void (error = deny.error);
+        if (t.trang_thai !== "cho_duyet") return void (error = "Công việc không ở trạng thái chờ xác nhận kết quả.");
+        if (!p.xac_nhan) return void (error = "Chỉ người giao việc mới được xác nhận kết quả công việc này.");
         const yk = str(fd, "y_kien");
         if (str(fd, "ket_luan") === "lam_lai") {
-          if (!yk) return void (error = "Nêu yêu cầu làm lại.");
-          await setStatus("dang_thuc_hien", { so_lan_lam_lai: t.so_lan_lam_lai + 1 });
-          await sysComment(tx, id, user.id, `Yêu cầu làm lại: ${yk}`);
-          await notify(tx, owners, "lam_lai", `Yêu cầu làm lại: ${t.ten}`, yk, "cong_viec", id, undefined, user.id);
-          msg = "Đã yêu cầu làm lại.";
+          if (!yk) return void (error = "Nêu rõ kết quả chưa đúng ở điểm nào, yêu cầu làm lại những gì.");
+          await setStatus("dang_thuc_hien", { so_lan_lam_lai: t.so_lan_lam_lai + 1, id_nguoi_xac_nhan: null, xac_nhan_luc: null, y_kien_xac_nhan: yk });
+          await sysComment(tx, id, user.id, `Không xác nhận kết quả, yêu cầu làm lại: ${yk}`);
+          await notify(tx, owners, "lam_lai", `Kết quả chưa được xác nhận, yêu cầu làm lại: ${t.ten}`, yk, "cong_viec", id, undefined, user.id);
+          msg = "Đã trả lại, yêu cầu làm lại.";
         } else {
-          await setStatus("hoan_thanh", { ngay_hoan_thanh: t.ngay_bao_cao || new Date(), phan_tram: 100 });
-          await sysComment(tx, id, user.id, `Duyệt hoàn thành${yk ? `: ${yk}` : ""}`);
-          await notify(tx, [...owners, ...members], "hoan_thanh", `Đã duyệt hoàn thành: ${t.ten}`, yk || null, "cong_viec", id, undefined, user.id);
+          if (fd.get("da_kiem_tra") !== "1") return void (error = "Đánh dấu “Tôi đã kiểm tra kết quả, sản phẩm, minh chứng” trước khi xác nhận.");
+          await setStatus("hoan_thanh", { ngay_hoan_thanh: t.ngay_bao_cao || new Date(), phan_tram: 100, id_nguoi_xac_nhan: user.id, xac_nhan_luc: new Date(), y_kien_xac_nhan: yk || null });
+          await sysComment(tx, id, user.id, `Xác nhận kết quả, công việc hoàn thành${yk ? `: ${yk}` : ""}`);
+          await notify(tx, [...owners, ...members], "hoan_thanh", `Kết quả đã được xác nhận: ${t.ten}`, yk || null, "cong_viec", id, undefined, user.id);
           if (t.id_cha) await recomputePercent(tx, t.id_cha);
-          msg = "Đã duyệt hoàn thành.";
+          msg = "Đã xác nhận kết quả. Công việc hoàn thành.";
         }
         break;
       }
@@ -542,7 +551,7 @@ export async function kanbanMove(id: number, to: string): Promise<{ error?: stri
   if (from === "moi_giao" && to === "da_nhan") op = "nhan";
   else if (from === "da_nhan" && to === "dang_thuc_hien") op = "bat_dau";
   else if ((from === "da_nhan" || from === "dang_thuc_hien") && to === "cho_duyet") return { need: "bao_cao" };
-  else if (from === "cho_duyet" && to === "hoan_thanh") op = "duyet";
+  else if (from === "cho_duyet" && to === "hoan_thanh") return { need: "xac_nhan" };
   else if (from === "cho_duyet" && to === "dang_thuc_hien") return { need: "lam_lai" };
   if (!op) return { error: `Không chuyển trực tiếp từ “${TRANG_THAI[from]}” sang “${TRANG_THAI[to]}”.` };
   const f = new FormData();

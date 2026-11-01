@@ -8,7 +8,7 @@ export const NHOM_QUYEN: { nhom: string; quyen: [string, string][] }[] = [
       ["cv.giao_cap1", "Giao việc cấp 1: giao cho đơn vị, trưởng/phó đơn vị trong phạm vi (người nhận không giao ngược lại cho mình)"],
       ["cv.giao_cap2", "Giao việc cấp 2: giao lại, giao việc cho cán bộ thuộc đơn vị mình phụ trách (không giao cho cấp trên)"],
       ["cv.nhap_nhanh", "Giao nhanh từ kết luận họp"],
-      ["cv.duyet", "Duyệt kết quả, duyệt gia hạn (trong phạm vi được xem)"],
+      ["cv.duyet", "Duyệt gia hạn (trong phạm vi được xem); kết quả công việc do người giao việc xác nhận"],
       ["cv.quan_ly", "Sửa, đổi hạn, tạm dừng, hủy việc (trong phạm vi được xem)"],
       ["cv.xuat", "Xuất danh sách công việc ra Excel"],
     ],

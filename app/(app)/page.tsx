@@ -134,7 +134,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stat("Việc đang làm", h.dang_lam, "/viec?tab=tat_ca&trang_thai=dang_mo", "plain", h.cho_duyet ? `${h.cho_duyet} chờ duyệt` : undefined)}
+        {stat("Việc đang làm", h.dang_lam, "/viec?tab=tat_ca&trang_thai=dang_mo", "plain", h.cho_duyet ? `${h.cho_duyet} chờ xác nhận` : undefined)}
         {stat("Việc quá hạn", h.qua_han, "/viec?tab=qua_han", "bad")}
         {stat("Đúng hạn trong tháng", h.ty_le == null ? "–" : `${Math.round(h.ty_le)}%`, "/bao-cao", "plain", `${h.dung_han}/${h.den_han} việc đến hạn`)}
         {stat("Chỉ tiêu có nguy cơ", risky, "/chi-tieu?loc=nguy_co", "bad", `trên ${kpis.length} chỉ tiêu`)}

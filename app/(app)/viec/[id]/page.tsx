@@ -58,7 +58,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
   const t = (
     await sql`
     SELECT cv.*, ct.ho_ten AS ten_chu_tri, ct.chuc_vu AS cv_chu_tri, ng.ho_ten AS ten_nguoi_giao, ng.chuc_vu AS cv_nguoi_giao,
-      th.ho_ten AS ten_thuc_hien, dv.ten AS ten_don_vi, tao.ho_ten AS ten_nguoi_tao, cha.ten AS ten_cha
+      th.ho_ten AS ten_thuc_hien, dv.ten AS ten_don_vi, tao.ho_ten AS ten_nguoi_tao, cha.ten AS ten_cha, xn.ho_ten AS ten_nguoi_xac_nhan
     FROM cong_viec cv
     JOIN nguoi_dung ct ON ct.id = cv.id_chu_tri
     JOIN nguoi_dung ng ON ng.id = cv.id_nguoi_giao
@@ -66,6 +66,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
     LEFT JOIN nguoi_dung th ON th.id = cv.id_nguoi_thuc_hien
     LEFT JOIN don_vi dv ON dv.id = cv.id_don_vi_chu_tri
     LEFT JOIN cong_viec cha ON cha.id = cv.id_cha
+    LEFT JOIN nguoi_dung xn ON xn.id = cv.id_nguoi_xac_nhan
     WHERE cv.id = ${id}`
   )[0];
   if (!t) notFound();
@@ -174,8 +175,25 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
           </p>
         )}
         {t.ket_qua && (
-          <p className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
-            <b>Kết quả báo cáo:</b> {t.ket_qua}
+          <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
+            <p>
+              <b>Kết quả báo cáo:</b> {t.ket_qua}
+            </p>
+            {t.ngay_bao_cao && <p className="mt-1 text-sm text-slate-600">Báo cáo lúc {fmtDateTime(t.ngay_bao_cao)}</p>}
+            {t.trang_thai === "cho_duyet" && (
+              <p className="mt-2 font-semibold text-amber-800">⏳ Chờ {t.ten_nguoi_giao} (người giao việc) xác nhận kết quả. Công việc chỉ được tính hoàn thành sau khi xác nhận.</p>
+            )}
+            {t.trang_thai === "hoan_thanh" && t.ten_nguoi_xac_nhan && (
+              <p className="mt-2 font-semibold text-emerald-800">
+                ✓ Kết quả đã được {t.ten_nguoi_xac_nhan} xác nhận{t.xac_nhan_luc ? ` lúc ${fmtDateTime(t.xac_nhan_luc)}` : ""}
+                {t.y_kien_xac_nhan ? `. Ý kiến: ${t.y_kien_xac_nhan}` : ""}
+              </p>
+            )}
+          </div>
+        )}
+        {t.trang_thai !== "cho_duyet" && t.trang_thai !== "hoan_thanh" && t.y_kien_xac_nhan && (
+          <p className="mt-3 rounded-xl border border-orange-300 bg-orange-50 p-3 text-orange-900">
+            <b>Kết quả lần trước chưa được xác nhận:</b> {t.y_kien_xac_nhan}
           </p>
         )}
       </div>
@@ -245,18 +263,24 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
           </div>
         )}
 
-        {p.duyet && t.trang_thai === "cho_duyet" && (
+        {p.xac_nhan && (
           <div className="card border-2 border-violet-300" id="duyet">
-            <h2 className="h2">Duyệt kết quả</h2>
+            <h2 className="h2">Xác nhận kết quả</h2>
+            <p className="muted text-sm">
+              {t.ten_chu_tri} đã báo cáo hoàn thành. Kiểm tra nội dung báo cáo và {files.length ? <a href="#tep" className="text-brand-700 underline">{files.length} tệp minh chứng</a> : "minh chứng (chưa có tệp đính kèm)"} trước khi xác nhận, tránh trường hợp báo cáo không đúng thực tế.
+            </p>
             <ActionForm action={taskAction} className="mt-2 space-y-2">
               <Hidden id={id} op="duyet" />
-              <textarea name="y_kien" className="input" rows={2} placeholder="Ý kiến (bắt buộc nếu yêu cầu làm lại)" />
-              <div className="flex gap-2">
+              <textarea name="y_kien" className="input" rows={2} placeholder="Ý kiến (bắt buộc nếu kết quả chưa đúng, yêu cầu làm lại)" />
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="da_kiem_tra" value="1" className="mt-0.5 h-5 w-5 shrink-0" /> Tôi đã kiểm tra kết quả, sản phẩm, minh chứng và xác nhận đúng thực tế
+              </label>
+              <div className="flex flex-wrap gap-2">
                 <Submit name="ket_luan" value="dong_y" className="btn btn-success flex-1">
-                  Đồng ý hoàn thành
+                  Xác nhận kết quả đúng
                 </Submit>
                 <Submit name="ket_luan" value="lam_lai" className="btn btn-outline flex-1">
-                  Yêu cầu làm lại
+                  Chưa đúng, yêu cầu làm lại
                 </Submit>
               </div>
             </ActionForm>
@@ -601,7 +625,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
       )}
 
       {/* Tệp */}
-      <div className="card">
+      <div className="card" id="tep">
         <h2 className="h2">Tệp đính kèm, minh chứng ({files.length})</h2>
         <ul className="mt-2 divide-y divide-slate-100">
           {files.map((f) => (

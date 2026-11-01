@@ -136,8 +136,9 @@ const day = (n) => {
   ok("chặn báo cáo khi chưa có tệp", true);
   await page.check('input[name="khong_tep"]');
   await page.click('#bao-cao button:has-text("Gửi báo cáo")');
-  await page.waitForSelector("text=chờ người giao duyệt");
+  await page.waitForSelector("text=chờ người giao việc xác nhận kết quả");
   ok("báo cáo hoàn thành", true);
+  ok("người báo cáo không tự xác nhận được kết quả", (await page.locator('button:has-text("Xác nhận kết quả đúng")').count()) === 0 && (await page.locator("text=người giao việc) xác nhận kết quả").count()) > 0);
   // Tải tệp (lưu vào CSDL vì không có Blob khi thử)
   const resp = await page.request.post(BASE + "/api/tep", { multipart: { file: { name: "bao-cao.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 test") }, doi_tuong: "cong_viec", id_doi_tuong: String(taskId), gps: "10.762622,106.660172" } });
   ok("tải tệp đính kèm", resp.status() === 200, `HTTP ${resp.status()}`);
@@ -149,20 +150,26 @@ const day = (n) => {
   ({ ctx, page } = await newPage());
   await login(page, "chutich");
   const notif = await check(page, "/thong-bao", "chủ tịch");
-  ok("thông báo nhắc tên / chờ duyệt", /nhắc đến bạn/.test(notif) && /Chờ duyệt kết quả/.test(notif));
+  ok("thông báo nhắc tên / chờ duyệt", /nhắc đến bạn/.test(notif) && /Chờ xác nhận kết quả/.test(notif));
   await page.goto(BASE + `/viec/${taskId}`);
   await page.click('button:has-text("Đồng ý gia hạn")');
   await page.waitForSelector("text=Đã đồng ý gia hạn.");
   ok("duyệt gia hạn", true);
-  await page.click('button:has-text("Đồng ý hoàn thành")');
-  await page.waitForSelector("text=Đã duyệt hoàn thành.");
+  await page.click('button:has-text("Xác nhận kết quả đúng")');
+  await page.waitForSelector("text=Đánh dấu “Tôi đã kiểm tra");
+  ok("xác nhận kết quả: bắt buộc đánh dấu đã kiểm tra", true);
+  await page.check('input[name="da_kiem_tra"]');
+  await page.click('button:has-text("Xác nhận kết quả đúng")');
+  await page.waitForSelector("text=Đã xác nhận kết quả. Công việc hoàn thành.");
+  await page.waitForSelector("text=Kết quả đã được");
+  ok("xác nhận kết quả: ghi người xác nhận", true);
   await page.waitForSelector("text=Đúng hạn");
   const det = await page.locator("body").innerText();
   ok("việc chuyển Hoàn thành + đúng hạn", /Hoàn thành/.test(det) && /đúng hạn/i.test(det));
   ok("lịch sử gia hạn ghi nhận", /Lịch sử gia hạn \(1\)/.test(det));
   // Kanban: kéo việc Mới giao -> Đã nhận không đúng người thì báo lỗi
   await page.goto(BASE + "/viec?xem=kanban&tab=tat_ca");
-  ok("bảng Kanban có 5 cột", (await page.locator("text=Chờ duyệt").count()) > 0);
+  ok("bảng Kanban có 5 cột", (await page.locator("text=Chờ xác nhận").count()) > 0);
   for (const p of ["/viec?tab=qua_han", "/viec?tab=sap_han", "/viec?xem=lich", "/chi-tieu", "/chi-tieu?loc=nguy_co", "/bao-cao", "/?ky=thang", "/?ky=quy"]) await check(page, p, "chủ tịch");
   // Xuất báo cáo
   for (const [p, type] of [

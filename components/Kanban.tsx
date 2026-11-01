@@ -19,7 +19,7 @@ export function Kanban({ columns, tasks }: { columns: { key: string; label: stri
       setMsg(null);
       const r = await kanbanMove(id, to);
       if (r.need === "bao_cao") router.push(`/viec/${id}#bao-cao`);
-      else if (r.need === "lam_lai") router.push(`/viec/${id}#duyet`);
+      else if (r.need === "lam_lai" || r.need === "xac_nhan") router.push(`/viec/${id}#duyet`);
       else if (r.error) setMsg(r.error);
       else router.refresh();
     });

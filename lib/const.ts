@@ -11,7 +11,7 @@ export const TRANG_THAI: Record<string, string> = {
   moi_giao: "Mới giao",
   da_nhan: "Đã nhận",
   dang_thuc_hien: "Đang thực hiện",
-  cho_duyet: "Chờ duyệt",
+  cho_duyet: "Chờ xác nhận",
   hoan_thanh: "Hoàn thành",
   tra_lai: "Trả lại",
   tam_dung: "Tạm dừng",

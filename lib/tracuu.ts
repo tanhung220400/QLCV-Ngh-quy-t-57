@@ -262,7 +262,7 @@ const TEN_TRANG_THAI: Record<TrangThaiTC, string> = {
   hoan_thanh: "Đã hoàn thành",
   dung_han: "Hoàn thành đúng hạn",
   tre_han: "Hoàn thành trễ hạn",
-  cho_duyet: "Chờ duyệt",
+  cho_duyet: "Chờ xác nhận kết quả",
   moi_giao: "Chưa nhận việc",
   tra_lai: "Bị trả lại",
   tam_dung: "Tạm dừng",

@@ -46,7 +46,7 @@ export default async function TraCuuPage({ searchParams }: { searchParams: Promi
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <Stat label="Tổng số việc" v={kq.tong.tong} />
                 <Stat label="Đang quá hạn" v={kq.tong.qua_han} bad />
-                <Stat label="Đang làm" v={kq.tong.dang_lam} sub={kq.tong.cho_duyet ? `${kq.tong.cho_duyet} chờ duyệt` : undefined} />
+                <Stat label="Đang làm" v={kq.tong.dang_lam} sub={kq.tong.cho_duyet ? `${kq.tong.cho_duyet} chờ xác nhận` : undefined} />
                 <Stat label="Hoàn thành" v={kq.tong.hoan_thanh} sub={`${pct(kq.tong.dung_han, kq.tong.hoan_thanh)} đúng hạn`} />
               </div>
               {kq.nhom.length > 0 && (

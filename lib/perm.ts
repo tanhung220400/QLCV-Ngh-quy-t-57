@@ -124,7 +124,9 @@ export type TaskPerms = {
   cap_nhat: boolean;
   bao_cao: boolean;
   xin_gia_han: boolean;
-  duyet: boolean; // duyệt kết quả, duyệt gia hạn
+  duyet: boolean; // duyệt gia hạn
+  /** xác nhận kết quả: chỉ người giao việc (hoặc người tạo) và quản trị dữ liệu */
+  xac_nhan: boolean;
   quan_ly: boolean; // sửa, tạm dừng, hủy, giao lại người chủ trì
   viec_con: boolean;
   /** Quản trị dữ liệu: sửa mọi trường, xóa vào thùng rác */
@@ -157,6 +159,7 @@ export async function taskPerms(user: User, t: TaskRow): Promise<TaskPerms> {
     bao_cao: working && (isOwner || isDoer),
     xin_gia_han: open && s !== "tra_lai" && s !== "tam_dung" && (isOwner || isDoer),
     duyet: admin || isAssigner || (q.has("cv.duyet") && inScope),
+    xac_nhan: s === "cho_duyet" && (admin || isAssigner),
     quan_ly: admin || isAssigner || (q.has("cv.quan_ly") && inScope),
     viec_con: open && (isOwner || isDoer || isAssigner || unitHead),
     admin,
