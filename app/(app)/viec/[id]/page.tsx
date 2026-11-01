@@ -233,7 +233,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
         {p.bao_cao && (
           <div className="card" id="bao-cao">
             <h2 className="h2">Báo cáo hoàn thành</h2>
-            <p className="muted text-sm">Đính kèm sản phẩm ({t.san_pham}) hoặc ảnh hiện trường ở mục Tệp đính kèm bên dưới trước khi gửi.</p>
+            <p className="muted text-sm">Đính kèm sản phẩm ({t.san_pham}) hoặc ảnh chụp ở mục Tệp đính kèm bên dưới trước khi gửi.</p>
             <ActionForm action={taskAction} className="mt-2 space-y-2">
               <Hidden id={id} op="bao_cao" />
               <textarea name="ket_qua" className="input" rows={3} placeholder="Kết quả đã làm, sản phẩm đã nộp..." required />
@@ -609,7 +609,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
               <a href={`/api/tep/${f.id}`} target="_blank" className="font-medium text-brand-700 underline">
                 {f.ten_tep}
               </a>
-              {f.la_minh_chung && <span className="chip border-emerald-300 bg-emerald-50 text-emerald-800">Ảnh hiện trường</span>}
+              {f.la_minh_chung && <span className="chip border-emerald-300 bg-emerald-50 text-emerald-800">Ảnh chụp</span>}
               <span className="text-sm text-slate-500">
                 {f.nguoi} · {fmtDateTime(f.tao_luc)}
                 {f.kich_thuoc ? ` · ${(f.kich_thuoc / 1048576).toFixed(1)} MB` : ""}

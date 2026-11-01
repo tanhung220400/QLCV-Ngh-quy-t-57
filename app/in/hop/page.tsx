@@ -13,7 +13,7 @@ export default async function PrintMeeting({ searchParams }: { searchParams: Pro
   const rows = await meetingData(user, sp.ten || "");
   const xong = rows.filter((r) => r.trang_thai === "hoan_thanh").length;
   return (
-    <PrintDoc cfg={cfg} title="Kết luận họp" sub={`Kết quả thực hiện kết luận tại ${sp.ten || ""}`}>
+    <PrintDoc cfg={cfg} kyThay={sp.nguoi_ky === "thay"} title="Kết luận họp" sub={`Kết quả thực hiện kết luận tại ${sp.ten || ""}`}>
       <p className="indent-8">
         Tổng số nhiệm vụ: {rows.length}; đã hoàn thành: {xong}; đang thực hiện: {rows.length - xong}.
       </p>

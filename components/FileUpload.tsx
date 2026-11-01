@@ -114,7 +114,7 @@ export function FileUpload({ doiTuong, idDoiTuong, blob }: { doiTuong: string; i
     <div className="mt-3">
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => camRef.current?.click()} className="btn btn-primary" disabled={!!busy}>
-          📷 Chụp ảnh hiện trường
+          📷 Ảnh chụp
         </button>
         <button type="button" onClick={() => fileRef.current?.click()} className="btn btn-outline" disabled={!!busy}>
           📎 Đính kèm tệp

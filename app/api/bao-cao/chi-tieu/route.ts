@@ -1,7 +1,7 @@
 import { apiUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { kpiReportData, kpiRowText } from "@/lib/reports";
-import { header, signature, p, table, docResponse } from "@/lib/word";
+import { header, signature, p, table, docResponse, tieuDe } from "@/lib/word";
 import { vnDate } from "@/lib/time";
 
 const KY: Record<string, string> = { thang: "tháng", quy: "quý", "6thang": "6 tháng", nam: "năm" };
@@ -29,13 +29,12 @@ export async function GET(req: Request) {
     }
   }
   const body = [
-    ...header(cfg),
-    p("BÁO CÁO", { bold: true, align: "center", size: 14, before: 240, after: 0 }),
-    p(`Kết quả thực hiện các chỉ tiêu ${kyText} năm ${nam}`, { bold: true, align: "center", size: 14, after: 240 }),
+    ...header(cfg, { ngang: true }),
+    ...tieuDe("Báo cáo", `Kết quả thực hiện các chỉ tiêu ${kyText} năm ${nam}`, true),
     p(`Tổng số ${kpis.length} chỉ tiêu; đã đạt và vượt: ${dat}; có nguy cơ không đạt: ${ngc}. Số liệu đã được trưởng đơn vị xác nhận tính đến ngày ${vnDate().split("-").reverse().join("/")}.`, { indent: true }),
     table(["STT", "Chỉ tiêu", "ĐVT", "Kế hoạch năm", "Thực hiện", "% KH", "Đánh giá"], rows, [6, 40, 9, 12, 12, 9, 12]),
     p("", { after: 240 }),
-    signature(cfg),
+    signature(cfg, new URL(req.url).searchParams.get("nguoi_ky") === "thay"),
   ];
   void KY;
   return docResponse(body, `Bao_cao_chi_tieu_${kyText.replace(/\s/g, "_")}_${nam}.docx`, true);

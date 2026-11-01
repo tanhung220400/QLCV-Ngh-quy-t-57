@@ -5,6 +5,7 @@ import { taskScope } from "@/lib/perm";
 import { personStats } from "@/lib/stats";
 import { meetingList, weekRange } from "@/lib/reports";
 import { fromVN, vnDate, fmtDate } from "@/lib/time";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,12 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const den = sp.den || vnDate();
   const people = !canPeople ? [] : await personStats(sql, (await taskScope(sql, user)).q, fromVN(tu, "00:00"), fromVN(den, "23:59"));
   const meetings = await meetingList(user);
+  const cfg = await getSettings();
+  const cv = (cfg.chuc_vu_ky || "Chủ tịch").toLowerCase();
+  const cfgKy = {
+    chinh: `${cv.charAt(0).toUpperCase() + cv.slice(1)} ký${cfg.nguoi_ky ? ` (${cfg.nguoi_ky})` : ""}`,
+    thay: `Ký thay: KT. ${cv}${cfg.nguoi_ky_thay ? ` – ${cfg.nguoi_ky_thay}` : ""}`,
+  };
 
   return (
     <div className="space-y-4">
@@ -53,6 +60,13 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
                 <input type="date" name="den" defaultValue={w.den} className="input" />
               </label>
             </div>
+            <label className="block">
+              <span className="text-sm">Người ký</span>
+              <select name="nguoi_ky" className="input" defaultValue="">
+                <option value="">{cfgKy.chinh}</option>
+                <option value="thay">{cfgKy.thay}</option>
+              </select>
+            </label>
             <div className="flex flex-wrap gap-2">
               <button className="btn btn-primary">Tải Word</button>
               <button formAction="/in/tuan" formTarget="_blank" className="btn btn-outline">
@@ -81,6 +95,13 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
                 </select>
               </label>
             </div>
+            <label className="block">
+              <span className="text-sm">Người ký</span>
+              <select name="nguoi_ky" className="input" defaultValue="">
+                <option value="">{cfgKy.chinh}</option>
+                <option value="thay">{cfgKy.thay}</option>
+              </select>
+            </label>
             <div className="flex flex-wrap gap-2">
               <button className="btn btn-primary">Tải Word</button>
               <button formAction="/api/xuat/chi-tieu" className="btn btn-outline">

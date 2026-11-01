@@ -42,6 +42,7 @@ export const LOAI_CHI_TIEU: Record<string, string> = {
   cong_don: "Cộng dồn",
   ty_le: "Tỷ lệ",
   dat_khong: "Đạt / không đạt",
+  ho_so: "Tỷ lệ hồ sơ toàn trình (nhập số hồ sơ)",
 };
 
 export const KY_CAP_NHAT: Record<string, string> = { tuan: "Tuần", thang: "Tháng", quy: "Quý" };
@@ -105,8 +106,13 @@ export const CAI_DAT_MAC_DINH = {
   ten_hien_thi: "",
   ten_cap_tren: "",
   dia_danh: "",
+  /** Thẩm quyền ký (dòng đầu khối chữ ký) */
+  tm_ky: "TM. ỦY BAN NHÂN DÂN",
   chuc_vu_ky: "CHỦ TỊCH",
   nguoi_ky: "",
+  /** Người ký thay (KT. CHỦ TỊCH) */
+  chuc_vu_ky_thay: "PHÓ CHỦ TỊCH",
+  nguoi_ky_thay: "",
   noi_nhan: "- Thường trực Đảng ủy;\n- Thường trực HĐND xã;\n- Lãnh đạo UBND xã;\n- Lưu: VT.",
   nguong_vang: 3, // số ngày làm việc
   nhac_truoc: [3, 1], // ngày làm việc trước hạn

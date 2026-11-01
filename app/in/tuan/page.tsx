@@ -15,10 +15,10 @@ export default async function PrintWeek({ searchParams }: { searchParams: Promis
   const pct = d.done.length ? Math.round((d.onTime * 100) / d.done.length) : 0;
   const f = (s: string) => s.split("-").reverse().join("/");
   return (
-    <PrintDoc cfg={cfg} title="Báo cáo tuần" sub={`Tình hình thực hiện nhiệm vụ tuần từ ${f(tu)} đến ${f(den)}`}>
+    <PrintDoc cfg={cfg} kyThay={sp.nguoi_ky === "thay"} title="Báo cáo tuần" sub={`Tình hình thực hiện nhiệm vụ tuần từ ${f(tu)} đến ${f(den)}`}>
       <p className="font-bold">I. KẾT QUẢ THỰC HIỆN</p>
       <p className="indent-8">
-        Trong tuần, lãnh đạo xã giao mới {d.giaoMoi} nhiệm vụ. Các đơn vị hoàn thành {d.done.length} nhiệm vụ, trong đó {d.onTime} nhiệm vụ đúng hạn (đạt {pct}%). Hiện có {d.dangLam} nhiệm vụ đang thực hiện, {d.overdue.length} nhiệm vụ quá hạn chưa hoàn thành.
+        Trong tuần, lãnh đạo giao mới {d.giaoMoi} nhiệm vụ. Các đơn vị hoàn thành {d.done.length} nhiệm vụ, trong đó {d.onTime} nhiệm vụ đúng hạn (đạt {pct}%). Hiện có {d.dangLam} nhiệm vụ đang thực hiện, {d.overdue.length} nhiệm vụ quá hạn chưa hoàn thành.
       </p>
       <p className="font-bold italic">1. Nhiệm vụ đã hoàn thành trong tuần</p>
       {d.done.length ? <PTable head={["STT", "Nhiệm vụ", "Chủ trì", "Hạn", "Hoàn thành"]} rows={d.done.map((x, i) => [i + 1, x.ten, [x.chu_tri, x.don_vi].filter(Boolean).join(" - "), fmtDue(x.han, x.han_co_gio), `${fmtDate(x.ngay_hoan_thanh)}${x.dung_han ? "" : " (trễ)"}`])} /> : <p className="italic">Không có.</p>}

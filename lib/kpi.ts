@@ -35,9 +35,25 @@ export type KpiCalc = {
   ky_moi_nhat: string | null;
   cho_xac_nhan: number;
   sap_het_han_chua_dat: boolean;
+  /** Chỉ tiêu tỷ lệ hồ sơ: số hồ sơ toàn trình và tổng số hồ sơ (cộng các kỳ đã xác nhận) */
+  ho_so?: { toan_trinh: number; mot_phan: number; truc_tiep: number; tong: number };
+  /** Số đơn vị đã có số liệu / số đơn vị phụ trách (chỉ tiêu giao nhiều đơn vị) */
+  don_vi_co_so_lieu?: number;
 };
 
-export type SoLieu = { id_chi_tieu: number; ky: string; gia_tri: number; xac_nhan: boolean };
+export type SoLieu = { id_chi_tieu: number; ky: string; gia_tri: number; xac_nhan: boolean; so_toan_trinh?: number | null; so_mot_phan?: number | null; so_truc_tiep?: number | null };
+
+/** Cộng số hồ sơ các dòng số liệu */
+export function sumHoSo(rows: Pick<SoLieu, "so_toan_trinh" | "so_mot_phan" | "so_truc_tiep">[]) {
+  const t = { toan_trinh: 0, mot_phan: 0, truc_tiep: 0, tong: 0 };
+  for (const r of rows) {
+    t.toan_trinh += Number(r.so_toan_trinh || 0);
+    t.mot_phan += Number(r.so_mot_phan || 0);
+    t.truc_tiep += Number(r.so_truc_tiep || 0);
+  }
+  t.tong = t.toan_trinh + t.mot_phan + t.truc_tiep;
+  return t;
+}
 export type KeHoachKy = { id_chi_tieu: number; ky: string; gia_tri: number };
 
 /** Số tháng đã qua tính đến hạn chốt số liệu gần nhất */
@@ -77,17 +93,28 @@ export function calcKpi(
   data: SoLieu[],
   plans: KeHoachKy[],
   nguong: number,
-  childValues: number[] = [],
+  children: KpiCalc[] = [],
   now = new Date(),
 ): KpiCalc {
   const mine = data.filter((d) => d.id_chi_tieu === k.id);
   const confirmed = mine.filter((d) => d.xac_nhan).sort((a, b) => (a.ky < b.ky ? -1 : 1));
-  const pending = mine.filter((d) => !d.xac_nhan).length;
+  const pending = mine.filter((d) => !d.xac_nhan).length + children.reduce((s, c) => s + c.cho_xac_nhan, 0);
   let th: number | null = null;
-  if (confirmed.length) {
+  let hoSo: KpiCalc["ho_so"];
+  const kidVals = children.filter((c) => c.thuc_hien != null);
+  if (k.loai === "ho_so") {
+    // tỷ lệ hồ sơ toàn trình = tổng hồ sơ toàn trình ÷ tổng hồ sơ tiếp nhận (của đơn vị, hoặc của toàn phường khi giao nhiều đơn vị)
+    const own = sumHoSo(confirmed);
+    hoSo = { ...own };
+    for (const c of children) if (c.ho_so) for (const f of ["toan_trinh", "mot_phan", "truc_tiep", "tong"] as const) hoSo[f] += c.ho_so[f];
+    th = hoSo.tong > 0 ? (hoSo.toan_trinh / hoSo.tong) * 100 : null;
+  } else if (confirmed.length) {
     th = k.loai === "cong_don" ? confirmed.reduce((s, d) => s + Number(d.gia_tri), 0) : Number(confirmed[confirmed.length - 1].gia_tri);
-  } else if (childValues.length && k.loai === "cong_don") {
-    th = childValues.reduce((s, v) => s + v, 0);
+  } else if (kidVals.length) {
+    const v = kidVals.map((c) => c.thuc_hien as number);
+    if (k.loai === "cong_don") th = v.reduce((s, x) => s + x, 0);
+    else if (k.loai === "ty_le") th = v.reduce((s, x) => s + x, 0) / v.length; // trung bình các đơn vị
+    else if (k.loai === "dat_khong") th = v.length === children.length && v.every((x) => x >= 1) ? 1 : 0;
   }
   const pct = pctOf(k, th);
   const mp = monthsPassed(k.nam, k.ngay_chot, now);
@@ -126,6 +153,8 @@ export function calcKpi(
     ky_moi_nhat: confirmed.length ? confirmed[confirmed.length - 1].ky : null,
     cho_xac_nhan: pending,
     sap_het_han_chua_dat: sapHet,
+    ho_so: hoSo,
+    don_vi_co_so_lieu: children.length ? kidVals.length : undefined,
   };
 }
 
@@ -144,13 +173,13 @@ export async function loadKpis(sql: Q, where: postgres.PendingQuery<postgres.Row
   if (!rows.length) return [];
   const all = (await sql`SELECT id, id_cha FROM chi_tieu WHERE NOT huy`) as unknown as { id: number; id_cha: number | null }[];
   const ids = [...new Set([...rows.map((r) => r.id), ...all.filter((a) => a.id_cha && rows.some((r) => r.id === a.id_cha)).map((a) => a.id)])];
-  const data = (await sql`SELECT id_chi_tieu, ky, gia_tri, xac_nhan FROM chi_tieu_so_lieu WHERE hieu_luc AND id_chi_tieu IN ${sql(ids)}`) as unknown as SoLieu[];
+  const data = (await sql`SELECT id_chi_tieu, ky, gia_tri, xac_nhan, so_toan_trinh, so_mot_phan, so_truc_tiep FROM chi_tieu_so_lieu WHERE hieu_luc AND id_chi_tieu IN ${sql(ids)}`) as unknown as SoLieu[];
   const plans = (await sql`SELECT id_chi_tieu, ky, gia_tri FROM chi_tieu_ke_hoach_ky WHERE id_chi_tieu IN ${sql(ids)}`) as unknown as KeHoachKy[];
   const childRows = (await sql`SELECT * FROM chi_tieu WHERE NOT huy AND id_cha IN ${sql(rows.map((r) => r.id))}`) as unknown as KpiRow[];
   return rows.map((k) => {
     const kids = childRows.filter((c) => c.id_cha === k.id);
-    const childVals = kids.map((c) => calcKpi(c, data, plans, nguong).thuc_hien).filter((v): v is number => v != null);
-    return { ...k, ...calcKpi(k, data, plans, nguong, childVals), so_phan_ra: kids.length, tong_ke_hoach_con: kids.reduce((s, c) => s + Number(c.ke_hoach_nam), 0) };
+    const childCalcs = kids.map((c) => calcKpi(c, data, plans, nguong));
+    return { ...k, ...calcKpi(k, data, plans, nguong, childCalcs), so_phan_ra: kids.length, tong_ke_hoach_con: kids.reduce((s, c) => s + Number(c.ke_hoach_nam), 0) };
   });
 }
 

@@ -515,16 +515,31 @@ async function Settings() {
           <span className="label">Địa danh (ví dụ: Tân Hưng)</span>
           <input name="dia_danh" className="input" defaultValue={c.dia_danh} />
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="label">Thẩm quyền ký (dòng đầu khối chữ ký)</span>
+          <input name="tm_ky" className="input" defaultValue={c.tm_ky || "TM. ỦY BAN NHÂN DÂN"} />
+        </label>
+        <div className="grid gap-2 sm:grid-cols-2">
           <label className="block">
             <span className="label">Chức vụ người ký</span>
-            <input name="chuc_vu_ky" className="input" defaultValue={c.chuc_vu_ky} />
+            <input name="chuc_vu_ky" className="input" defaultValue={c.chuc_vu_ky} placeholder="CHỦ TỊCH" />
           </label>
           <label className="block">
-            <span className="label">Họ tên người ký</span>
+            <span className="label">Họ và tên người ký</span>
             <input name="nguoi_ky" className="input" defaultValue={c.nguoi_ky} />
           </label>
+          <label className="block">
+            <span className="label">Chức vụ người ký thay</span>
+            <input name="chuc_vu_ky_thay" className="input" defaultValue={c.chuc_vu_ky_thay} placeholder="PHÓ CHỦ TỊCH" />
+          </label>
+          <label className="block">
+            <span className="label">Họ và tên người ký thay</span>
+            <input name="nguoi_ky_thay" className="input" defaultValue={c.nguoi_ky_thay} />
+          </label>
         </div>
+        <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          Khối chữ ký theo Nghị định 30/2020/NĐ-CP. Người ký chính: <b>{(c.tm_ky || "TM. ỦY BAN NHÂN DÂN").toUpperCase()}</b> / <b>{(c.chuc_vu_ky || "CHỦ TỊCH").toUpperCase()}</b> / {c.nguoi_ky || "…"}. Ký thay: <b>{(c.tm_ky || "TM. ỦY BAN NHÂN DÂN").toUpperCase()}</b> / <b>KT. {(c.chuc_vu_ky || "CHỦ TỊCH").toUpperCase()}</b> / <b>{(c.chuc_vu_ky_thay || "PHÓ CHỦ TỊCH").toUpperCase()}</b> / {c.nguoi_ky_thay || "…"}. Chọn người ký khi tải báo cáo.
+        </p>
         <label className="block">
           <span className="label">Nơi nhận</span>
           <textarea name="noi_nhan" rows={4} className="input" defaultValue={c.noi_nhan} />

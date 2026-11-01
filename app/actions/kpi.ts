@@ -37,7 +37,7 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
     nguon: str(fd, "nguon"),
     nhom: str(fd, "nhom"),
     don_vi_tinh: str(fd, "don_vi_tinh"),
-    loai: ["cong_don", "ty_le", "dat_khong"].includes(str(fd, "loai")) ? str(fd, "loai") : "cong_don",
+    loai: ["cong_don", "ty_le", "dat_khong", "ho_so"].includes(str(fd, "loai")) ? str(fd, "loai") : "cong_don",
     chieu_tot: str(fd, "chieu_tot") === "thap" ? "thap" : "cao",
     ke_hoach_nam: kh,
     gia_tri_dau_nam: dau,
@@ -51,7 +51,17 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
     ngay_chot: Math.min(28, Math.max(1, Number(str(fd, "ngay_chot")) || 25)),
     id_cha: idCha,
   };
-  const miss = [!v.ten && "tên", !v.nguon && "nguồn", !v.nhom && "nhóm", !v.don_vi_tinh && "đơn vị tính", Number.isNaN(kh) && "kế hoạch năm", !v.nam && "năm", !/^\d{4}-\d{2}-\d{2}$/.test(v.han) && "ngày hết hạn", !v.id_phu_trach && !v.id_don_vi_phu_trach && "người hoặc đơn vị phụ trách"].filter(Boolean);
+  // giao cho nhiều đơn vị: chỉ tiêu chung của phường + mỗi đơn vị một phần (tự tổng hợp)
+  const nhieu = [...new Set(fd.getAll("don_vi_nhieu").map(Number).filter(Boolean))];
+  if (fd.has("co_don_vi_nhieu")) {
+    if (nhieu.length === 1) v.id_don_vi_phu_trach = nhieu[0];
+    else if (nhieu.length > 1) {
+      v.id_don_vi_phu_trach = null;
+      if (!str(fd, "id_phu_trach")) v.id_phu_trach = null;
+    }
+  }
+  if (v.loai === "ho_so") v.don_vi_tinh = "%";
+  const miss = [!v.ten && "tên", !v.nguon && "nguồn", !v.nhom && "nhóm", !v.don_vi_tinh && "đơn vị tính", Number.isNaN(kh) && "kế hoạch năm", !v.nam && "năm", !/^\d{4}-\d{2}-\d{2}$/.test(v.han) && "ngày hết hạn", !v.id_phu_trach && !v.id_don_vi_phu_trach && nhieu.length < 2 && "người hoặc đơn vị phụ trách"].filter(Boolean);
   if (miss.length) return { error: `Còn thiếu: ${miss.join(", ")}.` };
   if (v.loai === "dat_khong") v.ke_hoach_nam = 1;
   if (!v.id_phu_trach && v.id_don_vi_phu_trach) {
@@ -68,6 +78,27 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
     newId = r.id;
     await writeLog(sql, user.id, "tao_chi_tieu", "chi_tieu", r.id, null, v);
     await notify(sql, [v.id_phu_trach], "giao_chi_tieu", `Được giao phụ trách chỉ tiêu: ${v.ten}`, `Kế hoạch năm ${v.nam}: ${kh} ${v.don_vi_tinh}`, "chi_tieu", r.id, `giaoct:${r.id}`, user.id);
+  }
+  if (nhieu.length > 1 && newId) {
+    // tạo phần của từng đơn vị chưa có; phần của đơn vị bỏ chọn được giữ lại (hủy ở trang chỉ tiêu con nếu cần)
+    const co = (await sql`SELECT id_don_vi_phu_trach AS dv FROM chi_tieu WHERE id_cha = ${newId} AND NOT huy`).map((r) => r.dv as number);
+    const ten = new Map((await sql`SELECT id, ten FROM don_vi WHERE id IN ${sql(nhieu)}`).map((r) => [r.id as number, r.ten as string]));
+    const khCon = v.loai === "cong_don" ? Math.round((kh / nhieu.length) * 100) / 100 : v.ke_hoach_nam;
+    // cập nhật thông tin chung xuống các phần đã có
+    await sql`UPDATE chi_tieu SET nguon = ${v.nguon}, nhom = ${v.nhom}, loai = ${v.loai}, don_vi_tinh = ${v.don_vi_tinh}, chieu_tot = ${v.chieu_tot}, nam = ${v.nam}, han = ${v.han},
+               linh_vuc = ${v.linh_vuc}, ky_cap_nhat = ${v.ky_cap_nhat}, ngay_chot = ${v.ngay_chot}, id_lanh_dao = ${v.id_lanh_dao},
+               ke_hoach_nam = CASE WHEN ${v.loai} = 'cong_don' THEN ke_hoach_nam ELSE ${v.ke_hoach_nam} END
+             WHERE id_cha = ${newId} AND NOT huy`;
+    let i = 0;
+    for (const dv of nhieu) {
+      if (co.includes(dv)) continue;
+      const h = await sql`SELECT id FROM nguoi_dung WHERE (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv}) AND vai_tro IN ('truong_don_vi','truong_thon','lanh_dao') AND trang_thai = 'hoat_dong'
+                          ORDER BY CASE WHEN id_don_vi = ${dv} THEN 0 ELSE 1 END, CASE WHEN chuc_vu ILIKE 'Phó%' THEN 1 ELSE 0 END, id LIMIT 1`;
+      const con = { ...v, ten: `${v.ten} — ${ten.get(dv) ?? ""}`, ke_hoach_nam: khCon, id_don_vi_phu_trach: dv, id_phu_trach: h[0]?.id ?? null, id_cha: newId, thu_tu: ++i };
+      const [r] = await sql`INSERT INTO chi_tieu ${sql(con as never)} RETURNING id`;
+      await writeLog(sql, user.id, "tao_chi_tieu", "chi_tieu", r.id, null, con);
+      if (h[0]) await notify(sql, [h[0].id], "giao_chi_tieu", `Được giao phụ trách chỉ tiêu: ${con.ten}`, `Kế hoạch năm ${v.nam}: ${khCon} ${v.don_vi_tinh}`, "chi_tieu", r.id, `giaoct:${r.id}`, user.id);
+    }
   }
   after(() => flushSms().catch(() => {}));
   return { redirect: `/chi-tieu/${idCha && !id ? idCha : newId}` };
@@ -121,23 +152,33 @@ export async function addDataAction(_: ActionState, fd: FormData): Promise<Actio
   if (!r.enter) return { error: "Bạn không phụ trách chỉ tiêu này." };
   const ky = str(fd, "ky");
   if (!/^\d{4}-(\d{2}|Q[1-4]|\d{2}-\d{2})$/.test(ky)) return { error: "Chọn kỳ số liệu." };
-  const v = r.k.loai === "dat_khong" ? (str(fd, "gia_tri") === "1" ? 1 : 0) : num(str(fd, "gia_tri"));
+  let hs: { tt: number; mp: number; tr: number } | null = null;
+  let v: number;
+  if (r.k.loai === "ho_so") {
+    const n = (k: string) => (str(fd, k) === "" ? 0 : num(str(fd, k)));
+    hs = { tt: n("so_toan_trinh"), mp: n("so_mot_phan"), tr: n("so_truc_tiep") };
+    if ([hs.tt, hs.mp, hs.tr].some((x) => Number.isNaN(x) || x < 0 || !Number.isInteger(x))) return { error: "Số hồ sơ phải là số nguyên không âm." };
+    const tong = hs.tt + hs.mp + hs.tr;
+    if (!tong) return { error: "Nhập số hồ sơ phát sinh trong kỳ (toàn trình, một phần, trực tiếp)." };
+    v = Math.round((hs.tt / tong) * 10000) / 100;
+  } else v = r.k.loai === "dat_khong" ? (str(fd, "gia_tri") === "1" ? 1 : 0) : num(str(fd, "gia_tri"));
   if (Number.isNaN(v)) return { error: "Nhập số thực hiện hợp lệ." };
   const sql = await db();
   const autoConfirm = r.confirm;
   let newId = 0;
   await sql.begin(async (tx) => {
     const old = await tx`UPDATE chi_tieu_so_lieu SET hieu_luc = FALSE WHERE id_chi_tieu = ${id} AND ky = ${ky} AND hieu_luc RETURNING gia_tri, xac_nhan`;
-    const [row] = await tx`INSERT INTO chi_tieu_so_lieu (id_chi_tieu, ky, gia_tri, ghi_chu, id_nguoi_nhap, xac_nhan, id_nguoi_xac_nhan)
-      VALUES (${id}, ${ky}, ${v}, ${str(fd, "ghi_chu") || null}, ${user.id}, ${autoConfirm}, ${autoConfirm ? user.id : null}) RETURNING id`;
+    const [row] = await tx`INSERT INTO chi_tieu_so_lieu (id_chi_tieu, ky, gia_tri, ghi_chu, id_nguoi_nhap, xac_nhan, id_nguoi_xac_nhan, so_toan_trinh, so_mot_phan, so_truc_tiep)
+      VALUES (${id}, ${ky}, ${v}, ${str(fd, "ghi_chu") || null}, ${user.id}, ${autoConfirm}, ${autoConfirm ? user.id : null}, ${hs?.tt ?? null}, ${hs?.mp ?? null}, ${hs?.tr ?? null}) RETURNING id`;
     newId = row.id;
-    await writeLog(tx, user.id, old.length ? "sua_so_lieu" : "nhap_so_lieu", "chi_tieu", id, old[0] ?? null, { ky, gia_tri: v, id_so_lieu: row.id });
+    await writeLog(tx, user.id, old.length ? "sua_so_lieu" : "nhap_so_lieu", "chi_tieu", id, old[0] ?? null, { ky, gia_tri: v, id_so_lieu: row.id, ...(hs ? { ho_so: hs } : {}) });
     if (!autoConfirm) {
       const heads = await tx`SELECT id FROM nguoi_dung WHERE id_don_vi = ${r.k.id_don_vi_phu_trach ?? -1} AND vai_tro = 'truong_don_vi' AND trang_thai = 'hoat_dong'`;
       await notify(tx, heads.map((h) => h.id as number), "xac_nhan_so_lieu", `Chờ xác nhận số liệu: ${r.k.ten}`, `${periodLabel(ky)}: ${v} ${r.k.don_vi_tinh}`, "chi_tieu", id, undefined, user.id);
     }
   });
-  return { ok: true, message: autoConfirm ? "Đã lưu số liệu." : "Đã lưu, chờ trưởng đơn vị xác nhận.", redirect: `/chi-tieu/${id}?so_lieu=${newId}` };
+  const ve = Number(str(fd, "ve")) || id;
+  return { ok: true, message: autoConfirm ? "Đã lưu số liệu." : "Đã lưu, chờ trưởng đơn vị xác nhận.", redirect: `/chi-tieu/${ve}?so_lieu=${newId}` };
 }
 
 export async function confirmDataAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -189,7 +230,7 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
     const ten = c(2);
     if (!ten) return;
     const loaiT = noAccent(c(6));
-    const loai = loaiT.startsWith("ty") ? "ty_le" : loaiT.startsWith("dat") ? "dat_khong" : "cong_don";
+    const loai = /ho so/.test(loaiT) ? "ho_so" : loaiT.startsWith("ty") ? "ty_le" : loaiT.startsWith("dat") ? "dat_khong" : "cong_don";
     const kh = Number(c(8).replace(",", "."));
     const dauS = c(9).replace(",", ".");
     const hanS = c(13);

@@ -938,6 +938,70 @@ const day = (n) => {
   ok("giao lại cho cán bộ cấp dưới", gl.join("|").includes("Vũ Thị Lan") && !gl.join("|").includes("Kiểm Thử Trưởng"), gl.join(" | "));
   await ctx.close();
 
+  // 19. Chỉ tiêu giao nhiều đơn vị, tỷ lệ hồ sơ toàn trình; báo cáo Word theo NĐ 30/2020, người ký thay
+  ({ ctx, page } = await newPage({ width: 1440, height: 900 }));
+  await page.goto(BASE + "/dang-nhap");
+  await page.fill('input[name="ten_dang_nhap"]', "quantri");
+  await page.fill('input[name="mat_khau"]', "Quantri@2026");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((u) => !u.pathname.startsWith("/dang-nhap"), { waitUntil: "commit" });
+  await page.goto(BASE + "/chi-tieu/moi");
+  await page.fill('input[name="ten"]', "Tỷ lệ hồ sơ trực tuyến toàn trình kiểm thử");
+  await page.selectOption('select[name="linh_vuc"]', { index: 1 });
+  await page.fill('input[name="don_vi_tinh"]', "%");
+  await page.selectOption('select[name="loai"]', "ho_so");
+  await page.fill('input[name="ke_hoach_nam"]', "80");
+  await page.check('label:has-text("Phòng Kinh tế") input[name="don_vi_nhieu"]');
+  await page.check('label:has-text("Phòng Văn hóa - Xã hội") input[name="don_vi_nhieu"]');
+  await page.click('button:has-text("Thêm chỉ tiêu")');
+  await page.waitForURL(/chi-tieu\/\d+$/, { waitUntil: "commit" });
+  await page.waitForSelector("h2:has-text('Đơn vị phụ trách (2)')");
+  const ctUrl = page.url();
+  ok("giao chỉ tiêu cho nhiều đơn vị", (await page.locator("main").innerText()).includes("Phụ trách: Phòng Kinh tế, Phòng Văn hóa - Xã hội"));
+  const nhapHs = async (dv, tt, mp, tr) => {
+    await page.goto(ctUrl);
+    const f = page.locator("#nhap form");
+    await f.locator('select[name="id"]').selectOption({ label: dv });
+    await f.locator('input[name="so_toan_trinh"]').fill(String(tt));
+    await f.locator('input[name="so_mot_phan"]').fill(String(mp));
+    await f.locator('input[name="so_truc_tiep"]').fill(String(tr));
+    await f.locator('button:has-text("Lưu số liệu")').click();
+    await page.waitForURL(/so_lieu=\d+/, { waitUntil: "commit" });
+  };
+  await nhapHs("Phòng Kinh tế", 8, 1, 1);
+  await nhapHs("Phòng Văn hóa - Xã hội", 2, 3, 5);
+  await page.goto(ctUrl);
+  const ctTxt = (await page.locator("main").innerText()).replace(/\s+/g, " ");
+  ok("số hồ sơ toàn trình / một phần / trực tiếp theo đơn vị", ctTxt.includes("8/10 hồ sơ toàn trình = 80%") && ctTxt.includes("2/10 hồ sơ toàn trình = 20%"), ctTxt.slice(0, 600));
+  ok("tỷ lệ toàn trình toàn phường = tổng toàn trình ÷ tổng hồ sơ", ctTxt.includes("Toàn phường: 10 hồ sơ toàn trình / 20 hồ sơ tiếp nhận") && ctTxt.includes("50% toàn trình"), ctTxt.slice(0, 600));
+  ok("bảng toàn phường theo kỳ", ctTxt.includes("Toàn phường theo kỳ") && /2\/2/.test(ctTxt));
+  // cài đặt người ký thay
+  await page.goto(BASE + "/quan-tri?muc=cai_dat");
+  await page.fill('input[name="nguoi_ky"]', "Trần Thị Châu");
+  await page.fill('input[name="chuc_vu_ky_thay"]', "Phó Chủ tịch");
+  await page.fill('input[name="nguoi_ky_thay"]', "Lê Văn Phúc");
+  await page.click('form:has(input[name="nguoi_ky_thay"]) button[type="submit"]');
+  await page.waitForTimeout(1500);
+  const docXml = async (url) => {
+    const r = await page.request.get(BASE + url);
+    require("fs").writeFileSync("/tmp/bc.docx", Buffer.from(await r.body()));
+    return require("child_process").execSync(`python3 -c "import zipfile;print(zipfile.ZipFile('/tmp/bc.docx').read('word/document.xml').decode())"`).toString().replace(/<[^>]+>/g, "");
+  };
+  const ky1 = await docXml("/api/bao-cao/tuan");
+  ok("báo cáo: TM. ỦY BAN NHÂN DÂN, chức vụ, người ký", ky1.includes("TM. ỦY BAN NHÂN DÂN") && ky1.includes("CHỦ TỊCH") && ky1.includes("Trần Thị Châu") && !ky1.includes("KT. CHỦ TỊCH"));
+  ok("báo cáo: quốc hiệu, tiêu ngữ, số ký hiệu, ngày tháng có số 0", ky1.includes("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM") && ky1.includes("Độc lập - Tự do - Hạnh phúc") && ky1.includes("/BC-UBND") && /ngày \d{2} tháng/.test(ky1));
+  const ky2 = await docXml("/api/bao-cao/tuan?nguoi_ky=thay");
+  ok("báo cáo ký thay: KT. CHỦ TỊCH / PHÓ CHỦ TỊCH / người ký thay", ky2.includes("KT. CHỦ TỊCH") && ky2.includes("PHÓ CHỦ TỊCH") && ky2.includes("Lê Văn Phúc"));
+  const sect = require("child_process").execSync(`python3 -c "import zipfile;print(zipfile.ZipFile('/tmp/bc.docx').read('word/document.xml').decode())"`).toString();
+  ok("lề trang theo NĐ 30 (trên 20, dưới 20, trái 30, phải 15 mm), không đánh số trang đầu", /w:top="1134"/.test(sect) && /w:left="1701"/.test(sect) && /w:right="851"/.test(sect) && /w:titlePg/.test(sect));
+  // Ảnh chụp
+  await page.goto(BASE + "/viec?tab=tat_ca");
+  await page.locator("main a[href^='/viec/']").first().click();
+  await page.waitForURL(/\/viec\/\d+/);
+  const tx = await page.locator("main").innerText();
+  ok("đổi “Chụp ảnh hiện trường” thành “Ảnh chụp”", !tx.includes("Chụp ảnh hiện trường") && !tx.includes("hiện trường"));
+  await ctx.close();
+
   await browser.close();
   console.log(results.join("\n"));
   console.log(`\n${results.filter((r) => r.startsWith("PASS")).length}/${results.length} PASS`);
