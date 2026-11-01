@@ -6,7 +6,8 @@ import { getUser, type User } from "@/lib/auth";
 import { canManageKpi, canSeeKpi } from "@/lib/perm";
 import { kpiRights } from "@/lib/kpiRights";
 import { notify, writeLog } from "@/lib/log";
-import { periodLabel } from "@/lib/kpi";
+import { periodLabel, currentPeriod } from "@/lib/kpi";
+import { tinhQuyen } from "@/lib/quyen";
 import { truongDonVi as dauDonVi } from "@/lib/giaoViec";
 import type { ActionState } from "@/components/ActionForm";
 
@@ -62,6 +63,10 @@ export async function saveKpiAction(_: ActionState, fd: FormData): Promise<Actio
     }
   }
   if (v.loai === "ho_so") v.don_vi_tinh = "%";
+  // chỉ tiêu không giao trước: tỷ lệ mặc định 100% số phát sinh; cộng dồn để 0 (tính 100% trên tổng số phát sinh)
+  if (!str(fd, "ke_hoach_nam") && (v.loai === "ty_le" || v.loai === "ho_so")) v.ke_hoach_nam = 100;
+  if (v.loai === "ty_le") v.don_vi_tinh = "%";
+  v.ky_cap_nhat = "thang"; // số liệu nhập theo tháng phát sinh
   const miss = [!v.ten && "tên", !v.nguon && "nguồn", !v.nhom && "nhóm", !v.don_vi_tinh && "đơn vị tính", Number.isNaN(kh) && "kế hoạch năm", !v.nam && "năm", !/^\d{4}-\d{2}-\d{2}$/.test(v.han) && "ngày hết hạn", !v.id_phu_trach && !v.id_don_vi_phu_trach && nhieu.length < 2 && "người hoặc đơn vị phụ trách"].filter(Boolean);
   if (miss.length) return { error: `Còn thiếu: ${miss.join(", ")}.` };
   if (v.loai === "dat_khong") v.ke_hoach_nam = 1;
@@ -236,6 +241,22 @@ export async function savePlansAction(_: ActionState, fd: FormData): Promise<Act
   return { ok: true, message: "Đã lưu kế hoạch theo kỳ." };
 }
 
+/** Người nhận thông báo xác nhận số liệu: Giao việc cấp 2 của đơn vị phụ trách, Giao việc cấp 1 của đơn vị hoặc lãnh đạo phụ trách */
+async function nguoiXacNhan(sql: Q, k: { id_don_vi_phu_trach: number | null; id_lanh_dao: number | null }): Promise<number[]> {
+  const dv = k.id_don_vi_phu_trach ?? -1;
+  const rows = await sql`SELECT id, vai_tro, quyen, id_don_vi, id_don_vi_kiem_nhiem FROM nguoi_dung WHERE trang_thai = 'hoat_dong'
+                         AND (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv} OR id = ${k.id_lanh_dao ?? -1})`;
+  const out = rows
+    .filter((u) => {
+      const q = tinhQuyen(u.vai_tro, u.quyen);
+      return q.has("cv.giao_cap1") || (q.has("cv.giao_cap2") && u.id !== k.id_lanh_dao);
+    })
+    .map((u) => u.id as number);
+  if (out.length) return out;
+  const all = await sql`SELECT id, vai_tro, quyen FROM nguoi_dung WHERE trang_thai = 'hoat_dong' AND vai_tro = 'lanh_dao'`;
+  return all.filter((u) => tinhQuyen(u.vai_tro, u.quyen).has("cv.giao_cap1")).map((u) => u.id as number);
+}
+
 export async function addDataAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const user = await getUser();
   if (!user) return { redirect: "/dang-nhap" };
@@ -244,8 +265,11 @@ export async function addDataAction(_: ActionState, fd: FormData): Promise<Actio
   if (!r) return { error: "Không tìm thấy chỉ tiêu." };
   if (!r.enter) return { error: "Bạn không phụ trách chỉ tiêu này." };
   const ky = str(fd, "ky");
-  if (!/^\d{4}-(\d{2}|Q[1-4]|\d{2}-\d{2})$/.test(ky)) return { error: "Chọn kỳ số liệu." };
+  if (!/^\d{4}-\d{2}$/.test(ky)) return { error: "Chọn tháng phát sinh số liệu." };
+  if (Number(ky.slice(0, 4)) !== Number(r.k.nam)) return { error: `Chỉ nhập số liệu các tháng của năm ${r.k.nam}.` };
+  if (ky > currentPeriod("thang")) return { error: "Chưa đến tháng này. Chỉ nhập số liệu đã phát sinh (đến tháng hiện tại)." };
   let hs: { tt: number; mp: number; tr: number } | null = null;
+  let dem: { ps: number; dat: number } | null = null;
   let v: number;
   if (r.k.loai === "ho_so") {
     const n = (k: string) => (str(fd, k) === "" ? 0 : num(str(fd, k)));
@@ -254,25 +278,31 @@ export async function addDataAction(_: ActionState, fd: FormData): Promise<Actio
     const tong = hs.tt + hs.mp + hs.tr;
     if (!tong) return { error: "Nhập số hồ sơ phát sinh trong kỳ (toàn trình, một phần, trực tiếp)." };
     v = Math.round((hs.tt / tong) * 10000) / 100;
+  } else if (r.k.loai === "ty_le") {
+    dem = { ps: num(str(fd, "so_phat_sinh")), dat: num(str(fd, "so_dat")) };
+    if ([dem.ps, dem.dat].some((x) => Number.isNaN(x) || x < 0) || str(fd, "so_phat_sinh") === "" || str(fd, "so_dat") === "") return { error: "Nhập tổng số phát sinh trong tháng và số đạt (số không âm)." };
+    if (!dem.ps) return { error: "Tổng số phát sinh trong tháng phải lớn hơn 0." };
+    if (dem.dat > dem.ps) return { error: "Số đạt không được lớn hơn tổng số phát sinh." };
+    v = Math.round((dem.dat / dem.ps) * 10000) / 100;
   } else v = r.k.loai === "dat_khong" ? (str(fd, "gia_tri") === "1" ? 1 : 0) : num(str(fd, "gia_tri"));
   if (Number.isNaN(v)) return { error: "Nhập số thực hiện hợp lệ." };
   const sql = await db();
-  const autoConfirm = r.confirm;
+  // số liệu luôn phải được người có quyền Giao việc cấp 1/cấp 2 khác xác nhận (không tự xác nhận)
+  const autoConfirm = false;
   let newId = 0;
   await sql.begin(async (tx) => {
     const old = await tx`UPDATE chi_tieu_so_lieu SET hieu_luc = FALSE WHERE id_chi_tieu = ${id} AND ky = ${ky} AND hieu_luc RETURNING gia_tri, xac_nhan`;
-    const [row] = await tx`INSERT INTO chi_tieu_so_lieu (id_chi_tieu, ky, gia_tri, ghi_chu, id_nguoi_nhap, xac_nhan, id_nguoi_xac_nhan, so_toan_trinh, so_mot_phan, so_truc_tiep)
-      VALUES (${id}, ${ky}, ${v}, ${str(fd, "ghi_chu") || null}, ${user.id}, ${autoConfirm}, ${autoConfirm ? user.id : null}, ${hs?.tt ?? null}, ${hs?.mp ?? null}, ${hs?.tr ?? null}) RETURNING id`;
+    const [row] = await tx`INSERT INTO chi_tieu_so_lieu (id_chi_tieu, ky, gia_tri, ghi_chu, id_nguoi_nhap, xac_nhan, id_nguoi_xac_nhan, so_toan_trinh, so_mot_phan, so_truc_tiep, so_phat_sinh, so_dat)
+      VALUES (${id}, ${ky}, ${v}, ${str(fd, "ghi_chu") || null}, ${user.id}, ${autoConfirm}, ${autoConfirm ? user.id : null}, ${hs?.tt ?? null}, ${hs?.mp ?? null}, ${hs?.tr ?? null}, ${dem?.ps ?? null}, ${dem?.dat ?? null}) RETURNING id`;
     newId = row.id;
-    await writeLog(tx, user.id, old.length ? "sua_so_lieu" : "nhap_so_lieu", "chi_tieu", id, old[0] ?? null, { ky, gia_tri: v, id_so_lieu: row.id, ...(hs ? { ho_so: hs } : {}) });
+    await writeLog(tx, user.id, old.length ? "sua_so_lieu" : "nhap_so_lieu", "chi_tieu", id, old[0] ?? null, { ky, gia_tri: v, id_so_lieu: row.id, ...(hs ? { ho_so: hs } : {}), ...(dem ? { phat_sinh: dem.ps, dat: dem.dat } : {}) });
     if (!autoConfirm) {
-      const dau = await dauDonVi(tx, r.k.id_don_vi_phu_trach);
-      const heads = await tx`SELECT id FROM nguoi_dung WHERE id_don_vi = ${r.k.id_don_vi_phu_trach ?? -1} AND vai_tro = 'truong_don_vi' AND trang_thai = 'hoat_dong'`;
-      await notify(tx, [...new Set([dau, ...heads.map((h) => h.id as number)].filter((x): x is number => !!x && x !== user.id))], "xac_nhan_so_lieu", `Chờ xác nhận số liệu: ${r.k.ten}`, `${periodLabel(ky)}: ${v} ${r.k.don_vi_tinh}`, "chi_tieu", id, undefined, user.id);
+      const nhan = await nguoiXacNhan(tx as never, r.k);
+      await notify(tx, nhan.filter((x) => x !== user.id), "xac_nhan_so_lieu", `Chờ xác nhận số liệu: ${r.k.ten}`, `${periodLabel(ky)}: ${v} ${r.k.don_vi_tinh}`, "chi_tieu", id, undefined, user.id);
     }
   });
   const ve = Number(str(fd, "ve")) || id;
-  return { ok: true, message: autoConfirm ? "Đã lưu số liệu." : "Đã lưu, chờ trưởng đơn vị xác nhận.", redirect: `/chi-tieu/${ve}?so_lieu=${newId}` };
+  return { ok: true, message: "Đã lưu số liệu, chờ người có quyền Giao việc cấp 1 hoặc cấp 2 xác nhận.", redirect: `/chi-tieu/${ve}?so_lieu=${newId}` };
 }
 
 export async function confirmDataAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -283,9 +313,12 @@ export async function confirmDataAction(_: ActionState, fd: FormData): Promise<A
   const s = (await sql`SELECT * FROM chi_tieu_so_lieu WHERE id = ${sid} AND hieu_luc`)[0];
   if (!s) return { error: "Số liệu không còn hiệu lực." };
   const r = await kpiRole(user, s.id_chi_tieu);
-  if (!r?.confirm) return { error: "Chỉ trưởng đơn vị hoặc lãnh đạo được xác nhận." };
+  if (!r?.confirm) return { error: "Chỉ người có quyền Giao việc cấp 1 (trong phạm vi) hoặc Giao việc cấp 2 (của đơn vị) được xác nhận số liệu." };
+  if (s.id_nguoi_nhap === user.id && !user.quyen.includes("qt.du_lieu")) return { error: "Không tự xác nhận số liệu do chính mình nhập." };
+  if (s.xac_nhan) return { error: "Số liệu đã được xác nhận." };
+  if (str(fd, "ket_luan") === "tra_lai" && !str(fd, "y_kien")) return { error: "Nêu lý do trả lại số liệu." };
   const ok = str(fd, "ket_luan") !== "tra_lai";
-  if (ok) await sql`UPDATE chi_tieu_so_lieu SET xac_nhan = TRUE, id_nguoi_xac_nhan = ${user.id} WHERE id = ${sid}`;
+  if (ok) await sql`UPDATE chi_tieu_so_lieu SET xac_nhan = TRUE, id_nguoi_xac_nhan = ${user.id}, xac_nhan_luc = now() WHERE id = ${sid}`;
   else await sql`UPDATE chi_tieu_so_lieu SET hieu_luc = FALSE WHERE id = ${sid}`;
   await writeLog(sql, user.id, ok ? "xac_nhan_so_lieu" : "tra_lai_so_lieu", "chi_tieu", s.id_chi_tieu, null, { id_so_lieu: sid, ky: s.ky, gia_tri: s.gia_tri, y_kien: str(fd, "y_kien") });
   await notify(sql, [s.id_nguoi_nhap], "so_lieu", `${ok ? "Đã xác nhận" : "Trả lại"} số liệu: ${r.k.ten}`, str(fd, "y_kien") || periodLabel(s.ky), "chi_tieu", s.id_chi_tieu, undefined, user.id);
@@ -339,7 +372,6 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
     const ld = ldT ? leaders.find((l) => noAccent(l.ho_ten) === ldT || noAccent(l.ho_ten).endsWith(ldT)) : undefined;
     if (Number.isNaN(kh) && loai !== "dat_khong") errs.push(`Dòng ${n}: kế hoạch năm không phải số.`);
     if (!dv) errs.push(`Dòng ${n}: không tìm thấy đơn vị “${c(10)}”.`);
-    const kyT = noAccent(c(12));
     const lvT = noAccent(c(14));
     const lv = lvT ? lvList.find((x) => noAccent(x) === lvT) || lvList.find((x) => noAccent(x).includes(lvT) || lvT.includes(noAccent(x))) : undefined;
     if (lvT && !lv) errs.push(`Dòng ${n}: lĩnh vực “${c(14)}” không có trong danh mục.`);
@@ -356,7 +388,7 @@ export async function importKpiAction(_: ActionState, fd: FormData): Promise<Act
       han,
       id_don_vi_phu_trach: dv?.id ?? null,
       id_lanh_dao: ld?.id ?? null,
-      ky_cap_nhat: kyT.startsWith("quy") ? "quy" : kyT.startsWith("tuan") ? "tuan" : "thang",
+      ky_cap_nhat: "thang",
       linh_vuc: lv ?? null,
       thu_tu: n,
     });

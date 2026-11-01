@@ -1,6 +1,6 @@
 import { ActionForm, Submit } from "./ActionForm";
 import { saveKpiAction } from "@/app/actions/kpi";
-import { LOAI_CHI_TIEU, KY_CAP_NHAT } from "@/lib/const";
+import { LOAI_CHI_TIEU } from "@/lib/const";
 
 type Opt = { id: number; ten: string };
 type K = Record<string, unknown>;
@@ -100,9 +100,9 @@ export function KpiForm({
           </select>
         </div>
         <div>
-          <label className="label req">Kế hoạch năm</label>
-          <input name="ke_hoach_nam" inputMode="decimal" className="input" defaultValue={k ? String(k.ke_hoach_nam) : ""} required />
-          <p className="mt-1 text-sm text-slate-500">Loại đạt/không đạt: để 1. Tỷ lệ hồ sơ: % toàn trình cần đạt.</p>
+          <label className="label">Kế hoạch năm (chỉ tiêu được giao)</label>
+          <input name="ke_hoach_nam" inputMode="decimal" className="input" defaultValue={k ? String(k.ke_hoach_nam) : ""} />
+          <p className="mt-1 text-sm text-slate-500">Để trống nếu chỉ tiêu không được giao trước: tỷ lệ tính trên 100% số phát sinh; cộng dồn tính 100% trên tổng số phát sinh. Loại đạt/không đạt: để 1.</p>
         </div>
         <div>
           <label className="label">Giá trị đầu năm</label>
@@ -177,13 +177,8 @@ export function KpiForm({
         </div>
         <div>
           <label className="label">Kỳ cập nhật</label>
-          <select name="ky_cap_nhat" className="input" defaultValue={g("ky_cap_nhat", "thang")}>
-            {Object.entries(KY_CAP_NHAT).map(([a, b]) => (
-              <option key={a} value={a}>
-                {b}
-              </option>
-            ))}
-          </select>
+          <input type="hidden" name="ky_cap_nhat" value="thang" />
+          <p className="input bg-slate-50">Hằng tháng (nhập số phát sinh trong tháng)</p>
         </div>
         <div>
           <label className="label">Ngày chốt số liệu hằng kỳ</label>

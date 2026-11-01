@@ -40,7 +40,7 @@ export const LOAI_DON_VI: Record<string, string> = {
 
 export const LOAI_CHI_TIEU: Record<string, string> = {
   cong_don: "Cộng dồn",
-  ty_le: "Tỷ lệ",
+  ty_le: "Tỷ lệ (nhập tổng số phát sinh và số đạt hằng tháng)",
   dat_khong: "Đạt / không đạt",
   ho_so: "Tỷ lệ hồ sơ toàn trình (nhập số hồ sơ)",
 };

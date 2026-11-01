@@ -213,17 +213,34 @@ const day = (n) => {
   await page.click("text=Tỷ lệ người dân tham gia bảo hiểm y tế");
   await page.waitForURL(/chi-tieu\/\d+/, { waitUntil: "commit" });
   const kpiUrl = page.url();
-  await page.fill('#nhap input[name="gia_tri"]', "93,2");
+  ok("nhập số liệu theo tháng phát sinh", (await page.locator('#nhap select[name="ky"] option').allInnerTexts()).every((t) => /^Tháng /.test(t)));
+  await page.fill('#nhap input[name="so_phat_sinh"]', "1000");
+  await page.fill('#nhap input[name="so_dat"]', "1200");
+  await page.click('#nhap button:has-text("Lưu số liệu")');
+  await page.waitForSelector("text=Số đạt không được lớn hơn tổng số phát sinh");
+  ok("chặn số đạt lớn hơn số phát sinh", true);
+  await page.fill('#nhap input[name="so_dat"]', "932");
   await page.click('#nhap button:has-text("Lưu số liệu")');
   await page.waitForURL(/so_lieu=\d+/, { waitUntil: "commit" });
-  ok("công chức nhập số liệu chỉ tiêu", (await page.locator("body").innerText()).includes("Chờ xác nhận"));
+  {
+    const tx = await page.locator("body").innerText();
+    ok("công chức nhập số liệu chỉ tiêu", tx.includes("Chờ xác nhận") && tx.includes("932 / 1.000"), tx.slice(0, 300));
+    ok("người nhập không tự xác nhận số liệu", (await page.locator('form:has(input[name="id_so_lieu"]) button:has-text("Xác nhận")').count()) === 0);
+    const th = await page.locator("table thead").last().innerText();
+    ok("cột Xác nhận sau cột Minh chứng", th.indexOf("Minh chứng") >= 0 && th.indexOf("Xác nhận") > th.indexOf("Minh chứng"), th);
+  }
   await ctx.close();
   ({ ctx, page } = await newPage());
   await login(page, "tp.vanhoa");
   await page.goto(kpiUrl);
-  await page.locator('button:has-text("Xác nhận")').first().click();
+  await page.locator('form:has(input[name="id_so_lieu"]) button:has-text("Xác nhận")').first().click();
   await page.waitForSelector("text=Đã xác nhận.");
-  ok("trưởng phòng xác nhận số liệu", true);
+  ok("trưởng phòng (Giao việc cấp 2) xác nhận số liệu", true);
+  await page.goto(kpiUrl);
+  {
+    const tx = (await page.locator("main").innerText()).replace(/\s+/g, " ");
+    ok("tổng hợp theo tháng, quý, năm", tx.includes("Tổng hợp theo tháng, quý, năm") && tx.includes("93,2%") && /Cả năm \d{4}/.test(tx), tx.slice(0, 500));
+  }
   await ctx.close();
 
   // 8. Văn phòng nhập nhanh từ kết luận họp
@@ -984,6 +1001,12 @@ const day = (n) => {
   await nhapHs("Phòng Kinh tế", 8, 1, 1);
   await nhapHs("Phòng Văn hóa - Xã hội", 2, 3, 5);
   await page.goto(ctUrl);
+  ok("số liệu chưa xác nhận thì chưa tính", !(await page.locator("main").innerText()).includes("Toàn phường: 10 hồ sơ toàn trình"));
+  for (let i = 0; i < 2; i++) {
+    await page.locator('form:has(input[name="id_so_lieu"]) button:has-text("Xác nhận")').first().click();
+    await page.waitForSelector("text=Đã xác nhận.");
+    await page.goto(ctUrl);
+  }
   const hsTxt = (await page.locator("main").innerText()).replace(/\s+/g, " ");
   ok("số hồ sơ toàn trình / một phần / trực tiếp theo đơn vị", hsTxt.includes("8/10 hồ sơ toàn trình = 80%") && hsTxt.includes("2/10 hồ sơ toàn trình = 20%"), hsTxt.slice(0, 600));
   ok("tỷ lệ toàn trình toàn phường = tổng toàn trình ÷ tổng hồ sơ", hsTxt.includes("Toàn phường: 10 hồ sơ toàn trình / 20 hồ sơ tiếp nhận") && hsTxt.includes("50% toàn trình"), hsTxt.slice(0, 600));

@@ -1,5 +1,5 @@
 // Mô hình dữ liệu theo mục 8 của đặc tả. Chạy lại nhiều lần không sao (IF NOT EXISTS).
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS don_vi (
@@ -384,4 +384,8 @@ ALTER TABLE chi_tieu_so_lieu ADD COLUMN IF NOT EXISTS so_truc_tiep INT;
 ALTER TABLE cong_viec ADD COLUMN IF NOT EXISTS id_nguoi_xac_nhan INT REFERENCES nguoi_dung(id);
 ALTER TABLE cong_viec ADD COLUMN IF NOT EXISTS xac_nhan_luc TIMESTAMPTZ;
 ALTER TABLE cong_viec ADD COLUMN IF NOT EXISTS y_kien_xac_nhan TEXT;
+-- ===== Phiên bản 11: chỉ tiêu tỷ lệ nhập theo số phát sinh trong tháng =====
+ALTER TABLE chi_tieu_so_lieu ADD COLUMN IF NOT EXISTS so_phat_sinh NUMERIC;
+ALTER TABLE chi_tieu_so_lieu ADD COLUMN IF NOT EXISTS so_dat NUMERIC;
+ALTER TABLE chi_tieu_so_lieu ADD COLUMN IF NOT EXISTS xac_nhan_luc TIMESTAMPTZ;
 `;

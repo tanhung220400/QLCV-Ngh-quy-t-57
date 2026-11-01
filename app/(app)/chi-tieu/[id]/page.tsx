@@ -9,7 +9,7 @@ import { getSettings } from "@/lib/settings";
 import { KpiBar, KpiStatus } from "@/components/Charts";
 import { ActionForm, Submit } from "@/components/ActionForm";
 import { addDataAction, confirmDataAction, savePlansAction, deleteKpiAction, adminKpiAction, updateKpiUnitsAction } from "@/app/actions/kpi";
-import { LOAI_CHI_TIEU, KY_CAP_NHAT, TRANG_THAI } from "@/lib/const";
+import { LOAI_CHI_TIEU, TRANG_THAI } from "@/lib/const";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { FileUpload } from "@/components/FileUpload";
 import { KpiForm } from "@/components/KpiForm";
@@ -69,9 +69,48 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
     }
   const pctHs = (tt: number, tong: number) => (tong ? `${fmtNum((tt / tong) * 100, 1)}%` : "–");
   const opts = manage ? await kpiFormOptions() : null;
-  const kyNow = currentPeriod(k.ky_cap_nhat);
-  const kyList = k.ky_cap_nhat === "tuan" ? [kyNow] : periods(k.nam, k.ky_cap_nhat);
+  // số liệu nhập theo tháng phát sinh, chỉ các tháng đã qua hoặc tháng hiện tại của năm chỉ tiêu
+  const thangNay = currentPeriod("thang");
+  const kyList = periods(k.nam, "thang").filter((p) => p <= thangNay);
+  const kyNow = kyList.includes(thangNay) ? thangNay : kyList[kyList.length - 1];
   const highlight = Number(sp.so_lieu) || 0;
+  // tổng hợp số liệu đã xác nhận theo tháng, quý, năm (gồm phần của các đơn vị)
+  const khNam = Number(k.ke_hoach_nam);
+  const coTongHop = k.loai === "cong_don" || k.loai === "ty_le" || hoSo;
+  type Dong = { a: number; b: number; n: number };
+  const theoThang = new Map<string, Dong>();
+  for (const d of data.filter((x) => x.hieu_luc && x.xac_nhan && /^\d{4}-\d{2}$/.test(x.ky))) {
+    const t = theoThang.get(d.ky) || { a: 0, b: 0, n: 0 };
+    if (hoSo) {
+      t.a += Number(d.so_toan_trinh || 0);
+      t.b += Number(d.so_toan_trinh || 0) + Number(d.so_mot_phan || 0) + Number(d.so_truc_tiep || 0);
+    } else if (k.loai === "ty_le") {
+      if (d.so_phat_sinh == null) continue;
+      t.a += Number(d.so_dat || 0);
+      t.b += Number(d.so_phat_sinh);
+    } else t.a += Number(d.gia_tri);
+    t.n += 1;
+    theoThang.set(d.ky, t);
+  }
+  const cong = (ds: Dong[]) => ds.reduce((x, y) => ({ a: x.a + y.a, b: x.b + y.b, n: x.n + y.n }), { a: 0, b: 0, n: 0 });
+  const tyLe = (t: Dong) => (t.b > 0 ? (t.a / t.b) * 100 : null);
+  const bangTongHop: { nhan: string; t: Dong; luyKe: number; cap: "thang" | "quy" | "nam" }[] = [];
+  if (coTongHop) {
+    let luyKe = 0;
+    for (let q = 1; q <= 4; q++) {
+      const thang = [1, 2, 3].map((i) => `${k.nam}-${String((q - 1) * 3 + i).padStart(2, "0")}`);
+      for (const m of thang) {
+        const t = theoThang.get(m);
+        if (!t) continue;
+        luyKe += t.a;
+        bangTongHop.push({ nhan: periodLabel(m), t, luyKe, cap: "thang" });
+      }
+      const tq = cong(thang.map((m) => theoThang.get(m)).filter((x): x is Dong => !!x));
+      if (tq.n) bangTongHop.push({ nhan: `Quý ${q}/${k.nam}`, t: tq, luyKe, cap: "quy" });
+    }
+    const tn = cong([...theoThang.values()]);
+    if (tn.n) bangTongHop.push({ nhan: `Cả năm ${k.nam}`, t: tn, luyKe, cap: "nam" });
+  }
   const sumKids = kids.reduce((a, c) => a + Number(c.ke_hoach_nam), 0);
 
   return (
@@ -105,7 +144,7 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
           <div>
             <div className="text-sm text-slate-500">Thực hiện / Kế hoạch năm</div>
             <div className="text-2xl font-bold tabular-nums">
-              {fmtNum(k.thuc_hien)} / {fmtNum(k.ke_hoach_nam)} <span className="text-base font-normal">{k.don_vi_tinh}</span>
+              {fmtNum(k.thuc_hien)} / {k.loai === "cong_don" && Number(k.ke_hoach_nam) === 0 ? "không giao trước" : fmtNum(k.ke_hoach_nam)} <span className="text-base font-normal">{k.don_vi_tinh}</span>
             </div>
           </div>
           <div>
@@ -128,7 +167,13 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
             <b>{pctHs(k.ho_so.toan_trinh, k.ho_so.tong)}</b> toàn trình.
           </p>
         )}
-        {kids.length > 0 && !hoSo && k.loai !== "cong_don" && (
+        {k.loai === "ty_le" && k.dem && (
+          <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-[15px]">
+            {kids.length ? "Toàn phường" : "Đơn vị"}: <b>{fmtNum(k.dem.dat)}</b> đạt / <b>{fmtNum(k.dem.phat_sinh)}</b> phát sinh (cộng các tháng đã xác nhận) → <b>{pctHs(k.dem.dat, k.dem.phat_sinh)}</b>
+            {Number(k.ke_hoach_nam) === 100 ? " (chỉ tiêu: 100% số phát sinh)" : ` (chỉ tiêu: ${fmtNum(k.ke_hoach_nam)}%)`}.
+          </p>
+        )}
+        {kids.length > 0 && !hoSo && k.loai !== "cong_don" && !k.dem && (
           <p className="mt-3 text-sm text-slate-500">
             Toàn phường = {k.loai === "ty_le" ? "trung bình số liệu mới nhất của các đơn vị" : "đạt khi tất cả đơn vị đạt"} ({k.don_vi_co_so_lieu ?? 0}/{kids.length} đơn vị đã có số liệu).
           </p>
@@ -144,7 +189,7 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
           </div>
           <div>Lãnh đạo phụ trách: {k.ten_lanh_dao || "–"}</div>
           <div>
-            Cập nhật: {KY_CAP_NHAT[k.ky_cap_nhat]}, chốt ngày {k.ngay_chot} · hết hạn {fmtDate(k.han)}
+            Cập nhật: số liệu phát sinh hằng tháng, chốt ngày {k.ngay_chot} · hết hạn {fmtDate(k.han)}
           </div>
         </dl>
         {k.chieu_tot === "thap" && (
@@ -159,13 +204,15 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
           <h2 className="h2">Cập nhật số liệu thực hiện</h2>
           <p className="text-sm text-slate-500">
             {hoSo
-              ? "Nhập số hồ sơ phát sinh trong kỳ: toàn trình, một phần, trực tiếp. Phần mềm tự tính tỷ lệ toàn trình của đơn vị và của toàn phường."
+              ? "Nhập số hồ sơ phát sinh trong tháng: toàn trình, một phần, trực tiếp. Phần mềm tự tính tỷ lệ toàn trình theo tháng, quý, năm."
               : k.loai === "cong_don"
-                ? "Nhập số phát sinh trong kỳ (hệ thống tự cộng dồn)."
-                : "Nhập giá trị tại thời điểm cuối kỳ."}
-            {!(kids.length ? nhapVao.every((c) => quyenCon.get(c.id)?.confirm) : confirm) && " Số liệu cần trưởng đơn vị xác nhận trước khi lên báo cáo."}
+                ? `Nhập số phát sinh trong tháng (không nhập số lũy kế). Phần mềm tự cộng các tháng và so với ${Number(k.ke_hoach_nam) ? "kế hoạch năm được giao" : "tổng số phát sinh (chỉ tiêu không giao trước tính 100%)"}.`
+                : k.loai === "ty_le"
+                  ? "Nhập tổng số phát sinh trong tháng và số đạt. Phần mềm tự tính tỷ lệ theo tháng, quý, năm; chỉ tiêu không giao trước tính trên 100% số phát sinh."
+                  : "Chọn kết quả của tháng."}
+            {" "}Sau khi lưu, số liệu cần người có quyền Giao việc cấp 1 hoặc Giao việc cấp 2 xác nhận mới được tính vào kết quả.
           </p>
-          <ActionForm action={addDataAction} className={`mt-3 grid gap-3 ${hoSo ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-4"}`}>
+          <ActionForm action={addDataAction} className={`mt-3 grid gap-3 ${hoSo || k.loai === "ty_le" ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-4"}`}>
             {kids.length ? (
               <>
                 <input type="hidden" name="ve" value={id} />
@@ -184,8 +231,8 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
               <input type="hidden" name="id" value={id} />
             )}
             <label className="block">
-              {(hoSo || kids.length > 0) && <span className="label">Kỳ</span>}
-              <select name="ky" className="input" defaultValue={kyNow} aria-label="Kỳ số liệu">
+              <span className="label">Tháng phát sinh</span>
+              <select name="ky" className="input" defaultValue={kyNow} aria-label="Tháng phát sinh">
                 {kyList.map((p) => (
                   <option key={p} value={p}>
                     {periodLabel(p)}
@@ -216,14 +263,25 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
                   <option value="0">Chưa đạt</option>
                 </select>
               </label>
+            ) : k.loai === "ty_le" ? (
+              <>
+                <label className="block">
+                  <span className="label">Tổng số phát sinh trong tháng</span>
+                  <input name="so_phat_sinh" type="number" min={0} step="any" inputMode="decimal" className="input" required />
+                </label>
+                <label className="block">
+                  <span className="label">Số đạt / hoàn thành</span>
+                  <input name="so_dat" type="number" min={0} step="any" inputMode="decimal" className="input" required />
+                </label>
+              </>
             ) : (
               <label className="block">
-                {kids.length > 0 && <span className="label">Số thực hiện</span>}
-                <input name="gia_tri" inputMode="decimal" className="input" placeholder={`Số thực hiện (${k.don_vi_tinh})`} required />
+                <span className="label">Số phát sinh trong tháng ({k.don_vi_tinh})</span>
+                <input name="gia_tri" inputMode="decimal" className="input" placeholder={`Số phát sinh trong tháng (${k.don_vi_tinh})`} required />
               </label>
             )}
             <label className="block">
-              {(hoSo || kids.length > 0) && <span className="label">Ghi chú</span>}
+              <span className="label">Ghi chú</span>
               <input name="ghi_chu" className="input" placeholder="Ghi chú, nguồn số liệu" />
             </label>
             <div className="flex items-end">
@@ -231,6 +289,68 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
             </div>
           </ActionForm>
           <p className="mt-2 text-sm text-slate-500">Sau khi lưu, đính kèm tệp minh chứng ở dòng số liệu trong bảng bên dưới.</p>
+        </div>
+      )}
+
+      {coTongHop && bangTongHop.length > 0 && (
+        <div className="card">
+          <h2 className="h2">Tổng hợp theo tháng, quý, năm</h2>
+          <p className="text-sm text-slate-500">
+            Chỉ tính số liệu đã được xác nhận{kids.length ? ", cộng tất cả đơn vị phụ trách" : ""}.{" "}
+            {k.loai === "cong_don"
+              ? khNam
+                ? `So với kế hoạch năm ${fmtNum(khNam)} ${k.don_vi_tinh}.`
+                : "Chỉ tiêu không giao trước: kết quả tính 100% trên tổng số phát sinh."
+              : `Tỷ lệ = ${hoSo ? "hồ sơ toàn trình ÷ tổng hồ sơ" : "số đạt ÷ tổng số phát sinh"}; chỉ tiêu ${fmtNum(khNam)}%${khNam === 100 ? " (100% số phát sinh)" : ""}.`}
+          </p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="tbl min-w-[560px]">
+              <thead>
+                <tr>
+                  <th>Kỳ</th>
+                  {k.loai === "cong_don" ? (
+                    <>
+                      <th className="text-right">Phát sinh</th>
+                      <th className="text-right">Lũy kế</th>
+                      <th className="text-right">% kế hoạch năm</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="text-right">{hoSo ? "Toàn trình" : "Đạt"}</th>
+                      <th className="text-right">{hoSo ? "Tổng hồ sơ" : "Phát sinh"}</th>
+                      <th className="text-right">Tỷ lệ</th>
+                      <th className="text-right">So với chỉ tiêu</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {bangTongHop.map((r) => {
+                  const tl = tyLe(r.t);
+                  const dat = tl != null && (k.chieu_tot === "thap" ? tl <= khNam : tl >= khNam);
+                  return (
+                    <tr key={r.nhan} className={r.cap === "thang" ? "" : r.cap === "quy" ? "bg-slate-50 font-semibold" : "bg-brand-50 font-bold"}>
+                      <td>{r.nhan}</td>
+                      {k.loai === "cong_don" ? (
+                        <>
+                          <td className="text-right tabular-nums">{fmtNum(r.t.a)}</td>
+                          <td className="text-right tabular-nums">{r.cap === "quy" ? "" : fmtNum(r.luyKe)}</td>
+                          <td className="text-right tabular-nums">{r.cap === "quy" ? (khNam ? `${fmtNum((r.t.a / khNam) * 100, 1)}% (trong quý)` : "100%") : khNam ? `${fmtNum((r.luyKe / khNam) * 100, 1)}%` : "100%"}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="text-right tabular-nums">{fmtNum(r.t.a)}</td>
+                          <td className="text-right tabular-nums">{fmtNum(r.t.b)}</td>
+                          <td className="text-right tabular-nums">{tl == null ? "–" : `${fmtNum(tl, 1)}%`}</td>
+                          <td className={`text-right ${dat ? "text-emerald-700" : "text-red-700"}`}>{tl == null ? "–" : dat ? "Đạt" : `Chưa đạt (${fmtNum(tl - khNam, 1)}%)`}</td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -282,11 +402,13 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
                 {kids.length > 0 && <th>Đơn vị</th>}
                 {hoSo ? (
                   <th className="text-right">Toàn trình / Một phần / Trực tiếp · Tổng</th>
+                ) : k.loai === "ty_le" ? (
+                  <th className="text-right">Đạt / Phát sinh</th>
                 ) : null}
-                <th className="text-right">{hoSo ? "% toàn trình" : "Giá trị"}</th>
+                <th className="text-right">{hoSo ? "% toàn trình" : k.loai === "ty_le" ? "Tỷ lệ" : k.loai === "cong_don" ? "Phát sinh trong tháng" : "Kết quả"}</th>
                 <th>Người nhập</th>
-                <th>Xác nhận</th>
                 <th>Minh chứng</th>
+                <th>Xác nhận</th>
               </tr>
             </thead>
             <tbody>
@@ -302,29 +424,14 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
                       {fmtNum(d.so_toan_trinh, 0)} / {fmtNum(d.so_mot_phan, 0)} / {fmtNum(d.so_truc_tiep, 0)} · <b>{fmtNum(Number(d.so_toan_trinh || 0) + Number(d.so_mot_phan || 0) + Number(d.so_truc_tiep || 0), 0)}</b>
                     </td>
                   )}
-                  <td className="text-right font-semibold tabular-nums">{k.loai === "dat_khong" ? (Number(d.gia_tri) >= 1 ? "Đạt" : "Chưa đạt") : hoSo ? `${fmtNum(d.gia_tri, 1)}%` : fmtNum(d.gia_tri)}</td>
+                  {k.loai === "ty_le" && (
+                    <td className="text-right tabular-nums">{d.so_phat_sinh != null ? `${fmtNum(d.so_dat)} / ${fmtNum(d.so_phat_sinh)}` : "–"}</td>
+                  )}
+                  <td className="text-right font-semibold tabular-nums">{k.loai === "dat_khong" ? (Number(d.gia_tri) >= 1 ? "Đạt" : "Chưa đạt") : hoSo || k.loai === "ty_le" ? `${fmtNum(d.gia_tri, 1)}%` : fmtNum(d.gia_tri)}</td>
                   <td>
                     {d.nguoi_nhap}
                     <span className="block text-xs text-slate-500">{fmtDateTime(d.thoi_gian)}</span>
                     {d.ghi_chu && <span className="block text-sm text-slate-600">{d.ghi_chu}</span>}
-                  </td>
-                  <td>
-                    {d.hieu_luc &&
-                      (d.xac_nhan ? (
-                        <span className="text-emerald-700">✓ {d.nguoi_xac_nhan}</span>
-                      ) : quyenDong(d.id_chi_tieu).confirm ? (
-                        <ActionForm action={confirmDataAction} className="flex flex-wrap gap-1">
-                          <input type="hidden" name="id_so_lieu" value={d.id} />
-                          <Submit name="ket_luan" value="dong_y" className="btn btn-success btn-sm">
-                            Xác nhận
-                          </Submit>
-                          <Submit name="ket_luan" value="tra_lai" className="btn btn-outline btn-sm">
-                            Trả lại
-                          </Submit>
-                        </ActionForm>
-                      ) : (
-                        <span className="font-semibold text-amber-700">Chờ xác nhận</span>
-                      ))}
                   </td>
                   <td>
                     {files
@@ -343,11 +450,38 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
                       </ActionForm>
                     )}
                   </td>
+                  <td>
+                    {d.hieu_luc &&
+                      (d.xac_nhan ? (
+                        <span className="text-emerald-700">
+                          ✓ {d.nguoi_xac_nhan}
+                          {d.xac_nhan_luc && <span className="block text-xs text-slate-500">{fmtDateTime(d.xac_nhan_luc)}</span>}
+                        </span>
+                      ) : quyenDong(d.id_chi_tieu).confirm && (d.id_nguoi_nhap !== user.id || user.quyen.includes("qt.du_lieu")) ? (
+                        <ActionForm action={confirmDataAction} className="flex min-w-[11rem] flex-col gap-1">
+                          <input type="hidden" name="id_so_lieu" value={d.id} />
+                          <input name="y_kien" className="input min-h-9 py-1 text-sm" placeholder="Ý kiến (bắt buộc khi trả lại)" />
+                          <div className="flex gap-1">
+                            <Submit name="ket_luan" value="dong_y" className="btn btn-success btn-sm flex-1">
+                              Xác nhận
+                            </Submit>
+                            <Submit name="ket_luan" value="tra_lai" className="btn btn-outline btn-sm flex-1">
+                              Trả lại
+                            </Submit>
+                          </div>
+                        </ActionForm>
+                      ) : (
+                        <span className="font-semibold text-amber-700">
+                          Chờ xác nhận
+                          {d.id_nguoi_nhap === user.id && <span className="block text-xs font-normal text-slate-500">Người có quyền Giao việc cấp 1/cấp 2 xác nhận</span>}
+                        </span>
+                      ))}
+                  </td>
                 </tr>
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td colSpan={5 + (kids.length ? 1 : 0) + (hoSo ? 1 : 0)} className="text-slate-500">
+                  <td colSpan={5 + (kids.length ? 1 : 0) + (hoSo || k.loai === "ty_le" ? 1 : 0)} className="text-slate-500">
                     Chưa có số liệu.
                   </td>
                 </tr>
