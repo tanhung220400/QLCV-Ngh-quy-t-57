@@ -971,10 +971,10 @@ const day = (n) => {
   await nhapHs("Phòng Kinh tế", 8, 1, 1);
   await nhapHs("Phòng Văn hóa - Xã hội", 2, 3, 5);
   await page.goto(ctUrl);
-  const ctTxt = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-  ok("số hồ sơ toàn trình / một phần / trực tiếp theo đơn vị", ctTxt.includes("8/10 hồ sơ toàn trình = 80%") && ctTxt.includes("2/10 hồ sơ toàn trình = 20%"), ctTxt.slice(0, 600));
-  ok("tỷ lệ toàn trình toàn phường = tổng toàn trình ÷ tổng hồ sơ", ctTxt.includes("Toàn phường: 10 hồ sơ toàn trình / 20 hồ sơ tiếp nhận") && ctTxt.includes("50% toàn trình"), ctTxt.slice(0, 600));
-  ok("bảng toàn phường theo kỳ", ctTxt.includes("Toàn phường theo kỳ") && /2\/2/.test(ctTxt));
+  const hsTxt = (await page.locator("main").innerText()).replace(/\s+/g, " ");
+  ok("số hồ sơ toàn trình / một phần / trực tiếp theo đơn vị", hsTxt.includes("8/10 hồ sơ toàn trình = 80%") && hsTxt.includes("2/10 hồ sơ toàn trình = 20%"), hsTxt.slice(0, 600));
+  ok("tỷ lệ toàn trình toàn phường = tổng toàn trình ÷ tổng hồ sơ", hsTxt.includes("Toàn phường: 10 hồ sơ toàn trình / 20 hồ sơ tiếp nhận") && hsTxt.includes("50% toàn trình"), hsTxt.slice(0, 600));
+  ok("bảng toàn phường theo kỳ", hsTxt.includes("Toàn phường theo kỳ") && /2\/2/.test(hsTxt));
   // cài đặt người ký thay
   await page.goto(BASE + "/quan-tri?muc=cai_dat");
   await page.fill('input[name="nguoi_ky"]', "Trần Thị Châu");
