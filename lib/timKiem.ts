@@ -208,7 +208,7 @@ export function moRong(noiDung: string, cauGoc: string): KhaiNiemTim[] {
   }
   const tu = t
     .split(/\s+/)
-    .filter((w) => w.length >= 2 && !TU_DUNG.has(w) && !/^\d{1,2}$/.test(w));
+    .filter((w) => w.length >= 2 && (!TU_DUNG.has(w) || !!TU_DON[dauMap.get(w) || ""]) && !/^\d{1,2}$/.test(w));
   const khongGoDau = khongDau(cauGoc) === coDau(cauGoc);
   for (const w of [...new Set(tu)]) {
     const wd = dauMap.get(w);

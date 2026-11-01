@@ -378,9 +378,11 @@ const day = (n) => {
   {
     // tìm theo hàm ý, đồng nghĩa, trong toàn bộ dữ liệu (kể cả dữ liệu module)
     const t1 = (await check(page, "/tra-cuu?q=" + encodeURIComponent("đèn đường bị hư"), "tra cứu hàm ý")).replace(/\s+/g, " ");
-    ok("tra cứu theo đồng nghĩa, hàm ý trong dữ liệu module", /Đèn chiếu sáng đường liên khu phố bị hỏng/.test(t1) && /đèn chiếu sáng/.test(t1), t1.slice(0, 400));
+    ok("tra cứu theo đồng nghĩa, hàm ý trong dữ liệu module", /Đèn chiếu sáng đường liên khu phố bị hỏng/.test(t1) && /Phản ánh, kiến nghị/.test(t1), t1.slice(0, 400));
     const t2 = (await check(page, "/tra-cuu?q=" + encodeURIComponent("dinh danh dien tu"), "tra cứu không dấu")).replace(/\s+/g, " ");
     ok("tra cứu không dấu, từ đồng nghĩa (định danh điện tử → VNeID)", /VNeID/.test(t2), t2.slice(0, 400));
+    const t3 = (await check(page, "/tra-cuu?q=" + encodeURIComponent("đèn"), "tra cứu từ đơn có dấu")).replace(/\s+/g, " ");
+    ok("từ đơn có dấu (“đèn” không lẫn với “đến”)", /Đèn chiếu sáng/.test(t3) && /Nội dung: “đèn/.test(t3), t3.slice(0, 300));
     const xe = await page.request.get(BASE + "/api/tra-cuu/xuat?q=" + encodeURIComponent("chuyển đổi số"));
     ok("xuất Excel tra cứu toàn bộ dữ liệu", xe.status() === 200 && (await xe.body()).length > 5000);
   }
