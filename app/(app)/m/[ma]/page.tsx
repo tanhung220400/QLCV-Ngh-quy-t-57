@@ -61,7 +61,11 @@ export default async function ModulePage({ params, searchParams }: { params: Pro
     </div>
   );
 
-  if (m.loai === "nhom") {
+  // module có module con nhưng chưa có trường, chưa có bản ghi: hiển thị như nhóm (không hiện khu vực nhập liệu trống)
+  const laNhom =
+    m.loai === "nhom" ||
+    (children.length > 0 && fields.length === 0 && (await sql`SELECT 1 FROM mo_dun_ban_ghi WHERE id_mo_dun = ${m.id} LIMIT 1`).length === 0);
+  if (laNhom) {
     return (
       <div className="space-y-5">
         <Crumbs up={up} />
