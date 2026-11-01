@@ -138,7 +138,13 @@ const day = (n) => {
   await page.click('#bao-cao button:has-text("Gửi báo cáo")');
   await page.waitForSelector("text=chờ người giao việc xác nhận kết quả");
   ok("báo cáo hoàn thành", true);
-  ok("người báo cáo không tự xác nhận được kết quả", (await page.locator('button:has-text("Xác nhận kết quả đúng")').count()) === 0 && (await page.locator("text=người giao việc) xác nhận kết quả").count()) > 0);
+  await page.reload();
+  await page.waitForSelector("text=Chờ xác nhận").catch(() => {});
+  {
+    const nut = await page.locator('button:has-text("Xác nhận kết quả đúng")').count();
+    const cho = /người giao việc\) xác nhận kết quả/.test(await page.locator("body").innerText());
+    ok("người báo cáo không tự xác nhận được kết quả", nut === 0 && cho, `nút=${nut} chờ=${cho}`);
+  }
   // Tải tệp (lưu vào CSDL vì không có Blob khi thử)
   const resp = await page.request.post(BASE + "/api/tep", { multipart: { file: { name: "bao-cao.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 test") }, doi_tuong: "cong_viec", id_doi_tuong: String(taskId), gps: "10.762622,106.660172" } });
   ok("tải tệp đính kèm", resp.status() === 200, `HTTP ${resp.status()}`);
