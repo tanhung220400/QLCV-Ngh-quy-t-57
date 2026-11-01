@@ -27,7 +27,7 @@ export default async function Account({ searchParams }: { searchParams: Promise<
     : [];
   const people = canDelegate ? await sql`SELECT id, ho_ten, chuc_vu FROM nguoi_dung WHERE trang_thai = 'hoat_dong' AND id <> ${user.id} AND vai_tro IN ('lanh_dao','truong_don_vi','cong_chuc','tong_hop') ORDER BY ho_ten` : [];
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <h1 className="h1">Tài khoản</h1>
       <div className="card">
         <div className="text-xl font-bold">{user.ho_ten}</div>

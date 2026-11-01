@@ -69,7 +69,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Welcome img={themeImageUrl("chao", theme.chao_v)} tenXa={cfg.ten_hien_thi || cfg.ten_don_vi || "UBND xã"} hoTen={user.ho_ten} bat={theme.chao_bat} />
       <Nav tree={nav} unread={unread} me={me} />
       <div className="lg:pl-(--side-w)">
-        <main className="mx-auto max-w-6xl px-3 pt-5 pb-28 sm:px-5 lg:pb-12">
+        <main className="w-full px-3 pt-5 pb-28 sm:px-5 lg:px-6 lg:pb-12 2xl:px-8">
           {user.uy_quyen_tu.length > 0 && (
             <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-indigo-900">Bạn đang được ủy quyền xử lý công việc thay cho {user.uy_quyen_tu.length} người.</div>
           )}

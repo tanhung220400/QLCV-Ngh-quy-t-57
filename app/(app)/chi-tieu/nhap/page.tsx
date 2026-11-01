@@ -10,7 +10,7 @@ export default async function ImportKpi() {
   const user = await requireUser();
   if (!canManageKpi(user)) redirect("/chi-tieu");
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <h1 className="h1">Nhập chỉ tiêu từ Excel</h1>
       <div className="card space-y-3">
         <ol className="list-decimal space-y-1 pl-5 text-slate-700">

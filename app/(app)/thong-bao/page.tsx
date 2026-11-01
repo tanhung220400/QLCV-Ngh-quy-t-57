@@ -20,7 +20,7 @@ export default async function Notifications({ searchParams }: { searchParams: Pr
   const rows = await sql`SELECT * FROM thong_bao WHERE id_nguoi_nhan = ${user.id} ${unreadOnly ? sql`AND NOT da_doc` : sql``} ORDER BY tao_luc DESC LIMIT 200`;
   const unread = rows.filter((r) => !r.da_doc).length;
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="h1">Thông báo</h1>
         <MarkRead all label={`Đánh dấu đã đọc tất cả${unread ? ` (${unread})` : ""}`} />

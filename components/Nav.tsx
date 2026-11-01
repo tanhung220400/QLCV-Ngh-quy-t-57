@@ -350,7 +350,7 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
 
       {/* Thanh trên cùng */}
       <header className="no-print sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur lg:ml-(--side-w)">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-5">
+        <div className="flex h-16 w-full items-center gap-2 px-3 sm:gap-3 sm:px-5 lg:px-6 2xl:px-8">
           <BackButton />
           <Link href="/" className={`min-w-0 shrink items-center gap-2 lg:hidden ${path === "/" ? "flex" : "hidden sm:flex"}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
