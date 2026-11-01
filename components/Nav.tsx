@@ -324,7 +324,7 @@ export function Nav({ tree, unread, me }: { tree: NavNode[]; unread: number; me:
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/cong-an-hieu-128.png" alt="Công an hiệu" className="h-12 w-[3.6rem] shrink-0 object-contain drop-shadow-[0_2px_6px_rgb(0_0_0/0.45)]" />
           <span className="min-w-0">
-            <span className="block leading-tight font-bold text-white">Giao việc &amp; Chỉ tiêu</span>
+            <span className="block leading-tight font-bold text-white">QLCV Nghị quyết 57-NQ/TW</span>
             <span className="block truncate text-sm text-white/75">{me.ten_xa}</span>
           </span>
         </Link>

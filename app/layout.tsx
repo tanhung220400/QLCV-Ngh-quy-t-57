@@ -6,7 +6,7 @@ import { SwRegister } from "@/components/SwRegister";
 const font = Be_Vietnam_Pro({ subsets: ["latin", "vietnamese"], weight: ["400", "500", "600", "700"], variable: "--font-be-vietnam", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Giao việc & Chỉ tiêu xã",
+  title: "QLCV Nghị quyết 57-NQ/TW",
   description: "Phần mềm giao việc và theo dõi chỉ tiêu cấp xã",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "QLCV xã", statusBarStyle: "default" },
