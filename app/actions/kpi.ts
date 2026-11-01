@@ -297,7 +297,7 @@ export async function addDataAction(_: ActionState, fd: FormData): Promise<Actio
     newId = row.id;
     await writeLog(tx, user.id, old.length ? "sua_so_lieu" : "nhap_so_lieu", "chi_tieu", id, old[0] ?? null, { ky, gia_tri: v, id_so_lieu: row.id, ...(hs ? { ho_so: hs } : {}), ...(dem ? { phat_sinh: dem.ps, dat: dem.dat } : {}) });
     if (!autoConfirm) {
-      const nhan = await nguoiXacNhan(tx as never, r.k);
+      const nhan = await nguoiXacNhan(tx as never, r.k as never);
       await notify(tx, nhan.filter((x) => x !== user.id), "xac_nhan_so_lieu", `Chờ xác nhận số liệu: ${r.k.ten}`, `${periodLabel(ky)}: ${v} ${r.k.don_vi_tinh}`, "chi_tieu", id, undefined, user.id);
     }
   });
