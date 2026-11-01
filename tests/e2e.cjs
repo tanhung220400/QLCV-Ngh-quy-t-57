@@ -996,8 +996,8 @@ const day = (n) => {
   ok("lề trang theo NĐ 30 (trên 20, dưới 20, trái 30, phải 15 mm), không đánh số trang đầu", /w:top="1134"/.test(sect) && /w:left="1701"/.test(sect) && /w:right="851"/.test(sect) && /w:titlePg/.test(sect));
   // Ảnh chụp
   await page.goto(BASE + "/viec?tab=tat_ca");
-  await page.locator("main a[href^='/viec/']").first().click();
-  await page.waitForURL(/\/viec\/\d+/);
+  const viecHref = await page.evaluate(() => [...document.querySelectorAll("main a")].map((a) => a.getAttribute("href")).find((h) => /^\/viec\/\d+$/.test(h || "")));
+  await page.goto(BASE + viecHref, { waitUntil: "networkidle" });
   const tx = await page.locator("main").innerText();
   ok("đổi “Chụp ảnh hiện trường” thành “Ảnh chụp”", !tx.includes("Chụp ảnh hiện trường") && !tx.includes("hiện trường"));
   await ctx.close();
