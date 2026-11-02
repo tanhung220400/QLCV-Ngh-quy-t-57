@@ -33,11 +33,13 @@ export default async function KpiDetail({ params, searchParams }: { params: Prom
   if (!k) notFound();
   if (!(await canSeeKpi(user, id))) return <div className="card">Bạn không được phân công xem chỉ tiêu này.</div>;
   // các truy vấn độc lập chạy song song
-  const [kids, tasksScope, parent] = await Promise.all([
+  const [kids, phamViViec, chaRows] = await Promise.all([
     loadKpis(sql, sql`ct.id_cha = ${id}`, cfg.nguong_nguy_co),
-    taskScope(sql, user).then((x) => x.q),
-    k.id_cha ? sql`SELECT id, ten FROM chi_tieu WHERE id = ${k.id_cha}`.then((r) => r[0]) : null,
+    taskScope(sql, user),
+    k.id_cha ? sql`SELECT id, ten FROM chi_tieu WHERE id = ${k.id_cha}` : Promise.resolve([]),
   ]);
+  const tasksScope = phamViViec.q;
+  const parent = chaRows[0] ?? null;
   // chỉ tiêu giao nhiều đơn vị: số liệu do từng đơn vị nhập ở phần của mình, xem chung tại đây
   const cacId = [id, ...kids.map((c) => c.id)];
   const tenDv = new Map<number, string>(kids.map((c) => [c.id, c.ten_don_vi || c.ten]));
