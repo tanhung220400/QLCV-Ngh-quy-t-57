@@ -169,9 +169,9 @@ const day = (n) => {
   await page.waitForSelector("text=Đã xác nhận kết quả. Công việc hoàn thành.");
   await page.waitForSelector("text=Kết quả đã được");
   ok("xác nhận kết quả: ghi người xác nhận", true);
-  await page.waitForSelector("text=Đúng hạn");
+  await page.waitForSelector("text=/Trước hạn|Đúng hạn/");
   const det = await page.locator("body").innerText();
-  ok("việc chuyển Hoàn thành + đúng hạn", /Hoàn thành/.test(det) && /đúng hạn/i.test(det));
+  ok("việc chuyển Hoàn thành + xong trước hạn (hạn còn xa)", /Hoàn thành/.test(det) && /trước hạn/i.test(det), det.match(/Hoàn thành[^\n]{0,60}/)?.[0]);
   ok("lịch sử gia hạn ghi nhận", /Lịch sử gia hạn \(1\)/.test(det));
   // Kanban: kéo việc Mới giao -> Đã nhận không đúng người thì báo lỗi
   await page.goto(BASE + "/viec?xem=kanban&tab=tat_ca");
