@@ -126,7 +126,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       {deny}
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="h1">Tình hình {seesAll(ids[0]) ? "toàn xã" : user.pham_vi.loai === "don_vi" ? user.ten_don_vi || "đơn vị" : user.pham_vi.loai === "linh_vuc" ? "lĩnh vực phụ trách" : "công việc của tôi"}</h1>
+          <h1 className="h1">Tình hình {seesAll(ids[0]) ? "toàn phường" : user.pham_vi.loai === "don_vi" ? user.ten_don_vi || "đơn vị" : user.pham_vi.loai === "linh_vuc" ? "lĩnh vực phụ trách" : "công việc của tôi"}</h1>
           <p className="muted">
             {hello}, {user.ho_ten}
           </p>

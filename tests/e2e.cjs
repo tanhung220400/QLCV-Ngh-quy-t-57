@@ -294,7 +294,12 @@ const day = (n) => {
   await page.waitForSelector('select[name="pham_vi"]');
   await page.selectOption('select[name="pham_vi"]', "don_vi");
   await page.locator('input[name="pv_don_vi"]').first().waitFor();
-  await page.check('label:has-text("Phòng Kinh tế") input[name="pv_don_vi"]');
+  {
+    const chinh = page.locator('label:has-text("Phòng Kinh tế") input[name="pv_don_vi"]');
+    ok("phạm vi theo phòng: đơn vị chính luôn được chọn sẵn", (await chinh.isChecked()) && (await chinh.isDisabled()) && (await page.locator('label:has-text("(đơn vị chính)")').count()) === 1);
+    ok("bỏ phạm vi theo lĩnh vực", (await page.locator('select[name="pham_vi"] option[value="linh_vuc"]').count()) === 0 && (await page.locator('input[name="pv_linh_vuc"]').count()) === 0);
+  }
+  await page.check('label:has-text("Phòng Văn hóa - Xã hội") input[name="pv_don_vi"]');
   await page.uncheck('input[name="quyen"][value="ct.xem"]');
   await page.check('input[name="quyen"][value="bc.dashboard"]');
   await page.check('input[name="quyen"][value="bc.bieu_do"]');

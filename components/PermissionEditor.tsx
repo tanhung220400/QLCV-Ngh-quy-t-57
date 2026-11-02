@@ -11,19 +11,23 @@ export function PermissionEditor({
   quyen,
   phamVi,
   units,
-  linhVuc,
+  idDonVi,
+  idKiemNhiem,
 }: {
   vaiTro: string;
   quyen: string[] | null; // null = theo mặc định của vai trò
   phamVi: { loai: string; linh_vuc: string[]; don_vi: number[] } | null;
   units: Opt[];
-  linhVuc: string[];
+  /** đơn vị chính, đơn vị kiêm nhiệm của cán bộ (luôn nằm trong phạm vi theo đơn vị) */
+  idDonVi?: number | null;
+  idKiemNhiem?: number | null;
+  linhVuc?: string[];
 }) {
   const [role, setRole] = useState(vaiTro || "cong_chuc");
   const [sel, setSel] = useState<string[]>(quyen ?? QUYEN_MAC_DINH[vaiTro || "cong_chuc"] ?? []);
-  const [pv, setPv] = useState(phamVi?.loai ?? "mac_dinh");
-  const [pvLv, setPvLv] = useState<string[]>(phamVi?.linh_vuc ?? []);
-  const [pvDv, setPvDv] = useState<number[]>(phamVi?.don_vi ?? []);
+  const [pv, setPv] = useState(phamVi?.loai === "linh_vuc" ? "don_vi" : (phamVi?.loai ?? "mac_dinh"));
+  const coDinh = [idDonVi, idKiemNhiem].filter((x): x is number => !!x);
+  const [pvDv, setPvDv] = useState<number[]>(phamVi?.loai === "don_vi" ? phamVi.don_vi : []);
   const def = new Set(QUYEN_MAC_DINH[role] || []);
   const changed = sel.length !== def.size || sel.some((q) => !def.has(q));
 
@@ -54,31 +58,13 @@ export function PermissionEditor({
         <legend className="px-1 font-semibold">Phạm vi dữ liệu được xem</legend>
         <p className="mb-2 text-sm text-slate-500">Áp dụng cho công việc, chỉ tiêu và báo cáo. Ai cũng luôn xem được việc mình giao, chủ trì, thực hiện hoặc phối hợp.</p>
         <select name="pham_vi" className="input" value={pv} onChange={(e) => setPv(e.target.value)}>
-          <option value="mac_dinh">Theo chức vụ, đơn vị (mặc định)</option>
+          <option value="mac_dinh">Mặc định theo chức vụ (lãnh đạo phụ trách, trưởng đơn vị: theo đơn vị chính và kiêm nhiệm)</option>
           {Object.entries(LOAI_PHAM_VI).map(([k, v]) => (
             <option key={k} value={k}>
               {v}
             </option>
           ))}
         </select>
-        {pv === "linh_vuc" && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {linhVuc.map((l) => (
-              <label key={l} className="chip cursor-pointer border-slate-300 bg-white py-1">
-                <input
-                  type="checkbox"
-                  name="pv_linh_vuc"
-                  value={l}
-                  checked={pvLv.includes(l)}
-                  onChange={(e) => setPvLv((s) => (e.target.checked ? [...s, l] : s.filter((x) => x !== l)))}
-                  className="mr-1.5"
-                />
-                {l}
-              </label>
-            ))}
-            <p className="w-full text-sm text-slate-500">Không chọn lĩnh vực nào thì dùng “Lĩnh vực phụ trách” của cán bộ.</p>
-          </div>
-        )}
         {pv === "don_vi" && (
           <div className="mt-2 flex flex-wrap gap-2">
             {units.map((u) => (
@@ -87,14 +73,16 @@ export function PermissionEditor({
                   type="checkbox"
                   name="pv_don_vi"
                   value={u.id}
-                  checked={pvDv.includes(u.id)}
+                  checked={coDinh.includes(u.id) || pvDv.includes(u.id)}
+                  disabled={coDinh.includes(u.id)}
                   onChange={(e) => setPvDv((s) => (e.target.checked ? [...s, u.id] : s.filter((x) => x !== u.id)))}
                   className="mr-1.5"
                 />
                 {u.ten}
+                {u.id === idDonVi ? " (đơn vị chính)" : u.id === idKiemNhiem ? " (kiêm nhiệm)" : ""}
               </label>
             ))}
-            <p className="w-full text-sm text-slate-500">Không chọn đơn vị nào thì dùng đơn vị của cán bộ. Đơn vị con (khu phố) được xem kèm.</p>
+            <p className="w-full text-sm text-slate-500">Luôn gồm đơn vị chính và đơn vị kiêm nhiệm của cán bộ; chọn thêm các phòng, đơn vị khác được xem. Đơn vị trực thuộc (khu phố, phòng thuộc UBND) được xem kèm.</p>
           </div>
         )}
       </fieldset>

@@ -7,6 +7,7 @@ export type Identity = {
   id: number;
   vai_tro: string;
   id_don_vi: number | null;
+  id_don_vi_kiem_nhiem?: number | null;
   linh_vuc_phu_trach: string[];
   pham_vi: PhamVi;
 };
@@ -27,7 +28,7 @@ export function subtree(units: DonViRow[], root: number | null): number[] {
 
 /** Bản thân + những người đã ủy quyền cho mình hôm nay */
 export async function identities(user: User): Promise<Identity[]> {
-  const me: Identity = { id: user.id, vai_tro: user.vai_tro, id_don_vi: user.id_don_vi, linh_vuc_phu_trach: user.linh_vuc_phu_trach, pham_vi: user.pham_vi };
+  const me: Identity = { id: user.id, vai_tro: user.vai_tro, id_don_vi: user.id_don_vi, id_don_vi_kiem_nhiem: user.id_don_vi_kiem_nhiem, linh_vuc_phu_trach: user.linh_vuc_phu_trach, pham_vi: user.pham_vi };
   if (!user.uy_quyen_tu.length) return [me];
   const sql = await db();
   const rows = await sql`SELECT id, vai_tro, id_don_vi, id_don_vi_kiem_nhiem, linh_vuc_phu_trach, pham_vi FROM nguoi_dung WHERE id IN ${sql(user.uy_quyen_tu)}`;
@@ -37,6 +38,7 @@ export async function identities(user: User): Promise<Identity[]> {
       id: r.id,
       vai_tro: r.vai_tro,
       id_don_vi: r.id_don_vi,
+      id_don_vi_kiem_nhiem: r.id_don_vi_kiem_nhiem,
       linh_vuc_phu_trach: r.linh_vuc_phu_trach || [],
       pham_vi: tinhPhamVi(r.vai_tro, r.id_don_vi, r.linh_vuc_phu_trach || [], r.pham_vi, r.id_don_vi_kiem_nhiem),
     })),
@@ -51,7 +53,14 @@ export async function scopeSets(ids: Identity[]) {
   const donVi = new Set<number>();
   const linhVuc = new Set<string>();
   for (const i of ids) {
-    if (i.pham_vi.loai === "don_vi") for (const d of i.pham_vi.don_vi) for (const x of subtree(units, d)) donVi.add(x);
+    if (i.pham_vi.loai === "don_vi")
+      for (const d of i.pham_vi.don_vi) {
+        // lãnh đạo (Phó Chủ tịch...): đơn vị chính / kiêm nhiệm là cơ quan có đơn vị trực thuộc (UBND, HĐND...) thì chỉ xem việc của chính cơ quan đó;
+        // các phòng, đơn vị được phân công phụ trách thì xem cả đơn vị trực thuộc
+        const laCuaMinh = d === i.id_don_vi || d === i.id_don_vi_kiem_nhiem;
+        if (i.vai_tro === "lanh_dao" && laCuaMinh && units.some((u) => u.id_cha === d)) donVi.add(d);
+        else for (const x of subtree(units, d)) donVi.add(x);
+      }
     if (i.pham_vi.loai === "linh_vuc") for (const l of i.pham_vi.linh_vuc) linhVuc.add(l);
   }
   return { donVi: [...donVi], linhVuc: [...linhVuc], units };

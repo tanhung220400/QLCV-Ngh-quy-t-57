@@ -66,19 +66,22 @@ export const QUYEN_MAC_DINH: Record<string, string[]> = {
 
 export type PhamVi = { loai: "toan_xa" | "linh_vuc" | "don_vi" | "ca_nhan"; linh_vuc: string[]; don_vi: number[] };
 
-export const LOAI_PHAM_VI: Record<PhamVi["loai"], string> = {
-  toan_xa: "Toàn xã",
-  linh_vuc: "Theo lĩnh vực được phân công",
-  don_vi: "Theo đơn vị được phân công",
+/** Các loại phạm vi được chọn khi phân quyền (phạm vi “theo lĩnh vực” cũ được đổi thành theo phòng, đơn vị) */
+export const LOAI_PHAM_VI: Partial<Record<PhamVi["loai"], string>> = {
+  toan_xa: "Toàn phường",
+  don_vi: "Theo phòng, đơn vị (đơn vị chính, đơn vị kiêm nhiệm và các phòng được chọn thêm)",
   ca_nhan: "Chỉ việc của bản thân",
 };
 
-/** Phạm vi mặc định theo vai trò (chức vụ + đơn vị) */
+const donViCuaMinh = (id_don_vi: number | null, id_kiem_nhiem: number | null) => [...new Set([id_don_vi, id_kiem_nhiem].filter((x): x is number => !!x))];
+
+/** Phạm vi mặc định theo vai trò (chức vụ + đơn vị chính + đơn vị kiêm nhiệm) */
 export function phamViMacDinh(vai_tro: string, id_don_vi: number | null, linh_vuc: string[], id_kiem_nhiem: number | null = null): PhamVi {
   if (vai_tro === "tong_hop" || vai_tro === "quan_tri") return { loai: "toan_xa", linh_vuc: [], don_vi: [] };
-  if (vai_tro === "lanh_dao") return linh_vuc.length ? { loai: "linh_vuc", linh_vuc, don_vi: [] } : { loai: "toan_xa", linh_vuc: [], don_vi: [] };
-  const dv = [id_don_vi, id_kiem_nhiem].filter((x): x is number => !!x);
-  if (vai_tro === "truong_don_vi" && dv.length) return { loai: "don_vi", linh_vuc: [], don_vi: [...new Set(dv)] };
+  const dv = donViCuaMinh(id_don_vi, id_kiem_nhiem);
+  // lãnh đạo có phân công phụ trách (Phó Chủ tịch...): theo đơn vị chính và đơn vị kiêm nhiệm; lãnh đạo chung (Chủ tịch, Bí thư): toàn phường
+  if (vai_tro === "lanh_dao") return linh_vuc.length && dv.length ? { loai: "don_vi", linh_vuc: [], don_vi: dv } : { loai: "toan_xa", linh_vuc: [], don_vi: [] };
+  if (vai_tro === "truong_don_vi" && dv.length) return { loai: "don_vi", linh_vuc: [], don_vi: dv };
   return { loai: "ca_nhan", linh_vuc: [], don_vi: [] };
 }
 
@@ -93,12 +96,11 @@ export function tinhQuyen(vai_tro: string, ghi_de: { them?: string[]; bo?: strin
 }
 
 export function tinhPhamVi(vai_tro: string, id_don_vi: number | null, linh_vuc: string[], ghi_de: Partial<PhamVi> | null | undefined, id_kiem_nhiem: number | null = null): PhamVi {
-  if (ghi_de?.loai && LOAI_PHAM_VI[ghi_de.loai]) {
-    return {
-      loai: ghi_de.loai,
-      linh_vuc: ghi_de.loai === "linh_vuc" ? (ghi_de.linh_vuc?.length ? ghi_de.linh_vuc : linh_vuc) : [],
-      don_vi: ghi_de.loai === "don_vi" ? (ghi_de.don_vi?.length ? ghi_de.don_vi.map(Number) : id_don_vi ? [id_don_vi] : []) : [],
-    };
+  const loai = ghi_de?.loai === "linh_vuc" ? "don_vi" : ghi_de?.loai; // phạm vi theo lĩnh vực cũ → theo đơn vị
+  if (loai && LOAI_PHAM_VI[loai]) {
+    // theo phòng, đơn vị: luôn gồm đơn vị chính, đơn vị kiêm nhiệm và các phòng được chọn thêm
+    const dv = loai === "don_vi" ? [...new Set([...donViCuaMinh(id_don_vi, id_kiem_nhiem), ...(ghi_de?.loai === "don_vi" ? (ghi_de.don_vi || []).map(Number) : [])])] : [];
+    return { loai, linh_vuc: [], don_vi: dv };
   }
   return phamViMacDinh(vai_tro, id_don_vi, linh_vuc, id_kiem_nhiem);
 }

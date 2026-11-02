@@ -133,11 +133,16 @@ export async function saveUserAction(_: ActionState, fd: FormData): Promise<Acti
     const loai = str(fd, "pham_vi");
     const pv =
       loai && loai !== "mac_dinh" && LOAI_PHAM_VI[loai as keyof typeof LOAI_PHAM_VI]
-        ? { loai, linh_vuc: fd.getAll("pv_linh_vuc").map(String).filter(Boolean), don_vi: fd.getAll("pv_don_vi").map(Number).filter(Boolean) }
+        ? { loai, linh_vuc: [], don_vi: loai === "don_vi" ? fd.getAll("pv_don_vi").map(Number).filter(Boolean) : [] }
         : null;
     logQuyen = { them, bo, pham_vi: pv };
     v.quyen = them.length || bo.length ? sql.json({ them, bo }) : null;
-    v.pham_vi = pv ? sql.json(pv) : null;
+    // lãnh đạo có phân công lĩnh vực, để mặc định: gợi ý các phòng, đơn vị phụ trách các lĩnh vực đó
+    const goiY =
+      !pv && v.vai_tro === "lanh_dao" && (v.linh_vuc_phu_trach as string[]).length
+        ? { loai: "don_vi", linh_vuc: [], don_vi: await (await import("@/lib/phamViDonVi")).donViTheoLinhVuc(sql, v.linh_vuc_phu_trach as string[], [v.id_don_vi, v.id_don_vi_kiem_nhiem]) }
+        : null;
+    v.pham_vi = pv ? sql.json(pv) : goiY ? sql.json(goiY) : null;
     if (id === u.id && !chosen.has("qt.nguoi_dung")) return { error: "Không tự bỏ quyền quản lý tài khoản của chính mình." };
   }
   if (!v.ho_ten || !v.ten_dang_nhap) return { error: "Nhập họ tên và tên đăng nhập." };

@@ -21,6 +21,7 @@ export async function seedAll(o: { ten_xa: string; ho_ten: string; username: str
     if (o.demo) {
       await seedDemo(tx, ld.id, vp.id);
       await seedDemoNQ57(tx, admin.id);
+      await (await import("./phamViDonVi")).doiPhamViTheoDonVi(tx);
     }
   });
   await saveSettings({ ten_don_vi: o.ten_xa.toUpperCase().startsWith("UBND") ? o.ten_xa : `UBND ${o.ten_xa}` });

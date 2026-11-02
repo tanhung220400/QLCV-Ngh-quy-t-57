@@ -347,7 +347,8 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
         quyen={u ? [...tinhQuyen(u.vai_tro as unknown as string, u.quyen as never)] : null}
         phamVi={(u?.pham_vi as never) ?? null}
         units={units}
-        linhVuc={linhVuc}
+        idDonVi={(u?.id_don_vi as number | null) ?? null}
+        idKiemNhiem={(u?.id_don_vi_kiem_nhiem as number | null) ?? null}
       />
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2 xl:col-span-4">
         {u && (
@@ -432,7 +433,7 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
                 <td>
                   <span className="mr-1">{VAI_TRO[u.vai_tro]}</span>
                   <CapChip c={capOf(u as never)} />
-                  {u.pham_vi?.loai && <span className="block text-xs text-indigo-700">Phạm vi: {LOAI_PHAM_VI[u.pham_vi.loai as keyof typeof LOAI_PHAM_VI]}</span>}
+                  {u.pham_vi?.loai && <span className="block text-xs text-indigo-700">Phạm vi: {LOAI_PHAM_VI[(u.pham_vi.loai === "linh_vuc" ? "don_vi" : u.pham_vi.loai) as keyof typeof LOAI_PHAM_VI]}</span>}
                   {u.quyen && (u.quyen.them?.length || u.quyen.bo?.length) ? (
                     <span className="block text-xs text-amber-700">
                       Quyền riêng: {u.quyen.them?.length ? `+${u.quyen.them.length}` : ""} {u.quyen.bo?.length ? `−${u.quyen.bo.length}` : ""}

@@ -89,6 +89,7 @@ async function migrate() {
     await ensureSystemModules(tx);
     if (v < 6) await renameKhuPho(tx);
     if (v < 9) await doiCapCongNhan(tx);
+    if (v < 12) await (await import("./phamViDonVi")).doiPhamViTheoDonVi(tx);
     await tx`INSERT INTO cai_dat (khoa, gia_tri) VALUES ('schema_version', ${tx.json(SCHEMA_VERSION)})
              ON CONFLICT (khoa) DO UPDATE SET gia_tri = EXCLUDED.gia_tri`;
   });
