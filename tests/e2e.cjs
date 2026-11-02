@@ -1103,6 +1103,18 @@ const day = (n) => {
   ok("báo cáo ký thay: KT. CHỦ TỊCH / PHÓ CHỦ TỊCH / người ký thay", ky2.includes("KT. CHỦ TỊCH") && ky2.includes("PHÓ CHỦ TỊCH") && ky2.includes("Lê Văn Phúc"));
   const sect = require("child_process").execSync(`python3 -c "import zipfile;print(zipfile.ZipFile('/tmp/bc.docx').read('word/document.xml').decode())"`).toString();
   ok("lề trang theo NĐ 30 (trên 20, dưới 20, trái 30, phải 15 mm), không đánh số trang đầu", /w:top="1134"/.test(sect) && /w:left="1701"/.test(sect) && /w:right="851"/.test(sect) && /w:titlePg/.test(sect));
+  {
+    // trưởng phòng (Giao việc cấp 2) lập báo cáo: báo cáo của phòng, người ký là trưởng phòng
+    const { ctx: c2, page: p2 } = await newPage();
+    await login(p2, "tp.kinhte");
+    const r2 = await p2.request.get(BASE + "/api/bao-cao/tuan");
+    require("fs").writeFileSync("/tmp/bc2.docx", Buffer.from(await r2.body()));
+    const x2 = require("child_process").execSync(`python3 -c "import zipfile;print(zipfile.ZipFile('/tmp/bc2.docx').read('word/document.xml').decode())"`).toString().replace(/<[^>]+>/g, "");
+    ok("báo cáo của trưởng phòng: người ký là trưởng phòng, đứng tên phòng", r2.status() === 200 && x2.includes("Hoàng Văn Khánh") && x2.includes("TRƯỞNG PHÒNG") && !x2.includes("Trần Thị Châu") && !x2.includes("TM. ỦY BAN NHÂN DÂN") && /PHÒNG KINH TẾ/.test(x2), x2.slice(0, 300));
+    await p2.goto(BASE + "/bao-cao");
+    ok("trang báo cáo hiện người ký là trưởng phòng", (await p2.locator('select[name="nguoi_ky"] option').first().textContent()).includes("Hoàng Văn Khánh"));
+    await c2.close();
+  }
   // Ảnh chụp
   await page.goto(BASE + "/viec?tab=tat_ca");
   const viecHref = await page.evaluate(() => [...document.querySelectorAll("main a")].map((a) => a.getAttribute("href")).find((h) => /^\/viec\/\d+$/.test(h || "")));

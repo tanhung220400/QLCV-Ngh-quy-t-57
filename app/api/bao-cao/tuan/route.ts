@@ -1,5 +1,5 @@
 import { apiUser } from "@/lib/auth";
-import { getSettings } from "@/lib/settings";
+import { caiDatKy } from "@/lib/nguoiKy";
 import { weeklyData, weekRange } from "@/lib/reports";
 import { header, signature, p, table, docResponse, tieuDe } from "@/lib/word";
 import { fmtDate, fmtDue } from "@/lib/time";
@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   if (user instanceof Response) return user;
   const u = new URL(req.url);
   const { tu, den } = weekRange(u.searchParams.get("tu") || "", u.searchParams.get("den") || "");
-  const cfg = await getSettings();
+  const cfg = await caiDatKy(user);
   const d = await weeklyData(user, tu, den);
   const pct = d.done.length ? Math.round((d.onTime * 100) / d.done.length) : 0;
   const body = [

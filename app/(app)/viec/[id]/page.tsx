@@ -150,7 +150,7 @@ export default async function TaskDetail({ params, searchParams }: { params: Pro
           {members.filter((m) => m.vai_tro === "theo_doi").length > 0 && <Info k="Theo dõi" v={members.filter((m) => m.vai_tro === "theo_doi").map((m) => m.ho_ten).join(", ")} />}
           <Info k="Giao lúc" v={fmtDateTime(t.tao_luc)} />
           {t.ngay_nhan && <Info k="Nhận lúc" v={fmtDateTime(t.ngay_nhan)} />}
-          {t.ngay_hoan_thanh && <Info k="Hoàn thành" v={`${fmtDateTime(t.ngay_hoan_thanh)} · ${onTime(t as never) ? "đúng hạn" : "trễ hạn"}`} />}
+          {t.ngay_hoan_thanh && <Info k="Hoàn thành" v={`${fmtDateTime(t.ngay_hoan_thanh)} · ${!onTime(t as never) ? "trễ hạn" : vnDate(t.ngay_hoan_thanh) < vnDate(t.han) ? "trước hạn" : "đúng hạn"}`} />}
           {(t.so_lan_gia_han > 0 || t.so_lan_lam_lai > 0) && <Info k="Gia hạn / làm lại" v={`${t.so_lan_gia_han} lần gia hạn · ${t.so_lan_lam_lai} lần làm lại`} />}
           {kpis.length > 0 && (
             <div className="sm:col-span-2">

@@ -66,7 +66,7 @@ const vung = (ngang = false) => (ngang ? 252 : 165);
 export function header(cfg: CaiDat, o: { so?: string; kyHieu?: string; ngang?: boolean } = {}) {
   const VUNG = vung(o.ngang);
   const so = o.so || "";
-  const kyHieu = o.kyHieu || "BC-UBND";
+  const kyHieu = o.kyHieu || (cfg as { ky_hieu_bc?: string }).ky_hieu_bc || "BC-UBND";
   const trai = Math.round(VUNG * 0.4);
   const phai = VUNG - trai;
   const capTren = (cfg.ten_cap_tren || "").trim().toUpperCase();
@@ -121,7 +121,7 @@ export function signature(cfg: CaiDat, kyThay = false) {
   const tm = (cfg.tm_ky || "TM. ỦY BAN NHÂN DÂN").toUpperCase();
   const chucVu = (cfg.chuc_vu_ky || "CHỦ TỊCH").toUpperCase();
   const thay = kyThay && !!(cfg.chuc_vu_ky_thay || cfg.nguoi_ky_thay);
-  const dong = thay ? [tm, `KT. ${chucVu}`, (cfg.chuc_vu_ky_thay || "PHÓ CHỦ TỊCH").toUpperCase()] : [tm, chucVu];
+  const dong = (thay ? [tm, `KT. ${chucVu}`, (cfg.chuc_vu_ky_thay || "PHÓ CHỦ TỊCH").toUpperCase()] : [tm, chucVu]).filter((x) => x.trim());
   const ten = thay ? cfg.nguoi_ky_thay : cfg.nguoi_ky;
   const noiNhan = (cfg.noi_nhan || "").split("\n").map((l) => l.trim()).filter(Boolean);
   return new Table({

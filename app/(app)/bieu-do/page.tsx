@@ -112,6 +112,7 @@ export default async function BieuDo({ searchParams }: { searchParams: Promise<R
                 <tr>
                   <th>Đơn vị</th>
                   <th className="text-right">Tổng việc</th>
+                  <th className="text-right">Xong trước hạn</th>
                   <th className="text-right">Xong đúng hạn</th>
                   <th className="text-right">Xong trễ hạn</th>
                   <th className="text-right">Đang làm, còn hạn</th>
@@ -130,7 +131,8 @@ export default async function BieuDo({ searchParams }: { searchParams: Promise<R
                       </Link>
                     </td>
                     <td className="text-right">{r.tong}</td>
-                    <td className="text-right">{r.dung_han}</td>
+                    <td className="text-right">{r.truoc_han}</td>
+                    <td className="text-right">{r.dung_han - r.truoc_han}</td>
                     <td className="text-right">{r.tre_han}</td>
                     <td className="text-right">{r.dang_lam}</td>
                     <td className="text-right">{r.qua_han}</td>

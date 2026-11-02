@@ -5,7 +5,7 @@ import { taskScope } from "@/lib/perm";
 import { personStats } from "@/lib/stats";
 import { meetingList, weekRange } from "@/lib/reports";
 import { fromVN, vnDate, fmtDate } from "@/lib/time";
-import { getSettings } from "@/lib/settings";
+import { caiDatKy } from "@/lib/nguoiKy";
 
 export const dynamic = "force-dynamic";
 
@@ -21,17 +21,22 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const den = sp.den || vnDate();
   const people = !canPeople ? [] : await personStats(sql, (await taskScope(sql, user)).q, fromVN(tu, "00:00"), fromVN(den, "23:59"));
   const meetings = await meetingList(user);
-  const cfg = await getSettings();
+  const cfg = await caiDatKy(user);
   const cv = (cfg.chuc_vu_ky || "Chủ tịch").toLowerCase();
   const cfgKy = {
     chinh: `${cv.charAt(0).toUpperCase() + cv.slice(1)} ký${cfg.nguoi_ky ? ` (${cfg.nguoi_ky})` : ""}`,
     thay: `Ký thay: KT. ${cv}${cfg.nguoi_ky_thay ? ` – ${cfg.nguoi_ky_thay}` : ""}`,
+    coThay: !cfg.cua_don_vi || !!cfg.nguoi_ky_thay,
+    donVi: cfg.cua_don_vi,
   };
 
   return (
     <div className="space-y-4">
       <h1 className="h1">Báo cáo</h1>
-      <p className="muted">Báo cáo lập tự động từ dữ liệu trên phần mềm, không cần nhập tay. Phạm vi theo quyền xem của bạn.</p>
+      <p className="muted">
+        Báo cáo lập tự động từ dữ liệu trên phần mềm, không cần nhập tay. Phạm vi theo quyền xem của bạn.
+        {cfgKy.donVi && ` Báo cáo đứng tên ${cfgKy.donVi}, người ký là người đứng đầu đơn vị.`}
+      </p>
       {user.quyen.includes("bc.tra_cuu") && (
         <Link href="/tra-cuu" className="card flex items-center gap-3 border-brand-100 bg-brand-50 hover:shadow-md">
           <span className="text-2xl" aria-hidden>🔎</span>
@@ -64,7 +69,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
               <span className="text-sm">Người ký</span>
               <select name="nguoi_ky" className="input" defaultValue="">
                 <option value="">{cfgKy.chinh}</option>
-                <option value="thay">{cfgKy.thay}</option>
+                {cfgKy.coThay && <option value="thay">{cfgKy.thay}</option>}
               </select>
             </label>
             <div className="flex flex-wrap gap-2">
@@ -99,7 +104,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
               <span className="text-sm">Người ký</span>
               <select name="nguoi_ky" className="input" defaultValue="">
                 <option value="">{cfgKy.chinh}</option>
-                <option value="thay">{cfgKy.thay}</option>
+                {cfgKy.coThay && <option value="thay">{cfgKy.thay}</option>}
               </select>
             </label>
             <div className="flex flex-wrap gap-2">

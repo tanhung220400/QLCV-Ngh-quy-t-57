@@ -3,11 +3,14 @@
 export const STATUS = { good: "#0ca30c", warning: "#fab219", serious: "#ec835a", critical: "#d03b3b" };
 const BRAND = "#1d4ed8";
 
-type UnitRow = { ten: string; id: number | null; dung_han: number; tre_han: number; qua_han: number; dang_lam: number };
+type UnitRow = { ten: string; id: number | null; dung_han: number; truoc_han?: number; tre_han: number; qua_han: number; dang_lam: number };
+/** Giá trị từng đoạn: “xong đúng hạn” hiển thị phần không gồm “xong trước hạn” */
+const giaTri = (r: UnitRow, k: string): number => (k === "truoc_han" ? (r.truoc_han ?? 0) : k === "dung_han" ? r.dung_han - (r.truoc_han ?? 0) : ((r as unknown as Record<string, number>)[k] ?? 0));
 
 export function UnitBars({ rows }: { rows: UnitRow[] }) {
   const max = Math.max(1, ...rows.map((r) => r.dung_han + r.tre_han + r.qua_han + r.dang_lam));
   const seg = [
+    { k: "truoc_han", label: "Xong trước hạn", color: "#066b2f" },
     { k: "dung_han", label: "Xong đúng hạn", color: STATUS.good },
     { k: "tre_han", label: "Xong trễ hạn", color: STATUS.serious },
     { k: "qua_han", label: "Đang quá hạn", color: STATUS.critical },
@@ -39,7 +42,7 @@ export function UnitBars({ rows }: { rows: UnitRow[] }) {
               </div>
               <div className="mt-1 flex h-4 gap-[2px]" style={{ width: `${Math.max(4, (total / max) * 100)}%` }}>
                 {seg.map((s) => {
-                  const v = r[s.k];
+                  const v = giaTri(r, s.k);
                   if (!v) return null;
                   return (
                     <div
@@ -188,6 +191,7 @@ type MonthPoint = { thang: string; ty_le: number | null; den_han: number; dung_h
  */
 export function UnitRateBars({ rows, months }: { rows: UnitRateRow[]; months: MonthPoint[] }) {
   const seg = [
+    { k: "truoc_han", label: "Xong trước hạn", color: "#066b2f" },
     { k: "dung_han", label: "Xong đúng hạn", color: STATUS.good },
     { k: "tre_han", label: "Xong trễ hạn", color: STATUS.serious },
     { k: "qua_han", label: "Đang quá hạn", color: STATUS.critical },
@@ -260,7 +264,7 @@ export function UnitRateBars({ rows, months }: { rows: UnitRateRow[]; months: Mo
                 <div className="flex items-center gap-2">
                   <div className="relative flex h-7 gap-[2px]" style={{ width: `${Math.max(3, share * 100)}%` }}>
                     {seg.map((s, i) => {
-                      const v = r[s.k];
+                      const v = giaTri(r, s.k);
                       if (!v) return null;
                       const last = seg.slice(i + 1).every((x) => !r[x.k]);
                       return (

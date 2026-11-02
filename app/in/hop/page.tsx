@@ -1,5 +1,5 @@
 import { requirePerm } from "@/lib/auth";
-import { getSettings } from "@/lib/settings";
+import { caiDatKy } from "@/lib/nguoiKy";
 import { meetingData, taskStatusText } from "@/lib/reports";
 import { PrintDoc, PTable } from "@/components/PrintDoc";
 import { fmtDue } from "@/lib/time";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function PrintMeeting({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
   const user = await requirePerm("bc.xuat");
-  const cfg = await getSettings();
+  const cfg = await caiDatKy(user);
   const rows = await meetingData(user, sp.ten || "");
   const xong = rows.filter((r) => r.trang_thai === "hoan_thanh").length;
   return (

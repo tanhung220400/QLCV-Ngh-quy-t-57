@@ -29,13 +29,18 @@ export async function runScan(force = false) {
   const today = vnDate(now);
   let sent = 0;
 
-  const leaders = (await sql`SELECT id, linh_vuc_phu_trach FROM nguoi_dung WHERE vai_tro = 'lanh_dao' AND trang_thai = 'hoat_dong'`) as unknown as {
-    id: number;
-    linh_vuc_phu_trach: string[];
-  }[];
-  const leadersFor = (lv: string) => {
-    const specific = leaders.filter((l) => l.linh_vuc_phu_trach.includes(lv)).map((l) => l.id);
-    return specific.length ? specific : leaders.filter((l) => !l.linh_vuc_phu_trach.length).map((l) => l.id);
+  // lãnh đạo nhận cảnh báo theo phòng, đơn vị phụ trách (phạm vi xem); không ai phụ trách thì lãnh đạo chung (toàn phường)
+  const { tinhPhamVi } = await import("./quyen");
+  const { allUnits, subtree } = await import("./perm");
+  const dvAll = await allUnits();
+  const leaders = (await sql`SELECT id, vai_tro, id_don_vi, id_don_vi_kiem_nhiem, linh_vuc_phu_trach, pham_vi FROM nguoi_dung WHERE vai_tro = 'lanh_dao' AND trang_thai = 'hoat_dong'`).map((l) => {
+    const pv = tinhPhamVi(l.vai_tro, l.id_don_vi, l.linh_vuc_phu_trach || [], l.pham_vi, l.id_don_vi_kiem_nhiem);
+    return { id: l.id as number, chung: pv.loai === "toan_xa", dv: pv.loai === "don_vi" ? pv.don_vi.flatMap((d) => (d === l.id_don_vi || d === l.id_don_vi_kiem_nhiem ? [d] : subtree(dvAll, d))) : [] };
+  });
+  const lanhDaoChung = leaders.filter((l) => l.chung).map((l) => l.id);
+  const leadersFor = (dv: number | null) => {
+    const specific = dv ? leaders.filter((l) => l.dv.includes(dv)).map((l) => l.id) : [];
+    return specific.length ? specific : lanhDaoChung;
   };
   const unitHeads = async (dv: number | null) =>
     dv
@@ -69,7 +74,7 @@ export async function runScan(force = false) {
       sent++;
     }
     if (qua && -con >= cfg.bao_cap_tren_sau) {
-      await notify(sql, [t.id_nguoi_giao, ...leadersFor(t.linh_vuc)], "qua_han", `Quá hạn ${-con} ngày: ${t.ten}`, `Hạn ${fmtDue(han, t.han_co_gio)}`, "cong_viec", t.id, `baocaptren:${t.id}:${hanDay}`);
+      await notify(sql, [t.id_nguoi_giao, ...leadersFor(t.id_don_vi_chu_tri)], "qua_han", `Quá hạn ${-con} ngày: ${t.ten}`, `Hạn ${fmtDue(han, t.han_co_gio)}`, "cong_viec", t.id, `baocaptren:${t.id}:${hanDay}`);
       sent++;
     }
     if (t.trang_thai === "moi_giao" && now.getTime() - new Date(t.tao_luc).getTime() > cfg.nhac_nhan_viec_gio * 3600000) {
@@ -142,7 +147,7 @@ export async function runScan(force = false) {
       }
     }
     if (k.nguy_co) {
-      await notify(sql, [k.id_lanh_dao, ...leaders.filter((l) => !l.linh_vuc_phu_trach.length).map((l) => l.id)], "nguy_co", `Chỉ tiêu có nguy cơ không đạt: ${k.ten}`,
+      await notify(sql, [k.id_lanh_dao, ...lanhDaoChung], "nguy_co", `Chỉ tiêu có nguy cơ không đạt: ${k.ten}`,
         k.pct == null ? "Chưa có số liệu" : `Đạt ${k.pct.toFixed(1)}%, lẽ ra phải đạt ${k.pct_le_ra.toFixed(1)}%`, "chi_tieu", k.id, `nguyco:${k.id}:${today.slice(0, 7)}`);
       sent++;
     }

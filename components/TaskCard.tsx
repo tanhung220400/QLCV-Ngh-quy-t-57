@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TRANG_THAI, UU_TIEN } from "@/lib/const";
 import { dueColor, MAU_CLASS, MAU_VIEN, onTime, type TaskListItem } from "@/lib/tasks";
-import { fmtDue, fmtDate } from "@/lib/time";
+import { fmtDue, fmtDate, vnDate } from "@/lib/time";
 
 export function StatusChip({ s }: { s: string }) {
   const cls: Record<string, string> = {
@@ -27,7 +27,7 @@ export function DueChip({ t, holidays, nguong }: { t: { trang_thai: string; han:
   let label = c.nhan;
   if (t.trang_thai === "hoan_thanh") {
     const ok = onTime(t);
-    label = ok ? "Đúng hạn" : "Trễ hạn";
+    label = !ok ? "Trễ hạn" : t.ngay_hoan_thanh && vnDate(t.ngay_hoan_thanh) < vnDate(t.han) ? "Trước hạn" : "Đúng hạn";
   }
   return <span className={`chip ${MAU_CLASS[c.mau]}`}>{label}</span>;
 }

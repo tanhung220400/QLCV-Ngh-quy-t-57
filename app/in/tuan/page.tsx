@@ -1,5 +1,5 @@
 import { requirePerm } from "@/lib/auth";
-import { getSettings } from "@/lib/settings";
+import { caiDatKy } from "@/lib/nguoiKy";
 import { weeklyData, weekRange } from "@/lib/reports";
 import { PrintDoc, PTable } from "@/components/PrintDoc";
 import { fmtDate, fmtDue } from "@/lib/time";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function PrintWeek({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
   const user = await requirePerm("bc.xuat");
-  const cfg = await getSettings();
+  const cfg = await caiDatKy(user);
   const { tu, den } = weekRange(sp.tu, sp.den);
   const d = await weeklyData(user, tu, den);
   const pct = d.done.length ? Math.round((d.onTime * 100) / d.done.length) : 0;

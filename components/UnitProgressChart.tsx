@@ -4,6 +4,7 @@ import type { UnitProgress, SubTask } from "@/lib/unitProgress";
 
 // Màu trạng thái cố định (giống các biểu đồ khác của phần mềm), luôn kèm chú thích chữ
 const SEG = [
+  { k: "truoc_han", label: "Xong trước hạn", color: "#066b2f" },
   { k: "dung_han", label: "Xong đúng hạn", color: "#0ca30c" },
   { k: "tre_han", label: "Xong trễ hạn", color: "#ec835a" },
   { k: "dang_lam", label: "Đang làm, còn hạn", color: "#b9b8ad" },
@@ -12,9 +13,11 @@ const SEG = [
 const CHI_SO = {
   tien_do: { label: "Tiến độ bình quân", note: "Trung bình % tiến độ của các việc; việc đã xong tính 100%" },
   hoan_thanh: { label: "Tỷ lệ đã hoàn thành", note: "Số việc đã xong trên tổng số việc được giao" },
-  dung_han_pct: { label: "Tỷ lệ xong đúng hạn", note: "Số việc xong đúng hạn trên số việc đã xong" },
+  dung_han_pct: { label: "Tỷ lệ xong đúng hạn", note: "Số việc xong đúng hạn (kể cả trước hạn) trên số việc đã xong" },
 } as const;
 type ChiSo = keyof typeof CHI_SO;
+/** “xong đúng hạn” hiển thị phần không gồm “xong trước hạn” */
+const giaTri = (r: UnitProgress, k: (typeof SEG)[number]["k"]): number => (k === "dung_han" ? r.dung_han - (r.truoc_han ?? 0) : r[k]);
 const BLUE = "#2563eb";
 const INK = "#334155";
 const MUTED = "#64748b";
@@ -71,7 +74,7 @@ function Tooltip({ tip, mode, chiSo }: { tip: Tip; mode: "trang_thai" | "chi_so"
           <li key={s.k} className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
             <span className="flex-1 text-slate-600">{s.label}</span>
-            <b className="tabular-nums text-slate-900">{r[s.k]}</b>
+            <b className="tabular-nums text-slate-900">{giaTri(r, s.k)}</b>
           </li>
         ))}
       </ul>
@@ -131,7 +134,7 @@ function Columns({ rows, mode, chiSo, height, link }: { rows: UnitProgress[]; mo
                   ) : null
                 ) : (
                   SEG.map((s, j) => {
-                    const v = r[s.k];
+                    const v = giaTri(r, s.k);
                     if (!v) return null;
                     const y0 = y(acc);
                     acc += v;
@@ -242,8 +245,8 @@ export function UnitProgressChart({ rows, linkBase }: { rows: UnitProgress[]; li
   );
 }
 
-const NHOM_TEN: Record<SubTask["nhom"], string> = { dung_han: "Xong đúng hạn", tre_han: "Xong trễ hạn", dang_lam: "Đang làm, còn hạn", qua_han: "Chưa xong, đã quá hạn" };
-const NHOM_MAU: Record<SubTask["nhom"], string> = { dung_han: "#0ca30c", tre_han: "#ec835a", dang_lam: "#b9b8ad", qua_han: "#d03b3b" };
+const NHOM_TEN: Record<SubTask["nhom"], string> = { truoc_han: "Xong trước hạn", dung_han: "Xong đúng hạn", tre_han: "Xong trễ hạn", dang_lam: "Đang làm, còn hạn", qua_han: "Chưa xong, đã quá hạn" };
+const NHOM_MAU: Record<SubTask["nhom"], string> = { truoc_han: "#066b2f", dung_han: "#0ca30c", tre_han: "#ec835a", dang_lam: "#b9b8ad", qua_han: "#d03b3b" };
 
 /** Biểu đồ con: mỗi cột là một việc con, chiều cao là % tiến độ, màu theo tình trạng hạn */
 export function SubtaskChart({ rows }: { rows: SubTask[] }) {

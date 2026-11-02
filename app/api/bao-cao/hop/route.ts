@@ -1,5 +1,5 @@
 import { apiUser } from "@/lib/auth";
-import { getSettings } from "@/lib/settings";
+import { caiDatKy } from "@/lib/nguoiKy";
 import { meetingData, taskStatusText } from "@/lib/reports";
 import { header, signature, p, table, docResponse, tieuDe } from "@/lib/word";
 import { fmtDue } from "@/lib/time";
@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   const user = await apiUser("bc.xuat");
   if (user instanceof Response) return user;
   const ten = new URL(req.url).searchParams.get("ten") || "";
-  const cfg = await getSettings();
+  const cfg = await caiDatKy(user);
   const rows = await meetingData(user, ten);
   const xong = rows.filter((r) => r.trang_thai === "hoan_thanh").length;
   const body = [

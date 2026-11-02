@@ -5,7 +5,10 @@ export type UnitProgress = {
   id: number | null;
   ten: string;
   tong: number;
+  /** xong đúng hạn (kể cả xong trước hạn) */
   dung_han: number;
+  /** xong trước ngày hạn (là một phần của dung_han) */
+  truoc_han: number;
   tre_han: number;
   qua_han: number;
   dang_lam: number;
@@ -32,6 +35,7 @@ export async function unitProgress(
     SELECT dv.id, COALESCE(dv.ten, 'Cá nhân, không thuộc đơn vị') AS ten,
       count(*)::int AS tong,
       count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh <= cv.han)::int AS dung_han,
+      count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND (cv.ngay_hoan_thanh AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < (cv.han AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)::int AS truoc_han,
       count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND (cv.ngay_hoan_thanh IS NULL OR cv.ngay_hoan_thanh > cv.han))::int AS tre_han,
       count(*) FILTER (WHERE cv.trang_thai <> 'hoan_thanh' AND cv.han < now())::int AS qua_han,
       count(*) FILTER (WHERE cv.trang_thai <> 'hoan_thanh' AND cv.han >= now())::int AS dang_lam,
@@ -61,7 +65,7 @@ export type SubTask = {
   trang_thai: string;
   tien_do: number;
   /** dung_han / tre_han / qua_han / dang_lam */
-  nhom: "dung_han" | "tre_han" | "qua_han" | "dang_lam";
+  nhom: "truoc_han" | "dung_han" | "tre_han" | "qua_han" | "dang_lam";
   han: string;
 };
 
@@ -88,7 +92,8 @@ export async function subtaskProgress(sql: postgres.Sql, unitId: number, o: { na
     )
     SELECT c.id, c.ten, con.id_goc, con.ten_goc, n.ho_ten AS chu_tri, c.trang_thai, to_char(c.han AT TIME ZONE 'Asia/Ho_Chi_Minh', 'DD/MM/YYYY') AS han,
       CASE WHEN c.trang_thai = 'hoan_thanh' THEN 100 ELSE c.phan_tram END AS tien_do,
-      CASE WHEN c.trang_thai = 'hoan_thanh' AND c.ngay_hoan_thanh <= c.han THEN 'dung_han'
+      CASE WHEN c.trang_thai = 'hoan_thanh' AND (c.ngay_hoan_thanh AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < (c.han AT TIME ZONE 'Asia/Ho_Chi_Minh')::date THEN 'truoc_han'
+           WHEN c.trang_thai = 'hoan_thanh' AND c.ngay_hoan_thanh <= c.han THEN 'dung_han'
            WHEN c.trang_thai = 'hoan_thanh' THEN 'tre_han'
            WHEN c.han < now() THEN 'qua_han' ELSE 'dang_lam' END AS nhom
     FROM con JOIN cong_viec c ON c.id = con.id JOIN nguoi_dung n ON n.id = c.id_chu_tri

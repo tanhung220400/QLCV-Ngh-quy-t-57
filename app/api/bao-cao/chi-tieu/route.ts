@@ -1,5 +1,5 @@
 import { apiUser } from "@/lib/auth";
-import { getSettings } from "@/lib/settings";
+import { caiDatKy } from "@/lib/nguoiKy";
 import { kpiReportData, kpiRowText } from "@/lib/reports";
 import { header, signature, p, table, docResponse, tieuDe } from "@/lib/word";
 import { vnDate } from "@/lib/time";
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const u = new URL(req.url);
   const nam = Number(u.searchParams.get("nam")) || Number(vnDate().slice(0, 4));
   const ky = u.searchParams.get("ky") || "thang";
-  const cfg = await getSettings();
+  const cfg = await caiDatKy(user);
   const kpis = await kpiReportData(user, nam);
   const groups = [...new Set(kpis.map((k) => k.nhom))];
   const m = Number(vnDate().slice(5, 7));

@@ -119,7 +119,6 @@ export async function saveUserAction(_: ActionState, fd: FormData): Promise<Acti
     chuc_danh_bcd: str(fd, "chuc_danh_bcd") || null,
     chuc_danh_tgv: str(fd, "chuc_danh_tgv") || null,
     vai_tro: VAI_TRO[str(fd, "vai_tro")] ? str(fd, "vai_tro") : "cong_chuc",
-    linh_vuc_phu_trach: fd.getAll("linh_vuc_phu_trach").map(String).filter(Boolean),
     trang_thai: str(fd, "trang_thai") === "khoa" ? "khoa" : "hoat_dong",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as Record<string, any>;
@@ -137,12 +136,7 @@ export async function saveUserAction(_: ActionState, fd: FormData): Promise<Acti
         : null;
     logQuyen = { them, bo, pham_vi: pv };
     v.quyen = them.length || bo.length ? sql.json({ them, bo }) : null;
-    // lãnh đạo có phân công lĩnh vực, để mặc định: gợi ý các phòng, đơn vị phụ trách các lĩnh vực đó
-    const goiY =
-      !pv && v.vai_tro === "lanh_dao" && (v.linh_vuc_phu_trach as string[]).length
-        ? { loai: "don_vi", linh_vuc: [], don_vi: await (await import("@/lib/phamViDonVi")).donViTheoLinhVuc(sql, v.linh_vuc_phu_trach as string[], [v.id_don_vi, v.id_don_vi_kiem_nhiem]) }
-        : null;
-    v.pham_vi = pv ? sql.json(pv) : goiY ? sql.json(goiY) : null;
+    v.pham_vi = pv ? sql.json(pv) : null;
     if (id === u.id && !chosen.has("qt.nguoi_dung")) return { error: "Không tự bỏ quyền quản lý tài khoản của chính mình." };
   }
   if (!v.ho_ten || !v.ten_dang_nhap) return { error: "Nhập họ tên và tên đăng nhập." };

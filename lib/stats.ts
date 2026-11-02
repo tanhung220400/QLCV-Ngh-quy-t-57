@@ -48,13 +48,14 @@ export async function byUnit(sql: Q, scope: Frag, from: Date) {
   return (await sql`
     SELECT COALESCE(dv.ten, 'Cá nhân, không thuộc đơn vị') AS ten, dv.id,
       count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh <= cv.han)::int AS dung_han,
+      count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND (cv.ngay_hoan_thanh AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < (cv.han AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)::int AS truoc_han,
       count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh > cv.han)::int AS tre_han,
       count(*) FILTER (WHERE cv.trang_thai IN ('moi_giao','da_nhan','dang_thuc_hien') AND cv.han < now())::int AS qua_han,
       count(*) FILTER (WHERE cv.trang_thai IN ('moi_giao','da_nhan','dang_thuc_hien','cho_duyet') AND cv.han >= now())::int AS dang_lam
     FROM cong_viec cv LEFT JOIN don_vi dv ON dv.id = cv.id_don_vi_chu_tri
     WHERE (${scope}) AND cv.trang_thai <> 'huy' AND (cv.han >= ${from} OR cv.trang_thai IN ('moi_giao','da_nhan','dang_thuc_hien','cho_duyet'))
     GROUP BY dv.id, dv.ten, dv.thu_tu
-    ORDER BY dv.thu_tu NULLS LAST`) as unknown as { ten: string; id: number | null; dung_han: number; tre_han: number; qua_han: number; dang_lam: number }[];
+    ORDER BY dv.thu_tu NULLS LAST`) as unknown as { ten: string; id: number | null; dung_han: number; truoc_han: number; tre_han: number; qua_han: number; dang_lam: number }[];
 }
 
 /** Tỷ lệ đúng hạn theo từng tháng (đường xu hướng) */

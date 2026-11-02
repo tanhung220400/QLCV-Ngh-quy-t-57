@@ -69,7 +69,11 @@ export async function meetingData(user: User, ten: string) {
 }
 
 export function taskStatusText(t: { trang_thai: string; han: Date; ngay_hoan_thanh: Date | null; phan_tram?: number }) {
-  if (t.trang_thai === "hoan_thanh") return `Hoàn thành ${fmtDate(t.ngay_hoan_thanh)} (${new Date(t.ngay_hoan_thanh!) <= new Date(t.han) ? "đúng hạn" : "trễ hạn"})`;
+  if (t.trang_thai === "hoan_thanh") {
+    const xong = new Date(t.ngay_hoan_thanh!);
+    const muc = xong > new Date(t.han) ? "trễ hạn" : vnDate(xong) < vnDate(t.han) ? "trước hạn" : "đúng hạn";
+    return `Hoàn thành ${fmtDate(t.ngay_hoan_thanh)} (${muc})`;
+  }
   const qua = new Date(t.han) < new Date() && ["moi_giao", "da_nhan", "dang_thuc_hien"].includes(t.trang_thai);
   return `${TRANG_THAI[t.trang_thai]}${t.phan_tram ? ` ${t.phan_tram}%` : ""}${qua ? " — QUÁ HẠN" : ""}`;
 }

@@ -45,7 +45,6 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
   const muc = allowed.some((m) => m[0] === sp.muc) ? sp.muc : allowed[0][0];
   const sql = await db();
   const units = await sql`SELECT d.*, c.ten AS ten_cha, (SELECT count(*)::int FROM nguoi_dung n WHERE n.id_don_vi = d.id) AS so_nguoi FROM don_vi d LEFT JOIN don_vi c ON c.id = d.id_cha ORDER BY d.thu_tu, d.ten`;
-  const linhVuc = await getCatalog("linh_vuc");
 
   return (
     <div className="space-y-4">
@@ -58,7 +57,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
         ))}
       </div>
 
-      {muc === "nguoi_dung" && <Users units={units as never} linhVuc={linhVuc} edit={Number(sp.sua) || 0} q={sp.q || ""} />}
+      {muc === "nguoi_dung" && <Users units={units as never} edit={Number(sp.sua) || 0} q={sp.q || ""} />}
 
       {muc === "don_vi" && <Units units={units as never} sua={Number(sp.sua) || 0} cha={Number(sp.cha) || null} luu={!!sp.luu} daXoa={sp.da_xoa || ""} />}
 
@@ -256,7 +255,7 @@ async function Units({ units, sua, cha, luu, daXoa }: { units: DonViRow[]; sua: 
   );
 }
 
-async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: string }[]; linhVuc: string[]; edit: number; q: string }) {
+async function Users({ units, edit, q }: { units: { id: number; ten: string }[]; edit: number; q: string }) {
   const sql = await db();
   const users = await sql`SELECT n.*, d.ten AS ten_don_vi, k.ten AS ten_don_vi_kn FROM nguoi_dung n LEFT JOIN don_vi d ON d.id = n.id_don_vi LEFT JOIN don_vi k ON k.id = n.id_don_vi_kiem_nhiem
     WHERE ${q ? sql`(n.ho_ten ILIKE ${"%" + q + "%"} OR n.ten_dang_nhap ILIKE ${"%" + q + "%"} OR n.chuc_vu ILIKE ${"%" + q + "%"} OR d.ten ILIKE ${"%" + q + "%"})` : sql`TRUE`}
@@ -330,17 +329,6 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
         <span className="label">Số điện thoại (nhận SMS nhắc việc)</span>
         <input name="sdt" className="input" inputMode="tel" defaultValue={u?.sdt ?? ""} />
       </label>
-      <div className="sm:col-span-2 xl:col-span-4">
-        <label className="label">Lĩnh vực phụ trách (với lãnh đạo: để trống = toàn phường; với cán bộ: lĩnh vực theo dõi)</label>
-        <div className="flex flex-wrap gap-2">
-          {linhVuc.map((l) => (
-            <label key={l} className="chip cursor-pointer border-slate-300 bg-white py-1">
-              <input type="checkbox" name="linh_vuc_phu_trach" value={l} defaultChecked={(u?.linh_vuc_phu_trach as unknown as string[] | undefined)?.includes(l)} className="mr-1.5" />
-              {l}
-            </label>
-          ))}
-        </div>
-      </div>
       <PermissionEditor
         key={u?.id ?? "moi"}
         vaiTro={(u?.vai_tro as unknown as string) || "cong_chuc"}

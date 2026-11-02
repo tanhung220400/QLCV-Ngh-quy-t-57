@@ -21,7 +21,7 @@ export function PrintDoc({ cfg, title, sub, kyThay, children }: { cfg: CaiDat; t
           {cfg.ten_cap_tren && <div className="text-[13pt] uppercase">{cfg.ten_cap_tren}</div>}
           <div className="text-[13pt] font-bold">{coQuan}</div>
           <div className="mx-auto mt-0.5 w-[30mm] border-b border-black" />
-          <div className="mt-2 text-[13pt]">Số: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/BC-UBND</div>
+          <div className="mt-2 text-[13pt]">Số: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/{(cfg as { ky_hieu_bc?: string }).ky_hieu_bc || "BC-UBND"}</div>
         </div>
         <div>
           <div className="text-[13pt] font-bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
@@ -42,7 +42,7 @@ export function PrintDoc({ cfg, title, sub, kyThay, children }: { cfg: CaiDat; t
           <div className="text-[11pt] whitespace-pre-line">{cfg.noi_nhan}</div>
         </div>
         <div className="text-center font-bold">
-          <div>{tm}</div>
+          {tm.trim() && <div>{tm}</div>}
           {thay ? (
             <>
               <div>KT. {cv}</div>
