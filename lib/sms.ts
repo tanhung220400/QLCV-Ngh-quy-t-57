@@ -112,18 +112,30 @@ export function buildSmsText(c: SmsConfig, tieuDe: string, noiDung: string | nul
 type Q = postgres.Sql | postgres.TransactionSql;
 
 /** Đưa SMS vào hàng đợi cho các người nhận (gọi trong cùng giao dịch với thông báo ứng dụng) */
+declare global {
+  // eslint-disable-next-line no-var
+  var __smsMoi: boolean | undefined;
+}
+/** Máy chủ này vừa đưa tin nhắn vào hàng đợi (đọc xong thì xóa dấu) */
+export function coSmsMoi(): boolean {
+  const c = !!global.__smsMoi;
+  global.__smsMoi = false;
+  return c;
+}
+
 export async function queueSms(sql: Q, recipients: number[], loai: string, tieuDe: string, noiDung: string | null, path: string | null, khoa: string | null) {
   if (!recipients.length) return;
   const c = await getSmsConfig();
   if (!c.bat || !c.su_kien.includes(loai)) return;
   const users = await sql`SELECT id, sdt FROM nguoi_dung WHERE id IN ${sql(recipients)} AND trang_thai = 'hoat_dong'`;
   const text = buildSmsText(c, tieuDe, noiDung, path);
-  for (const u of users) {
+  const dong = users.flatMap((u) => {
     const sdt = chuanSdt(u.sdt);
-    if (!sdt) continue;
-    await sql`INSERT INTO sms_hang_doi (id_nguoi_nhan, sdt, noi_dung, loai, khoa)
-      VALUES (${u.id}, ${sdt}, ${text}, ${loai}, ${khoa ? `${khoa}:${u.id}` : null}) ON CONFLICT (khoa) DO NOTHING`;
-  }
+    return sdt ? [{ id_nguoi_nhan: u.id as number, sdt, noi_dung: text, loai, khoa: khoa ? `${khoa}:${u.id}` : null }] : [];
+  });
+  if (!dong.length) return;
+  await sql`INSERT INTO sms_hang_doi ${sql(dong, "id_nguoi_nhan", "sdt", "noi_dung", "loai", "khoa")} ON CONFLICT (khoa) DO NOTHING`;
+  global.__smsMoi = true;
 }
 
 function inQuietHours(c: SmsConfig, now = new Date()): boolean {

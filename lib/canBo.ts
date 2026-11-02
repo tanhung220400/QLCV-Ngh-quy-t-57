@@ -1,8 +1,8 @@
 // Chức vụ, cấp bậc và quy tắc giao việc theo cấp (cấp 1 / cấp 2), chặn giao ngược lên cấp trên.
 import { tinhQuyen } from "./quyen";
+import { boDauThuong } from "./chuoi";
 
-export const khongDau = (s: string) =>
-  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
+export const khongDau = (s: string) => boDauThuong(s).replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
 
 /** Bậc của chức vụ trong một đơn vị: 1 cấp trưởng, 2 cấp phó, 3 cán bộ, công chức, nhân viên */
 export function bacChucVu(cv: string | null | undefined): 1 | 2 | 3 {

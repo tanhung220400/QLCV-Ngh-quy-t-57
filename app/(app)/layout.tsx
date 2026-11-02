@@ -4,8 +4,7 @@ import { getUser } from "@/lib/auth";
 import { db, hasDatabase } from "@/lib/db";
 import { canCreateTask, isAdmin } from "@/lib/perm";
 import { Nav, type NavNode } from "@/components/Nav";
-import { runScan } from "@/lib/scan";
-import { flushSms } from "@/lib/sms";
+import { chayNenSauTrang } from "@/lib/scan";
 import { OfflineSync } from "@/components/OfflineSync";
 import { menuTree, type MenuNode } from "@/lib/modules";
 import { getSettings } from "@/lib/settings";
@@ -27,15 +26,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   if (user.doi_mat_khau) redirect("/doi-mat-khau");
   const sql = await db();
-  const [unreadRow, tree, cfg, theme] = await Promise.all([
+  // Công việc các năm cũ được đóng gói thành mục con của “Công việc”
+  const [unreadRow, tree, cfg, theme, years] = await Promise.all([
     sql`SELECT count(*)::int AS n FROM thong_bao WHERE id_nguoi_nhan = ${user.id} AND NOT da_doc`,
     menuTree(sql, user),
     getSettings(),
     getTheme(sql),
+    oldYears(),
   ]);
   const unread = unreadRow[0].n as number;
-  // Công việc các năm cũ được đóng gói thành mục con của “Công việc”
-  const years = await oldYears();
   const nav = tree.map(slim);
   if (years.length) {
     const find = (ns: NavNode[]): NavNode | undefined => ns.map((n) => (n.href === "/viec" ? n : find(n.con))).find(Boolean);
@@ -45,8 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   after(async () => {
     try {
-      await runScan(false);
-      await flushSms();
+      await chayNenSauTrang();
     } catch (e) {
       console.error("scan", e);
     }

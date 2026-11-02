@@ -10,10 +10,36 @@ import { truongDonVi } from "./giaoViec";
  * Quét hạn và gửi nhắc việc (mục 4.3), tạo việc định kỳ, nhắc chốt số liệu chỉ tiêu.
  * Gọi từ tác vụ định kỳ và tự chạy nền khi có người dùng truy cập (tối đa 15 phút/lần).
  */
+declare global {
+  // eslint-disable-next-line no-var
+  var __nen: { quet: number; sms: number } | undefined;
+}
+
+/**
+ * Việc chạy nền sau mỗi lượt mở trang. Trước đây mỗi lượt đều ghi vào CSDL để giành lượt quét;
+ * nay mỗi máy chủ chỉ hỏi CSDL tối đa 1 lần/phút, tin nhắn mới đưa vào hàng đợi thì gửi ngay.
+ */
+export async function chayNenSauTrang() {
+  const nen = (global.__nen ||= { quet: 0, sms: 0 });
+  const bay = Date.now();
+  if (bay - nen.quet >= 60_000) {
+    nen.quet = bay;
+    await runScan(false);
+  }
+  const { flushSms, coSmsMoi } = await import("./sms");
+  if (coSmsMoi() || bay - nen.sms >= 60_000) {
+    nen.sms = bay;
+    await flushSms();
+  }
+}
+
 export async function runScan(force = false) {
   const sql = await db();
   const now = new Date();
   if (!force) {
+    // đọc trước (không khóa, không ghi); chỉ giành lượt quét khi đã quá 15 phút
+    const cuoi = (await sql`SELECT gia_tri #>> '{}' AS t FROM cai_dat WHERE khoa = 'quet_cuoi'`)[0];
+    if (cuoi && now.getTime() - new Date(String(cuoi.t)).getTime() < 15 * 60_000) return { skipped: true };
     const r = await sql`
       INSERT INTO cai_dat (khoa, gia_tri) VALUES ('quet_cuoi', ${sql.json(now.toISOString())})
       ON CONFLICT (khoa) DO UPDATE SET gia_tri = EXCLUDED.gia_tri

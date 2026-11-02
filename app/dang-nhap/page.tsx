@@ -13,10 +13,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   if (!hasDatabase()) redirect("/cai-dat-ban-dau");
   const sql = await db();
-  if ((await sql`SELECT count(*)::int AS n FROM nguoi_dung`)[0].n === 0) redirect("/cai-dat-ban-dau");
+  if (!(await sql`SELECT 1 FROM nguoi_dung LIMIT 1`).length) redirect("/cai-dat-ban-dau");
   if (await getUser()) redirect("/");
   const cfg = await getSettings();
-  const demo = (await sql`SELECT 1 FROM nguoi_dung WHERE ten_dang_nhap = 'chutich' LIMIT 1`).length > 0;
   return (
     <AuthShell title="Đăng nhập" sub={cfg.ten_hien_thi || cfg.ten_don_vi}>
       {sp.dat_lai && <p className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-emerald-800">Đã đặt lại mật khẩu. Mời đăng nhập.</p>}
@@ -24,23 +23,6 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <LoginFields />
         <Submit className="btn btn-primary w-full text-lg">Đăng nhập</Submit>
       </ActionForm>
-      {demo && (
-        <details className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          <summary className="cursor-pointer font-semibold">Tài khoản dùng thử (dữ liệu mẫu)</summary>
-          <p className="mt-2">
-            Mật khẩu chung: <b>Demo@2026</b>
-          </p>
-          <ul className="mt-1 list-disc pl-5">
-            <li>chutich — Chủ tịch UBND (xem toàn xã)</li>
-            <li>pct.kinhte — Phó Chủ tịch phụ trách kinh tế</li>
-            <li>tp.kinhte — Trưởng phòng Kinh tế</li>
-            <li>cv.kinhte1 — Chuyên viên</li>
-            <li>vanphong — Văn phòng (tổng hợp)</li>
-            <li>thon.dong — Trưởng khu phố</li>
-          </ul>
-          <p className="mt-2">Quản trị nên khóa các tài khoản này khi dùng thật.</p>
-        </details>
-      )}
     </AuthShell>
   );
 }

@@ -1,5 +1,6 @@
 import type postgres from "postgres";
 import { vnDate, fromVN, addDays } from "./time";
+import { dkDungHan, dkTruocHan, dkTreHan } from "./tienDo";
 
 type Q = postgres.Sql;
 type Frag = postgres.PendingQuery<postgres.Row[]>;
@@ -36,7 +37,7 @@ export async function onTimeRate(sql: Q, scope: Frag, from: Date, to: Date) {
   const r = (
     await sql`
     SELECT count(*)::int AS den_han,
-           count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh <= cv.han)::int AS dung_han
+           count(*) FILTER (WHERE ${sql.unsafe(dkDungHan())})::int AS dung_han
     FROM cong_viec cv
     WHERE (${scope}) AND cv.trang_thai <> 'huy' AND cv.han >= ${from} AND cv.han <= ${to}`
   )[0];
@@ -47,9 +48,9 @@ export async function onTimeRate(sql: Q, scope: Frag, from: Date, to: Date) {
 export async function byUnit(sql: Q, scope: Frag, from: Date) {
   return (await sql`
     SELECT COALESCE(dv.ten, 'Cá nhân, không thuộc đơn vị') AS ten, dv.id,
-      count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh <= cv.han)::int AS dung_han,
-      count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND (cv.ngay_hoan_thanh AT TIME ZONE 'Asia/Ho_Chi_Minh')::date < (cv.han AT TIME ZONE 'Asia/Ho_Chi_Minh')::date)::int AS truoc_han,
-      count(*) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh > cv.han)::int AS tre_han,
+      count(*) FILTER (WHERE ${sql.unsafe(dkDungHan())})::int AS dung_han,
+      count(*) FILTER (WHERE ${sql.unsafe(dkTruocHan())})::int AS truoc_han,
+      count(*) FILTER (WHERE ${sql.unsafe(dkTreHan())})::int AS tre_han,
       count(*) FILTER (WHERE cv.trang_thai IN ('moi_giao','da_nhan','dang_thuc_hien') AND cv.han < now())::int AS qua_han,
       count(*) FILTER (WHERE cv.trang_thai IN ('moi_giao','da_nhan','dang_thuc_hien','cho_duyet') AND cv.han >= now())::int AS dang_lam
     FROM cong_viec cv LEFT JOIN don_vi dv ON dv.id = cv.id_don_vi_chu_tri
@@ -91,7 +92,7 @@ export async function personStats(sql: Q, scope: Frag, from: Date, to: Date) {
     SELECT n.id, n.ho_ten, n.chuc_vu, d.ten AS don_vi,
       count(cv.id)::int AS duoc_giao,
       count(cv.id) FILTER (WHERE cv.trang_thai = 'hoan_thanh')::int AS hoan_thanh,
-      count(cv.id) FILTER (WHERE cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh <= cv.han)::int AS dung_han,
+      count(cv.id) FILTER (WHERE ${sql.unsafe(dkDungHan())})::int AS dung_han,
       COALESCE(sum(cv.so_lan_gia_han), 0)::int AS gia_han,
       COALESCE(sum(cv.so_lan_lam_lai), 0)::int AS lam_lai,
       COALESCE(avg(GREATEST(0, EXTRACT(EPOCH FROM (COALESCE(cv.ngay_hoan_thanh, LEAST(now(), ${to})) - cv.han)) / 86400))

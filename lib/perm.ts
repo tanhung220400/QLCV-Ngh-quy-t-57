@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type postgres from "postgres";
 import type { User } from "./auth";
 import { db } from "./db";
@@ -14,10 +15,11 @@ export type Identity = {
 
 type DonViRow = { id: number; id_cha: number | null };
 
-export async function allUnits(): Promise<DonViRow[]> {
+/** Cây đơn vị (ghi nhớ trong một lượt hiển thị trang vì nhiều hàm phân quyền cùng cần) */
+export const allUnits = cache(async (): Promise<DonViRow[]> => {
   const sql = await db();
   return (await sql`SELECT id, id_cha FROM don_vi`) as unknown as DonViRow[];
-}
+});
 
 export function subtree(units: DonViRow[], root: number | null): number[] {
   if (!root) return [];
@@ -27,7 +29,9 @@ export function subtree(units: DonViRow[], root: number | null): number[] {
 }
 
 /** Bản thân + những người đã ủy quyền cho mình hôm nay */
-export async function identities(user: User): Promise<Identity[]> {
+export const identities = cache(docDanhTinh);
+
+async function docDanhTinh(user: User): Promise<Identity[]> {
   const me: Identity = { id: user.id, vai_tro: user.vai_tro, id_don_vi: user.id_don_vi, id_don_vi_kiem_nhiem: user.id_don_vi_kiem_nhiem, linh_vuc_phu_trach: user.linh_vuc_phu_trach, pham_vi: user.pham_vi };
   if (!user.uy_quyen_tu.length) return [me];
   const sql = await db();

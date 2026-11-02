@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
@@ -84,7 +85,13 @@ export async function destroySession() {
   c.delete(PENDING);
 }
 
-export async function getUser(): Promise<User | null> {
+/**
+ * Người dùng hiện tại. Bố cục chung và từng trang đều cần, nên ghi nhớ trong một lượt hiển thị trang
+ * (React cache chỉ có hiệu lực trong một lượt hiển thị, không dùng chung giữa các yêu cầu).
+ */
+export const getUser = cache(docNguoiDung);
+
+async function docNguoiDung(): Promise<User | null> {
   const c = await cookies();
   const t = c.get(COOKIE)?.value;
   if (!t) return null;

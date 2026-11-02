@@ -31,14 +31,12 @@ export async function notify(
   exclude?: number,
 ) {
   const uniq = [...new Set(recipients.filter((x): x is number => typeof x === "number" && x !== exclude))];
-  const fresh: number[] = [];
-  for (const r of uniq) {
-    const k = khoa ? `${khoa}:${r}` : null;
-    const ins = await sql`INSERT INTO thong_bao (id_nguoi_nhan, loai, tieu_de, noi_dung, doi_tuong, id_doi_tuong, khoa)
-      VALUES (${r}, ${loai}, ${tieu_de}, ${noi_dung}, ${doi_tuong}, ${id_doi_tuong}, ${k})
-      ON CONFLICT (khoa) DO NOTHING RETURNING id`;
-    if (ins.length) fresh.push(r);
-  }
+  if (!uniq.length) return;
+  // một lệnh ghi cho tất cả người nhận (trước đây mỗi người một lệnh)
+  const dong = uniq.map((r) => ({ id_nguoi_nhan: r, loai, tieu_de, noi_dung, doi_tuong, id_doi_tuong, khoa: khoa ? `${khoa}:${r}` : null }));
+  const ins = await sql`INSERT INTO thong_bao ${sql(dong, "id_nguoi_nhan", "loai", "tieu_de", "noi_dung", "doi_tuong", "id_doi_tuong", "khoa")}
+    ON CONFLICT (khoa) DO NOTHING RETURNING id_nguoi_nhan`;
+  const fresh = ins.map((x) => x.id_nguoi_nhan as number);
   // Gửi kèm SMS cho các sự kiện quản trị đã bật (chỉ người chưa nhận thông báo này)
   if (fresh.length) {
     const path = doi_tuong === "cong_viec" && id_doi_tuong ? `/viec/${id_doi_tuong}` : doi_tuong === "chi_tieu" && id_doi_tuong ? `/chi-tieu/${id_doi_tuong}` : null;

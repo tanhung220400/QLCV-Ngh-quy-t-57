@@ -54,10 +54,24 @@ export async function nguoiDuocGiao(sql: Q, user: User, idViecTren: number | nul
  */
 export async function truongDonVi(sql: Q, dv: number | null | undefined): Promise<number | null> {
   if (!dv) return null;
-  const r = await sql`SELECT id, vai_tro, id_don_vi = ${dv} AS chinh, CASE WHEN id_don_vi = ${dv} THEN chuc_vu ELSE chuc_vu_kiem_nhiem END AS cv
-                      FROM nguoi_dung WHERE (id_don_vi = ${dv} OR id_don_vi_kiem_nhiem = ${dv}) AND trang_thai = 'hoat_dong' AND ten_dang_nhap <> 'admin'`;
+  return (await truongCacDonVi(sql, [dv])).get(dv) ?? null;
+}
+
+/** Người đứng đầu của nhiều đơn vị cùng lúc (một truy vấn), cùng quy tắc với truongDonVi */
+export async function truongCacDonVi(sql: Q, dvs: number[]): Promise<Map<number, number | null>> {
+  const out = new Map<number, number | null>();
+  const ids = [...new Set(dvs.filter(Boolean))];
+  if (!ids.length) return out;
+  const rows = await sql`SELECT id, vai_tro, id_don_vi, id_don_vi_kiem_nhiem, chuc_vu, chuc_vu_kiem_nhiem
+                         FROM nguoi_dung WHERE (id_don_vi IN ${sql(ids)} OR id_don_vi_kiem_nhiem IN ${sql(ids)}) AND trang_thai = 'hoat_dong' AND ten_dang_nhap <> 'admin'`;
   const { bacChucVu } = await import("./canBo");
   const role: Record<string, number> = { truong_don_vi: 0, truong_thon: 1, lanh_dao: 2 };
-  r.sort((a, b) => bacChucVu(a.cv) - bacChucVu(b.cv) || Number(b.chinh) - Number(a.chinh) || (role[a.vai_tro] ?? 3) - (role[b.vai_tro] ?? 3) || a.id - b.id);
-  return (r[0]?.id as number) ?? null;
+  for (const dv of ids) {
+    const r = rows
+      .filter((x) => x.id_don_vi === dv || x.id_don_vi_kiem_nhiem === dv)
+      .map((x) => ({ id: x.id as number, vai_tro: x.vai_tro as string, chinh: x.id_don_vi === dv, cv: (x.id_don_vi === dv ? x.chuc_vu : x.chuc_vu_kiem_nhiem) as string | null }));
+    r.sort((a, b) => bacChucVu(a.cv) - bacChucVu(b.cv) || Number(b.chinh) - Number(a.chinh) || (role[a.vai_tro] ?? 3) - (role[b.vai_tro] ?? 3) || a.id - b.id);
+    out.set(dv, r[0]?.id ?? null);
+  }
+  return out;
 }

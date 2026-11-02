@@ -1,14 +1,10 @@
 // Hiểu câu hỏi tiếng Việt (có dấu hoặc không dấu, từ đồng nghĩa, cách nói thông dụng)
 // và chuyển thành bộ lọc có cấu trúc. Không gửi dữ liệu ra ngoài.
 import { vnDate, addDays } from "./time";
+import { boDauThuong } from "./chuoi";
 
 export const boDau = (s: string) =>
-  s
-    .normalize("NFC")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/g, "d")
+  boDauThuong(s)
     .replace(/[^a-z0-9/\-.\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();

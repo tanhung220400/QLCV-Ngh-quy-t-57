@@ -28,20 +28,26 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
     f.han_den = `${thang}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
     f.con = "1";
   }
-  const [tasks, holidays, cfg, linhVuc, nguon] = await Promise.all([
-    queryTasks(user, view === "kanban" ? { ...f, trang_thai: f.trang_thai || "" } : f),
+  // hiện tối đa `so` việc (mặc định 300); còn nhiều hơn thì báo rõ và cho hiện thêm, không âm thầm bỏ bớt
+  const so = Math.min(3000, Math.max(300, Math.floor((Number(sp.so) || 300) / 300) * 300));
+  const [tatCa, holidays, cfg, linhVuc, nguon] = await Promise.all([
+    queryTasks(user, view === "kanban" ? { ...f, trang_thai: f.trang_thai || "" } : f, so + 1),
     getHolidays(),
     getSettings(),
     getCatalog("linh_vuc"),
     getCatalog("nguon_giao"),
   ]);
+  const conNua = tatCa.length > so;
+  const tasks = conNua ? tatCa.slice(0, so) : tatCa;
   const sql = await db();
-  const years = await oldYears();
+  const [years, units, people] = await Promise.all([
+    oldYears(),
+    sql`SELECT id, ten FROM don_vi WHERE hoat_dong ORDER BY thu_tu, ten`,
+    sql`SELECT id, ho_ten FROM nguoi_dung WHERE trang_thai = 'hoat_dong' AND vai_tro <> 'quan_tri' ORDER BY ho_ten`,
+  ]);
   const nam = years.includes(Number(sp.nam)) ? Number(sp.nam) : 0;
   const admin = user.quyen.includes("qt.du_lieu");
   const chon = admin && sp.chon === "1" && view === "ds";
-  const units = await sql`SELECT id, ten FROM don_vi WHERE hoat_dong ORDER BY thu_tu, ten`;
-  const people = await sql`SELECT id, ho_ten FROM nguoi_dung WHERE trang_thai = 'hoat_dong' AND vai_tro <> 'quan_tri' ORDER BY ho_ten`;
 
   const qs = (over: Record<string, string>) => {
     const p = new URLSearchParams({ ...sp, tab, ...over });
@@ -118,7 +124,8 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
           ))}
         </div>
         <span className="text-slate-500">
-          {tasks.length} việc
+          {tasks.length}
+          {conNua ? "+" : ""} việc
           {counts.do > 0 && <span className="ml-2 font-semibold text-red-700">· {counts.do} quá hạn</span>}
           {counts.vang > 0 && <span className="ml-2 font-semibold text-amber-700">· {counts.vang} sắp đến hạn</span>}
         </span>
@@ -206,6 +213,16 @@ export default async function TaskListPage({ searchParams }: { searchParams: Pro
         </form>
       </details>
 
+      {conNua && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+          <span>Đang hiện {so} việc đầu tiên, còn việc khác chưa hiện. Có thể thu hẹp bằng bộ lọc hoặc ô tìm kiếm.</span>
+          {so < 3000 && (
+            <Link href={qs({ so: String(so + 300) })} className="btn btn-sm btn-outline">
+              Hiện thêm 300 việc
+            </Link>
+          )}
+        </div>
+      )}
       {view === "kanban" ? (
         <Kanban
           columns={KANBAN_COT.map((k) => ({ key: k, label: TRANG_THAI[k] }))}

@@ -1,8 +1,12 @@
+import { cache } from "react";
 import type postgres from "postgres";
 import { db } from "./db";
 import { CAI_DAT_MAC_DINH, type CaiDat, DANH_MUC_MAC_DINH } from "./const";
 
-export async function getSettings(): Promise<CaiDat> {
+/** Cài đặt chung (ghi nhớ trong một lượt hiển thị trang) */
+export const getSettings = cache(docCaiDat);
+
+async function docCaiDat(): Promise<CaiDat> {
   const sql = await db();
   const r = await sql`SELECT gia_tri FROM cai_dat WHERE khoa = 'chung'`;
   return { ...CAI_DAT_MAC_DINH, ...((r[0]?.gia_tri as Partial<CaiDat>) || {}) };
@@ -10,13 +14,15 @@ export async function getSettings(): Promise<CaiDat> {
 
 export async function saveSettings(s: Partial<CaiDat>) {
   const sql = await db();
-  const cur = await getSettings();
+  const cur = await docCaiDat();
   const v = { ...cur, ...s };
   await sql`INSERT INTO cai_dat (khoa, gia_tri) VALUES ('chung', ${sql.json(v as never)})
             ON CONFLICT (khoa) DO UPDATE SET gia_tri = EXCLUDED.gia_tri`;
 }
 
-export async function getHolidays(): Promise<Set<string>> {
+export const getHolidays = cache(docNgayNghi);
+
+async function docNgayNghi(): Promise<Set<string>> {
   const sql = await db();
   const r = await sql`SELECT to_char(ngay, 'YYYY-MM-DD') AS d FROM ngay_nghi`;
   return new Set(r.map((x) => x.d as string));

@@ -10,6 +10,7 @@ import { hieuCauHoi, type BoLoc } from "./tracuu";
 import { moRong, chuanBi, xepHang, type KhaiNiemTim } from "./timKiem";
 import { canSeeModule, type MoDun, type Truong as TruongMD } from "./modules";
 import { recordScope, recordTitle, showValue, lookups } from "./records";
+import { dkDungHan, dkTreHan } from "./tienDo";
 
 type Frag = postgres.PendingQuery<postgres.Row[]>;
 
@@ -99,9 +100,9 @@ export async function traCuu(user: User, q: string): Promise<KetQuaTraCuu> {
           case "hoan_thanh":
             return sql`cv.trang_thai = 'hoan_thanh'`;
           case "dung_han":
-            return sql`(cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh <= cv.han)`;
+            return sql`(${sql.unsafe(dkDungHan())})`;
           case "tre_han":
-            return sql`(cv.trang_thai = 'hoan_thanh' AND cv.ngay_hoan_thanh > cv.han)`;
+            return sql`(${sql.unsafe(dkTreHan())})`;
           case "gia_han":
             return sql`(cv.so_lan_gia_han > 0 OR EXISTS (SELECT 1 FROM gia_han g WHERE g.id_cong_viec = cv.id))`;
           case "lam_lai":
@@ -129,11 +130,15 @@ export async function traCuu(user: User, q: string): Promise<KetQuaTraCuu> {
     if (ds.length) {
       const ids = ds.map((t) => t.id);
       const gop = async (q: Frag) => new Map((await q).map((r) => [r.id as number, r.t as string]));
-      const bl = await gop(sql`SELECT id_cong_viec AS id, string_agg(noi_dung, ' | ' ORDER BY thoi_gian) AS t FROM binh_luan WHERE id_cong_viec IN ${sql(ids)} AND loai <> 'he_thong' GROUP BY id_cong_viec`);
-      const ck = await gop(sql`SELECT id_cong_viec AS id, string_agg(noi_dung, ' | ' ORDER BY thu_tu) AS t FROM checklist WHERE id_cong_viec IN ${sql(ids)} GROUP BY id_cong_viec`);
-      const tp = await gop(sql`SELECT id_doi_tuong AS id, string_agg(ten_tep, ' | ') AS t FROM tep_dinh_kem WHERE doi_tuong = 'cong_viec' AND id_doi_tuong IN ${sql(ids)} GROUP BY id_doi_tuong`);
-      const td = await gop(sql`SELECT tv.id_cong_viec AS id, string_agg(n.ho_ten, ', ' ORDER BY n.ho_ten) AS t FROM cong_viec_thanh_vien tv JOIN nguoi_dung n ON n.id = tv.id_nguoi_dung WHERE tv.id_cong_viec IN ${sql(ids)} AND tv.vai_tro = 'theo_doi' GROUP BY tv.id_cong_viec`);
-      const ph = await gop(sql`SELECT tv.id_cong_viec AS id, string_agg(n.ho_ten, ', ' ORDER BY n.ho_ten) AS t FROM cong_viec_thanh_vien tv JOIN nguoi_dung n ON n.id = tv.id_nguoi_dung WHERE tv.id_cong_viec IN ${sql(ids)} AND tv.vai_tro = 'phoi_hop' GROUP BY tv.id_cong_viec`);
+      // bình luận, việc nhỏ, tên tệp chỉ dùng để chấm điểm khi tìm theo nội dung; các truy vấn chạy song song
+      const khong = Promise.resolve(new Map<number, string>());
+      const [bl, ck, tp, td, ph] = await Promise.all([
+        kn.length ? gop(sql`SELECT id_cong_viec AS id, string_agg(noi_dung, ' | ' ORDER BY thoi_gian) AS t FROM binh_luan WHERE id_cong_viec IN ${sql(ids)} AND loai <> 'he_thong' GROUP BY id_cong_viec`) : khong,
+        kn.length ? gop(sql`SELECT id_cong_viec AS id, string_agg(noi_dung, ' | ' ORDER BY thu_tu) AS t FROM checklist WHERE id_cong_viec IN ${sql(ids)} GROUP BY id_cong_viec`) : khong,
+        kn.length ? gop(sql`SELECT id_doi_tuong AS id, string_agg(ten_tep, ' | ') AS t FROM tep_dinh_kem WHERE doi_tuong = 'cong_viec' AND id_doi_tuong IN ${sql(ids)} GROUP BY id_doi_tuong`) : khong,
+        gop(sql`SELECT tv.id_cong_viec AS id, string_agg(n.ho_ten, ', ' ORDER BY n.ho_ten) AS t FROM cong_viec_thanh_vien tv JOIN nguoi_dung n ON n.id = tv.id_nguoi_dung WHERE tv.id_cong_viec IN ${sql(ids)} AND tv.vai_tro = 'theo_doi' GROUP BY tv.id_cong_viec`),
+        gop(sql`SELECT tv.id_cong_viec AS id, string_agg(n.ho_ten, ', ' ORDER BY n.ho_ten) AS t FROM cong_viec_thanh_vien tv JOIN nguoi_dung n ON n.id = tv.id_nguoi_dung WHERE tv.id_cong_viec IN ${sql(ids)} AND tv.vai_tro = 'phoi_hop' GROUP BY tv.id_cong_viec`),
+      ]);
       for (const t of ds) {
         t.binh_luan = bl.get(t.id) || null;
         t.viec_nho = ck.get(t.id) || null;
@@ -173,7 +178,7 @@ export async function traCuu(user: User, q: string): Promise<KetQuaTraCuu> {
       dang_lam: list.filter((t) => ["moi_giao", "da_nhan", "dang_thuc_hien", "cho_duyet"].includes(t.trang_thai)).length,
       hoan_thanh: list.filter((t) => t.trang_thai === "hoan_thanh").length,
       dung_han: list.filter((t) => t.trang_thai === "hoan_thanh" && t.ngay_hoan_thanh && new Date(t.ngay_hoan_thanh) <= new Date(t.han)).length,
-      tre_han: list.filter((t) => t.trang_thai === "hoan_thanh" && t.ngay_hoan_thanh && new Date(t.ngay_hoan_thanh) > new Date(t.han)).length,
+      tre_han: list.filter((t) => t.trang_thai === "hoan_thanh" && (!t.ngay_hoan_thanh || new Date(t.ngay_hoan_thanh) > new Date(t.han))).length,
       cho_duyet: list.filter((t) => t.trang_thai === "cho_duyet").length,
     });
     const TT: Record<string, string> = { moi_giao: "Mới giao", da_nhan: "Đã nhận", dang_thuc_hien: "Đang thực hiện", cho_duyet: "Chờ xác nhận", hoan_thanh: "Hoàn thành", tra_lai: "Trả lại", tam_dung: "Tạm dừng", huy: "Hủy" };
@@ -274,8 +279,10 @@ export async function traCuu(user: User, q: string): Promise<KetQuaTraCuu> {
   if (timKhac) {
     const lk = await lookups(sql);
     const mods = ((await sql`SELECT * FROM mo_dun WHERE loai = 'du_lieu' ORDER BY thu_tu, id`) as unknown as MoDun[]).filter((m) => canSeeModule(user, m) || user.quyen.includes("qt.du_lieu"));
+    // trường của mọi module đọc một lần (trước đây mỗi module một truy vấn)
+    const tatCaTruong = mods.length ? ((await sql`SELECT * FROM mo_dun_truong WHERE id_mo_dun IN ${sql(mods.map((m) => m.id))} ORDER BY thu_tu, id`) as unknown as TruongMD[]) : [];
     for (const m of mods) {
-      const fields = (await sql`SELECT * FROM mo_dun_truong WHERE id_mo_dun = ${m.id} ORDER BY thu_tu, id`) as unknown as TruongMD[];
+      const fields = tatCaTruong.filter((t) => t.id_mo_dun === m.id);
       const scope = (await recordScope(sql, user, m)).q;
       const conds: Frag[] = [sql`bg.id_mo_dun = ${m.id}`, scope];
       if (unitIds.length) conds.push(sql`bg.id_don_vi IN ${sql(unitIds)}`);
@@ -342,13 +349,14 @@ export async function traCuu(user: User, q: string): Promise<KetQuaTraCuu> {
     ).slice(0, 50);
 
     const dvs = await sql`SELECT d.id, d.ten, (SELECT count(*)::int FROM nguoi_dung n WHERE n.id_don_vi = d.id AND n.trang_thai = 'hoat_dong') AS so_can_bo FROM don_vi d WHERE d.hoat_dong`;
-    const { truongDonVi } = await import("./giaoViec");
+    const { truongCacDonVi } = await import("./giaoViec");
     const dvKq = xepHang(
       dvs.map((d) => ({ x: { id: d.id, ten: d.ten, so_can_bo: d.so_can_bo, nguoi_dung_dau: null, diem: 0, khop: [], trich: "" } as DonViTim, d: chuanBi({ truong: [{ ten: "Tên đơn vị", text: d.ten, w: 3 }] }) })),
       kn,
     ).slice(0, 20);
+    const dau = await truongCacDonVi(sql, dvKq.map((d) => d.id));
     for (const d of dvKq) {
-      const h = await truongDonVi(sql, d.id);
+      const h = dau.get(d.id);
       d.nguoi_dung_dau = h ? lk.people.find((p) => p.id === h)?.ho_ten || null : null;
     }
     don_vi = dvKq;

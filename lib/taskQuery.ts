@@ -25,10 +25,11 @@ export type TaskFilter = {
 export const NAM_GIAO = "extract(year FROM cv.tao_luc AT TIME ZONE 'Asia/Ho_Chi_Minh')::int";
 
 /** Các năm cũ có công việc (để đóng gói thành mục “Công việc năm …”) */
+/** Các năm cũ có công việc (hiện thành mục con trên menu). Lọc theo thời điểm tạo để dùng chỉ mục, không quét cả bảng */
 export async function oldYears(): Promise<number[]> {
-  const sql = await db();
   const cur = Number(vnDate().slice(0, 4));
-  return (await sql`SELECT DISTINCT ${sql.unsafe(NAM_GIAO)} AS y FROM cong_viec cv WHERE ${sql.unsafe(NAM_GIAO)} < ${cur} ORDER BY 1 DESC`).map((r) => r.y as number);
+  const sql = await db();
+  return (await sql`SELECT DISTINCT ${sql.unsafe(NAM_GIAO)} AS y FROM cong_viec cv WHERE cv.tao_luc < ${fromVN(`${cur}-01-01`, "00:00")} ORDER BY 1 DESC`).map((r) => r.y as number);
 }
 
 export const TABS: { key: string; label: string }[] = [

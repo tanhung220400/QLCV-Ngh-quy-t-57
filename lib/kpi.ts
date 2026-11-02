@@ -181,11 +181,13 @@ export async function loadKpis(sql: Q, where: postgres.PendingQuery<postgres.Row
     WHERE NOT ct.huy AND (${where}) ${nam ? sql`AND ct.nam = ${nam}` : sql``}
     ORDER BY ct.nhom, ct.thu_tu, ct.id`) as unknown as KpiRow[];
   if (!rows.length) return [];
-  const all = (await sql`SELECT id, id_cha FROM chi_tieu WHERE NOT huy`) as unknown as { id: number; id_cha: number | null }[];
-  const ids = [...new Set([...rows.map((r) => r.id), ...all.filter((a) => a.id_cha && rows.some((r) => r.id === a.id_cha)).map((a) => a.id)])];
-  const data = (await sql`SELECT id_chi_tieu, ky, gia_tri, xac_nhan, so_toan_trinh, so_mot_phan, so_truc_tiep, so_phat_sinh, so_dat FROM chi_tieu_so_lieu WHERE hieu_luc AND id_chi_tieu IN ${sql(ids)}`) as unknown as SoLieu[];
-  const plans = (await sql`SELECT id_chi_tieu, ky, gia_tri FROM chi_tieu_ke_hoach_ky WHERE id_chi_tieu IN ${sql(ids)}`) as unknown as KeHoachKy[];
+  // phần phân rã (chỉ tiêu con) của các chỉ tiêu đã chọn — trước đây đọc toàn bộ bảng chi_tieu để lọc
   const childRows = (await sql`SELECT * FROM chi_tieu WHERE NOT huy AND id_cha IN ${sql(rows.map((r) => r.id))}`) as unknown as KpiRow[];
+  const ids = [...new Set([...rows.map((r) => r.id), ...childRows.map((c) => c.id)])];
+  const [data, plans] = (await Promise.all([
+    sql`SELECT id_chi_tieu, ky, gia_tri, xac_nhan, so_toan_trinh, so_mot_phan, so_truc_tiep, so_phat_sinh, so_dat FROM chi_tieu_so_lieu WHERE hieu_luc AND id_chi_tieu IN ${sql(ids)}`,
+    sql`SELECT id_chi_tieu, ky, gia_tri FROM chi_tieu_ke_hoach_ky WHERE id_chi_tieu IN ${sql(ids)}`,
+  ])) as unknown as [SoLieu[], KeHoachKy[]];
   return rows.map((k) => {
     const kids = childRows.filter((c) => c.id_cha === k.id);
     const childCalcs = kids.map((c) => calcKpi(c, data, plans, nguong));

@@ -1,5 +1,5 @@
 // Mô hình dữ liệu theo mục 8 của đặc tả. Chạy lại nhiều lần không sao (IF NOT EXISTS).
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS don_vi (
@@ -388,4 +388,14 @@ ALTER TABLE cong_viec ADD COLUMN IF NOT EXISTS y_kien_xac_nhan TEXT;
 ALTER TABLE chi_tieu_so_lieu ADD COLUMN IF NOT EXISTS so_phat_sinh NUMERIC;
 ALTER TABLE chi_tieu_so_lieu ADD COLUMN IF NOT EXISTS so_dat NUMERIC;
 ALTER TABLE chi_tieu_so_lieu ADD COLUMN IF NOT EXISTS xac_nhan_luc TIMESTAMPTZ;
+-- ===== Phiên bản 13: chỉ mục tăng tốc truy vấn =====
+CREATE INDEX IF NOT EXISTS nk_hanh_dong ON nhat_ky(hanh_dong, thoi_gian);
+CREATE INDEX IF NOT EXISTS ck_cv ON checklist(id_cong_viec);
+CREATE INDEX IF NOT EXISTS gh_cv ON gia_han(id_cong_viec);
+CREATE INDEX IF NOT EXISTS cvct_ct ON cong_viec_chi_tieu(id_chi_tieu);
+CREATE INDEX IF NOT EXISTS tv_nguoi ON cong_viec_thanh_vien(id_nguoi_dung);
+CREATE INDEX IF NOT EXISTS ct_cha ON chi_tieu(id_cha);
+CREATE INDEX IF NOT EXISTS nd_don_vi ON nguoi_dung(id_don_vi);
+CREATE INDEX IF NOT EXISTS cv_trang_thai ON cong_viec(trang_thai);
+CREATE INDEX IF NOT EXISTS cv_tao_luc ON cong_viec(tao_luc);
 `;
