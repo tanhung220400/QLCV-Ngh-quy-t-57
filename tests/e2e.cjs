@@ -65,6 +65,12 @@ const day = (n) => {
     await check(page, p, "quản trị");
   await ctx.close();
 
+  {
+    const k = await newPage();
+    const dn = await (await k.ctx.request.get(BASE + "/dang-nhap")).text();
+    ok("trang đăng nhập không hiện mật khẩu dùng thử", dn.includes("Đăng nhập") && !dn.includes("Demo@2026") && !dn.includes("Mật khẩu chung"));
+    await k.ctx.close();
+  }
   // 2. Chủ tịch giao việc cho Phòng Kinh tế và Phòng Văn hóa (tách 2 việc)
   ({ ctx, page } = await newPage());
   await login(page, "chutich");
@@ -150,6 +156,14 @@ const day = (n) => {
   ok("tải tệp đính kèm", resp.status() === 200, `HTTP ${resp.status()}`);
   const bad = await page.request.post(BASE + "/api/tep", { multipart: { file: { name: "virus.exe", mimeType: "application/octet-stream", buffer: Buffer.from("x") }, doi_tuong: "cong_viec", id_doi_tuong: String(taskId) } });
   ok("chặn loại tệp không cho phép", bad.status() === 400);
+  // Tệp “.pdf” nhưng khai là trang web: khi mở phải trả đúng loại PDF, không chạy như trang web
+  const gia = await page.request.post(BASE + "/api/tep", { multipart: { file: { name: "gia-mao.pdf", mimeType: "text/html", buffer: Buffer.from("<script>alert(1)</script>") }, doi_tuong: "cong_viec", id_doi_tuong: String(taskId) } });
+  const giaId = (await gia.json()).id;
+  const moGia = await page.request.get(BASE + `/api/tep/${giaId}`);
+  ok("mở tệp theo đuôi tên, không theo loại khai báo", moGia.status() === 200 && moGia.headers()["content-type"] === "application/pdf" && moGia.headers()["x-content-type-options"] === "nosniff", moGia.headers()["content-type"]);
+  const word = await page.request.post(BASE + "/api/tep", { multipart: { file: { name: "bien-ban.docx", mimeType: "text/html", buffer: Buffer.from("PK test") }, doi_tuong: "cong_viec", id_doi_tuong: String(taskId) } });
+  const moWord = await page.request.get(BASE + `/api/tep/${(await word.json()).id}`);
+  ok("tệp Word luôn tải về, không mở trong trình duyệt", /^attachment/.test(moWord.headers()["content-disposition"] || ""), moWord.headers()["content-disposition"]);
   await ctx.close();
 
   // 5. Chủ tịch duyệt gia hạn và kết quả
@@ -494,12 +508,16 @@ const day = (n) => {
   await page.click("text=Tổ chức các lớp “Bình dân học vụ số” cho người dân tại khu phố");
   await page.waitForURL(/\/viec\/\d+$/, { waitUntil: "commit" });
   const delUrl = page.url().replace(BASE, "");
+  // gắn một tệp để kiểm tra tệp được giữ khi xóa và tự gắn lại khi khôi phục
+  const tepXoa = (await (await page.request.post(BASE + "/api/tep", { multipart: { file: { name: "danh-sach-lop.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 lop") }, doi_tuong: "cong_viec", id_doi_tuong: delUrl.split("/").pop() } })).json()).id;
   await page.click("summary:has-text('Quản trị dữ liệu')");
   await page.locator('form:has(button:has-text("Xóa công việc")) input[name="ly_do"]').fill("Kiểm thử xóa");
   await page.click('button:has-text("Xóa công việc")');
   await page.waitForURL(/viec\?xoa=1/, { waitUntil: "commit" });
   const gr = await page.goto(BASE + delUrl);
   const gone = await page.locator("body").innerText();
+  const tepKhiXoa = await page.request.get(BASE + `/api/tep/${tepXoa}`, { maxRedirects: 0 });
+  ok("việc trong thùng rác thì không mở được tệp của việc", tepKhiXoa.status() === 403, `HTTP ${tepKhiXoa.status()}`);
   ok("quản trị xóa công việc", gr.status() === 404 || /không tìm thấy|could not be found/i.test(gone), `HTTP ${gr.status()}`);
   await page.goto(BASE + "/quan-tri?muc=thung_rac");
   ok("thùng rác ghi việc con", (await page.locator("main").innerText()).includes("kèm 3 việc con"));
@@ -507,6 +525,8 @@ const day = (n) => {
   await page.waitForSelector("text=Đã khôi phục");
   const back2 = await check(page, delUrl, "khôi phục việc");
   ok("khôi phục công việc kèm việc con", back2.includes("Bình dân học vụ số") && back2.includes("Lớp tại"));
+  const tepLai = await page.request.get(BASE + `/api/tep/${tepXoa}`);
+  ok("khôi phục việc thì tệp đính kèm dùng lại được", tepLai.status() === 200 && (await tepLai.text()).includes("%PDF-1.4 lop") && back2.includes("danh-sach-lop.pdf"), `HTTP ${tepLai.status()}`);
   // Quản trị sửa toàn bộ (đổi trạng thái việc đã hoàn thành)
   await page.click("summary:has-text('Quản trị dữ liệu')");
   await page.selectOption('form:has(button:has-text("Lưu (quản trị)")) select[name="trang_thai"]', "tam_dung");
