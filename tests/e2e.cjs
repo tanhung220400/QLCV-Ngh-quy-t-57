@@ -233,8 +233,11 @@ const day = (n) => {
   ({ ctx, page } = await newPage());
   await login(page, "tp.vanhoa");
   await page.goto(kpiUrl);
-  await page.locator('form:has(input[name="id_so_lieu"]) button:has-text("Xác nhận")').first().click();
-  await page.waitForSelector("text=Đã xác nhận.");
+  {
+    const truoc = await page.locator('form:has(input[name="id_so_lieu"])').count();
+    await page.locator('form:has(input[name="id_so_lieu"]) button:has-text("Xác nhận")').first().click();
+    await page.waitForFunction((n) => document.querySelectorAll('form input[name="id_so_lieu"]').length < n, truoc, { timeout: 20000 });
+  }
   ok("trưởng phòng (Giao việc cấp 2) xác nhận số liệu", true);
   await page.goto(kpiUrl);
   {
@@ -1030,8 +1033,9 @@ const day = (n) => {
   await page.goto(ctUrl);
   ok("số liệu chưa xác nhận thì chưa tính", !(await page.locator("main").innerText()).includes("Toàn phường: 10 hồ sơ toàn trình"));
   for (let i = 0; i < 2; i++) {
+    const truoc = await page.locator('form:has(input[name="id_so_lieu"])').count();
     await page.locator('form:has(input[name="id_so_lieu"]) button:has-text("Xác nhận")').first().click();
-    await page.waitForSelector("text=Đã xác nhận.");
+    await page.waitForFunction((n) => document.querySelectorAll('form input[name="id_so_lieu"]').length < n, truoc, { timeout: 20000 });
     await page.goto(ctUrl);
   }
   const hsTxt = (await page.locator("main").innerText()).replace(/\s+/g, " ");
