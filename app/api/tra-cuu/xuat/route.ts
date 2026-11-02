@@ -1,274 +1,252 @@
 import ExcelJS from "exceljs";
 import { apiUser } from "@/lib/auth";
-import { traCuu } from "@/lib/tracuuRun";
-import { styleHeader, toResponse, borderAll } from "@/lib/excel";
-import { TRANG_THAI, LOAI_CHI_TIEU } from "@/lib/const";
-import { fmtDue, fmtDate, fmtDateTime } from "@/lib/time";
-import { taskStatusText } from "@/lib/reports";
+import { traCuu, type KetQuaTraCuu } from "@/lib/tracuuRun";
+import { toResponse } from "@/lib/excel";
+import { fmtDue, fmtDate, fmtDateTime, vnDate } from "@/lib/time";
 import { fmtNum } from "@/lib/kpi";
+import { getSettings } from "@/lib/settings";
+import { taskStatusText } from "@/lib/reports";
 
 export const maxDuration = 60;
 
-/** Tên trang tính hợp lệ (≤ 31 ký tự, không trùng) */
+type O = string | number | null | undefined;
+type Cot = { h: string; w: number; giua?: boolean };
+type Nhom = { ten: string; dong: O[][] };
+
+const FONT = "Times New Roman";
+const vien = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } } as const;
+const LA_MA = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
+
 function tenTrang(wb: ExcelJS.Workbook, s: string) {
-  const goc = s.replace(/[\\/?*[\]:]/g, " ").slice(0, 28).trim() || "Trang";
+  const goc = s.replace(/[\\/?*[\]:]/g, " ").slice(0, 28).trim() || "Danh sach";
   let t = goc;
   let i = 2;
   while (wb.getWorksheet(t)) t = `${goc.slice(0, 26)} ${i++}`;
   return t;
 }
 
-/** Thêm một bảng có tiêu đề, kẻ khung, cố định dòng tiêu đề */
-function bang(wb: ExcelJS.Workbook, ten: string, tieuDe: string, cot: { h: string; w: number }[], dong: (string | number | null | undefined)[][]) {
-  const ws = wb.addWorksheet(tenTrang(wb, ten), { views: [{ state: "frozen", ySplit: 3 }] });
-  ws.addRow([tieuDe]).font = { bold: true, size: 13 };
-  ws.addRow([`${dong.length} dòng, xếp theo mức độ phù hợp`]).font = { italic: true, color: { argb: "FF64748B" } };
-  ws.addRow(cot.map((c) => c.h));
-  styleHeader(ws, 3);
-  for (const d of dong) ws.addRow(d.map((x) => (x == null ? "" : x)));
-  borderAll(ws, 3);
-  cot.forEach((c, i) => (ws.getColumn(i + 1).width = c.w));
-  ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: cot.length } };
+/**
+ * Một trang danh sách theo thể thức văn bản: tên cơ quan, tiêu đề “DANH SÁCH …”, dòng yêu cầu,
+ * bảng có STT và các cột phù hợp với nội dung; nếu tổng hợp theo nhóm thì có dòng nhóm I, II, III…
+ */
+function danhSach(wb: ExcelJS.Workbook, o: { trang: string; coQuan: string; tieuDe: string; yeuCau: string; cot: Cot[]; nhom: Nhom[] }) {
+  const ws = wb.addWorksheet(tenTrang(wb, o.trang), {
+    pageSetup: { paperSize: 9, orientation: o.cot.length > 6 ? "landscape" : "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.6, right: 0.4, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 } },
+    views: [{ state: "frozen", ySplit: 6 }],
+  });
+  const n = o.cot.length;
+  const dong = (v: string, cao: number, f: Partial<ExcelJS.Font>, canh: "center" | "left" = "center") => {
+    const r = ws.addRow([v]);
+    ws.mergeCells(r.number, 1, r.number, n);
+    r.getCell(1).font = { name: FONT, size: 12, ...f };
+    r.getCell(1).alignment = { horizontal: canh, vertical: "middle", wrapText: true };
+    r.height = cao;
+    return r;
+  };
+  dong(o.coQuan.toUpperCase(), 18, { bold: true });
+  dong(o.tieuDe.toUpperCase(), 24, { bold: true, size: 14 });
+  dong(o.yeuCau, 32, { italic: true, size: 11 });
+  dong(`(Tổng số: ${o.nhom.reduce((s, g) => s + g.dong.length, 0)} · lập lúc ${fmtDateTime(new Date())})`, 16, { italic: true, size: 10, color: { argb: "FF475569" } });
+  ws.addRow([]);
+  const h = ws.addRow(o.cot.map((c) => c.h));
+  h.height = 32;
+  h.eachCell((c) => {
+    c.font = { name: FONT, size: 12, bold: true };
+    c.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } };
+    c.border = vien;
+  });
+  const coNhom = o.nhom.length > 1 || (o.nhom.length === 1 && o.nhom[0].ten);
+  let stt = 0;
+  o.nhom.forEach((g, gi) => {
+    if (coNhom) {
+      const r = ws.addRow([`${LA_MA[gi] || gi + 1}. ${g.ten} (${g.dong.length})`]);
+      ws.mergeCells(r.number, 1, r.number, n);
+      r.getCell(1).font = { name: FONT, size: 12, bold: true };
+      r.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+      for (let i = 1; i <= n; i++) r.getCell(i).border = vien;
+    }
+    for (const d of g.dong) {
+      const r = ws.addRow([++stt, ...d.map((x) => (x == null ? "" : x))]);
+      r.eachCell({ includeEmpty: true }, (c, i) => {
+        c.font = { name: FONT, size: 12 };
+        c.alignment = { vertical: "top", wrapText: true, horizontal: i === 1 || o.cot[i - 1]?.giua ? "center" : "left" };
+        c.border = vien;
+      });
+    }
+  });
+  o.cot.forEach((c, i) => (ws.getColumn(i + 1).width = c.w));
+  ws.headerFooter.oddFooter = "&C&\"Times New Roman\"&10Trang &P/&N";
   return ws;
 }
+
+/** Chia danh sách thành nhóm theo yêu cầu “theo từng đơn vị / lĩnh vực / cán bộ…” */
+function chiaNhom<T>(ds: T[], khoa: ((x: T) => string) | null, dong: (x: T) => O[]): Nhom[] {
+  if (!khoa) return [{ ten: "", dong: ds.map(dong) }];
+  const m = new Map<string, T[]>();
+  for (const x of ds) {
+    const k = khoa(x) || "Khác";
+    m.set(k, [...(m.get(k) || []), x]);
+  }
+  return [...m.entries()].map(([ten, xs]) => ({ ten, dong: xs.map(dong) }));
+}
+
+const DANH_GIA: Record<string, string> = { xanh: "Đúng tiến độ", vang: "Chậm tiến độ", do: "Có nguy cơ không đạt", xam: "Chưa có số liệu" };
 
 export async function GET(req: Request) {
   const user = await apiUser("bc.tra_cuu");
   if (user instanceof Response) return user;
   if (!user.quyen.includes("bc.xuat")) return new Response("Tài khoản chưa được phân quyền xuất báo cáo", { status: 403 });
   const q = (new URL(req.url).searchParams.get("q") || "").slice(0, 300);
-  const kq = await traCuu(user, q);
-  const base = new URL(req.url).origin;
+  const kq: KetQuaTraCuu = await traCuu(user, q);
+  const cfg = await getSettings();
+  const coQuan = cfg.ten_don_vi || "Ủy ban nhân dân";
+  const yeuCau = `Theo yêu cầu: “${q}”${kq.bo_loc.hieu.length ? ` — ${kq.bo_loc.hieu.filter((h) => !h.startsWith("Tìm trong toàn bộ")).slice(0, 6).join("; ")}` : ""}`;
+  const nhomTheo = kq.bo_loc.nhom_theo;
   const wb = new ExcelJS.Workbook();
   wb.creator = "QLCV Nghị quyết 57-NQ/TW";
 
-  // ---- Trang tổng hợp ----
-  const ws = wb.addWorksheet("Tong hop");
-  ws.addRow([`KẾT QUẢ TRA CỨU: “${q}”`]).font = { bold: true, size: 14 };
-  ws.addRow([`Người tra cứu: ${user.ho_ten} · Thời điểm: ${fmtDateTime(new Date())}`]).font = { italic: true };
-  ws.addRow([]);
-  ws.addRow(["Phần mềm hiểu câu hỏi là"]).font = { bold: true };
-  for (const h of kq.bo_loc.hieu) ws.addRow([`• ${h}`]);
-  if (kq.khai_niem.length) {
-    ws.addRow([]);
-    ws.addRow(["Khái niệm tìm kiếm", "Các cách gọi cùng nghĩa, nội dung liên quan được tìm cùng"]).font = { bold: true };
-    for (const k of kq.khai_niem) ws.addRow([k.ten, k.bien.map((b) => b.dau || b.t).join("; ")]);
+  // ---- Chỉ tiêu ----
+  if (kq.chi_tieu?.ds.length) {
+    const ds = kq.chi_tieu.ds;
+    const khoa = nhomTheo === "don_vi" ? (k: (typeof ds)[number]) => k.ten_don_vi || k.don_vi_con || "Chưa giao đơn vị" : nhomTheo === "nguoi" ? (k: (typeof ds)[number]) => k.ten_phu_trach || "Chưa có người thực hiện" : nhomTheo === "linh_vuc" ? (k: (typeof ds)[number]) => k.linh_vuc || "Chưa phân lĩnh vực" : null;
+    danhSach(wb, {
+      trang: "Danh sach chi tieu",
+      coQuan,
+      tieuDe: `Danh sách chỉ tiêu năm ${kq.chi_tieu.nam}`,
+      yeuCau,
+      cot: [
+        { h: "STT", w: 6, giua: true },
+        { h: "Tên chỉ tiêu", w: 46 },
+        { h: "Đơn vị thực hiện", w: 30 },
+        { h: "Người theo dõi", w: 22 },
+        { h: "Người thực hiện", w: 22 },
+        { h: "Thời gian hoàn thành", w: 14, giua: true },
+        { h: "Tiến độ", w: 26 },
+        { h: "Ghi chú", w: 30 },
+      ],
+      nhom: chiaNhom(ds, khoa, (k) => [
+        k.ten,
+        k.ten_don_vi || k.don_vi_con || "",
+        k.ten_lanh_dao,
+        k.ten_phu_trach || k.nguoi_con,
+        fmtDate(k.han),
+        `${fmtNum(k.thuc_hien)}/${Number(k.ke_hoach_nam) ? fmtNum(k.ke_hoach_nam) : "—"} ${k.don_vi_tinh}${k.pct == null ? "" : ` (${fmtNum(k.pct, 1)}%)`} — ${DANH_GIA[k.mau]}`,
+        [k.cho_xac_nhan ? `${k.cho_xac_nhan} số liệu chờ xác nhận` : "", k.ghi_chu_so_lieu || ""].filter(Boolean).join("; "),
+      ]),
+    });
   }
-  ws.addRow([]);
-  const h = ws.addRow(["Loại dữ liệu", "Số kết quả"]);
-  h.font = { bold: true };
-  const tk: [string, number][] = [];
-  if (kq.cong_viec) tk.push(["Công việc", kq.cong_viec.ds.length]);
-  if (kq.chi_tieu) tk.push([`Chỉ tiêu năm ${kq.chi_tieu.nam}`, kq.chi_tieu.ds.length]);
-  for (const b of kq.ban_ghi) tk.push([`Module: ${b.mo_dun.ten}`, b.ds.length]);
-  if (kq.can_bo.length) tk.push(["Cán bộ", kq.can_bo.length]);
-  if (kq.don_vi.length) tk.push(["Đơn vị", kq.don_vi.length]);
-  for (const r of tk) ws.addRow(r);
-  ws.addRow(["Tổng cộng", kq.tong_so]).font = { bold: true };
-  if (kq.cong_viec) {
-    const c = kq.cong_viec.tong;
-    ws.addRow([]);
-    ws.addRow(["Tình hình công việc", ""]).font = { bold: true };
-    for (const [a, b] of [
-      ["Tổng số việc", c.tong],
-      ["Đang quá hạn", c.qua_han],
-      ["Đang làm", c.dang_lam],
-      ["Chờ xác nhận kết quả", c.cho_duyet],
-      ["Hoàn thành", c.hoan_thanh],
-      ["Hoàn thành đúng hạn", c.dung_han],
-      ["Hoàn thành trễ hạn", c.tre_han],
-    ] as const)
-      ws.addRow([a, b]);
-    if (kq.cong_viec.nhom.length) {
-      ws.addRow([]);
-      const r = ws.addRow(["Nhóm", "Tổng", "Quá hạn", "Đang làm", "Hoàn thành", "Đúng hạn"]);
-      r.font = { bold: true };
-      for (const g of kq.cong_viec.nhom) ws.addRow([g.ten, g.tong, g.qua_han, g.dang_lam, g.hoan_thanh, g.dung_han]);
-    }
-  }
-  if (kq.chi_tieu) {
-    const c = kq.chi_tieu.tong;
-    ws.addRow([]);
-    ws.addRow([`Tình hình chỉ tiêu năm ${kq.chi_tieu.nam}`, ""]).font = { bold: true };
-    for (const [a, b] of [
-      ["Số chỉ tiêu", c.tong],
-      ["Có nguy cơ không đạt", c.do],
-      ["Chậm nhẹ", c.vang],
-      ["Đúng tiến độ", c.xanh],
-      ["Đã đạt kế hoạch năm", c.dat],
-      ["Chưa có số liệu", c.xam],
-    ] as const)
-      ws.addRow([a, b]);
-  }
-  ws.getColumn(1).width = 48;
-  ws.getColumn(2).width = 90;
-  ws.getColumn(2).alignment = { wrapText: true, vertical: "top" };
 
   // ---- Công việc ----
-  if (kq.cong_viec?.ds.length)
-    bang(
-      wb,
-      "Cong viec",
-      `CÔNG VIỆC (${kq.cong_viec.ds.length})`,
-      [
-        { h: "STT", w: 6 },
-        { h: "Mức phù hợp (%)", w: 10 },
-        { h: "Tên công việc", w: 48 },
-        { h: "Nội dung, yêu cầu", w: 50 },
-        { h: "Nguồn giao", w: 18 },
-        { h: "Số hiệu văn bản", w: 18 },
-        { h: "Cuộc họp", w: 24 },
-        { h: "Lĩnh vực", w: 22 },
-        { h: "Ưu tiên", w: 10 },
-        { h: "Người giao", w: 22 },
-        { h: "Chủ trì", w: 22 },
-        { h: "Người thực hiện", w: 22 },
-        { h: "Đơn vị", w: 28 },
-        { h: "Ngày giao", w: 12 },
-        { h: "Hạn", w: 16 },
-        { h: "Trạng thái", w: 16 },
-        { h: "Tình hình", w: 28 },
-        { h: "Tiến độ (%)", w: 9 },
-        { h: "Sản phẩm", w: 18 },
-        { h: "Kết quả báo cáo", w: 50 },
-        { h: "Ngày báo cáo", w: 12 },
-        { h: "Người xác nhận kết quả", w: 22 },
-        { h: "Ngày xác nhận", w: 12 },
-        { h: "Việc nhỏ (checklist)", w: 40 },
-        { h: "Trao đổi", w: 50 },
-        { h: "Tệp đính kèm", w: 30 },
-        { h: "Đoạn khớp nội dung", w: 50 },
-        { h: "Từ khớp", w: 24 },
-        { h: "Đường dẫn", w: 30 },
+  if (kq.cong_viec?.ds.length) {
+    const ds = kq.cong_viec.ds;
+    const isQua = (t: (typeof ds)[number]) => ["moi_giao", "da_nhan", "dang_thuc_hien"].includes(t.trang_thai) && new Date(t.han) < new Date();
+    const khoa =
+      nhomTheo === "don_vi"
+        ? (t: (typeof ds)[number]) => t.ten_don_vi || "Không thuộc đơn vị"
+        : nhomTheo === "nguoi"
+          ? (t: (typeof ds)[number]) => t.ten_thuc_hien || t.ten_chu_tri
+          : nhomTheo === "linh_vuc"
+            ? (t: (typeof ds)[number]) => t.linh_vuc
+            : nhomTheo === "thang"
+              ? (t: (typeof ds)[number]) => `Tháng ${Number(vnDate(t.han).slice(5, 7))}/${vnDate(t.han).slice(0, 4)}`
+              : nhomTheo === "trang_thai"
+                ? (t: (typeof ds)[number]) => (isQua(t) ? "Quá hạn" : taskStatusText(t).split(" ")[0])
+                : null;
+    danhSach(wb, {
+      trang: "Danh sach cong viec",
+      coQuan,
+      tieuDe: "Danh sách công việc",
+      yeuCau,
+      cot: [
+        { h: "STT", w: 6, giua: true },
+        { h: "Tên công việc", w: 46 },
+        { h: "Đơn vị thực hiện", w: 28 },
+        { h: "Người theo dõi", w: 24 },
+        { h: "Người thực hiện", w: 24 },
+        { h: "Thời hạn", w: 14, giua: true },
+        { h: "Thời gian hoàn thành", w: 14, giua: true },
+        { h: "Tiến độ", w: 26 },
+        { h: "Ghi chú", w: 36 },
       ],
-      kq.cong_viec.ds.map((t, i) => [
-        i + 1,
-        t.diem ?? "",
+      nhom: chiaNhom(ds, khoa, (t) => [
         t.ten,
-        t.mo_ta,
-        t.nguon_giao,
-        t.so_hieu_vb,
-        t.cuoc_hop,
-        t.linh_vuc,
-        t.uu_tien === "hoa_toc" ? "Hỏa tốc" : t.uu_tien === "khan" ? "Khẩn" : "Thường",
-        t.ten_nguoi_giao,
-        t.ten_chu_tri,
-        t.ten_thuc_hien,
         t.ten_don_vi,
-        fmtDate(t.tao_luc),
+        [t.ten_nguoi_giao, t.nguoi_theo_doi].filter(Boolean).join(", "),
+        [t.ten_thuc_hien || t.ten_chu_tri, t.nguoi_phoi_hop && `phối hợp: ${t.nguoi_phoi_hop}`].filter(Boolean).join("; "),
         fmtDue(t.han, t.han_co_gio),
-        TRANG_THAI[t.trang_thai],
+        t.ngay_hoan_thanh ? fmtDate(t.ngay_hoan_thanh) : "",
         taskStatusText(t),
-        t.phan_tram,
-        t.san_pham,
-        t.ket_qua,
-        t.ngay_bao_cao ? fmtDate(t.ngay_bao_cao) : "",
-        t.ten_nguoi_xac_nhan,
-        t.xac_nhan_luc ? fmtDate(t.xac_nhan_luc) : "",
-        t.viec_nho,
-        t.binh_luan,
-        t.tep,
-        t.trich,
-        (t.khop || []).join(", "),
-        `${base}/viec/${t.id}`,
+        [t.ket_qua && `Kết quả: ${t.ket_qua}`, t.so_hieu_vb && `Văn bản: ${t.so_hieu_vb}`, t.cuoc_hop && `Họp: ${t.cuoc_hop}`].filter(Boolean).join("; "),
       ]),
-    );
+    });
+  }
 
-  // ---- Chỉ tiêu ----
-  if (kq.chi_tieu?.ds.length)
-    bang(
-      wb,
-      "Chi tieu",
-      `CHỈ TIÊU NĂM ${kq.chi_tieu.nam} (${kq.chi_tieu.ds.length})`,
-      [
-        { h: "STT", w: 6 },
-        { h: "Mức phù hợp (%)", w: 10 },
-        { h: "Tên chỉ tiêu", w: 50 },
-        { h: "Nhóm", w: 20 },
-        { h: "Lĩnh vực", w: 22 },
-        { h: "Nguồn", w: 20 },
-        { h: "Loại", w: 20 },
-        { h: "Đơn vị tính", w: 10 },
-        { h: "Kế hoạch năm", w: 12 },
-        { h: "Thực hiện", w: 12 },
-        { h: "% kế hoạch", w: 10 },
-        { h: "Lẽ ra phải đạt", w: 10 },
-        { h: "Đánh giá", w: 16 },
-        { h: "Số liệu chờ xác nhận", w: 10 },
-        { h: "Đơn vị phụ trách", w: 28 },
-        { h: "Người phụ trách", w: 22 },
-        { h: "Lãnh đạo phụ trách", w: 22 },
-        { h: "Hạn", w: 12 },
-        { h: "Ghi chú số liệu", w: 40 },
-        { h: "Đoạn khớp nội dung", w: 40 },
-        { h: "Đường dẫn", w: 30 },
-      ],
-      kq.chi_tieu.ds.map((k, i) => [
-        i + 1,
-        k.diem ?? "",
-        k.ten,
-        k.nhom,
-        k.linh_vuc,
-        k.nguon,
-        LOAI_CHI_TIEU[k.loai] || k.loai,
-        k.don_vi_tinh,
-        Number(k.ke_hoach_nam),
-        k.thuc_hien ?? "",
-        k.pct == null ? "" : `${fmtNum(k.pct, 1)}%`,
-        `${fmtNum(k.pct_le_ra, 0)}%`,
-        { xanh: "Đúng tiến độ", vang: "Chậm nhẹ", do: "Có nguy cơ", xam: "Chưa có số liệu" }[k.mau],
-        k.cho_xac_nhan,
-        k.ten_don_vi || (k.so_phan_ra ? `${k.so_phan_ra} đơn vị` : ""),
-        k.ten_phu_trach,
-        k.ten_lanh_dao,
-        fmtDate(k.han),
-        k.ghi_chu_so_lieu,
-        k.trich,
-        `${base}/chi-tieu/${k.id}`,
+  // ---- Dữ liệu các module: cột theo các trường hiển thị của module ----
+  for (const b of kq.ban_ghi) {
+    const cotMd = b.truong.filter((f) => f.hien_danh_sach).slice(0, 8);
+    const cotKhac = b.truong.filter((f) => !cotMd.includes(f));
+    danhSach(wb, {
+      trang: b.mo_dun.ten,
+      coQuan,
+      tieuDe: `Danh sách ${b.mo_dun.ten}`,
+      yeuCau,
+      cot: [{ h: "STT", w: 6, giua: true }, ...cotMd.map((f) => ({ h: f.ten, w: f.kieu === "doan_van" ? 40 : 22 })), { h: "Đơn vị", w: 24 }, { h: "Ghi chú", w: 34 }],
+      nhom: chiaNhom(b.ds, nhomTheo === "don_vi" ? (r) => r.don_vi || "Không thuộc đơn vị" : null, (r) => [
+        ...cotMd.map((f) => r.gia_tri[f.khoa]),
+        r.don_vi,
+        cotKhac
+          .map((f) => (r.gia_tri[f.khoa] ? `${f.ten}: ${r.gia_tri[f.khoa]}` : ""))
+          .filter(Boolean)
+          .join("; "),
       ]),
-    );
+    });
+  }
 
-  // ---- Dữ liệu các module: mỗi module một trang, đủ các trường ----
-  for (const b of kq.ban_ghi)
-    bang(
-      wb,
-      b.mo_dun.ten,
-      `${b.mo_dun.ten.toUpperCase()} (${b.ds.length})`,
-      [{ h: "STT", w: 6 }, { h: "Mức phù hợp (%)", w: 10 }, ...b.truong.map((f) => ({ h: f.ten, w: f.kieu === "doan_van" ? 50 : 24 })), { h: "Đơn vị", w: 26 }, { h: "Người nhập", w: 22 }, { h: "Ngày nhập", w: 12 }, { h: "Từ khớp", w: 24 }, { h: "Đường dẫn", w: 30 }],
-      b.ds.map((r, i) => [i + 1, r.diem, ...b.truong.map((f) => r.gia_tri[f.khoa]), r.don_vi, r.nguoi_tao, fmtDate(r.tao_luc), r.khop.join(", "), `${base}/m/${b.mo_dun.ma}/${r.id}`]),
-    );
-
-  // ---- Cán bộ, đơn vị ----
+  // ---- Cán bộ ----
   if (kq.can_bo.length)
-    bang(
-      wb,
-      "Can bo",
-      `CÁN BỘ (${kq.can_bo.length})`,
-      [
-        { h: "STT", w: 6 },
+    danhSach(wb, {
+      trang: "Danh sach can bo",
+      coQuan,
+      tieuDe: "Danh sách cán bộ",
+      yeuCau,
+      cot: [
+        { h: "STT", w: 6, giua: true },
         { h: "Họ và tên", w: 26 },
-        { h: "Chức vụ chính quyền", w: 26 },
-        { h: "Chức vụ Đảng", w: 22 },
-        { h: "Đơn vị", w: 30 },
-        { h: "Kiêm nhiệm", w: 30 },
-        { h: "Lĩnh vực phụ trách", w: 40 },
-        { h: "Số điện thoại", w: 14 },
+        { h: "Chức vụ", w: 26 },
+        { h: "Đơn vị", w: 32 },
+        { h: "Số điện thoại", w: 14, giua: true },
+        { h: "Ghi chú", w: 34 },
       ],
-      kq.can_bo.map((p, i) => [i + 1, p.ho_ten, p.chuc_vu, p.chuc_vu_dang, p.don_vi, p.kiem_nhiem, p.linh_vuc, p.sdt]),
-    );
+      nhom: chiaNhom(kq.can_bo, nhomTheo === "don_vi" ? (p) => p.don_vi || "Chưa có đơn vị" : null, (p) => [
+        p.ho_ten,
+        [p.chuc_vu, p.chuc_vu_dang].filter(Boolean).join("; "),
+        p.don_vi,
+        p.sdt,
+        p.kiem_nhiem ? `Kiêm nhiệm: ${p.kiem_nhiem}` : "",
+      ]),
+    });
+
+  // ---- Đơn vị ----
   if (kq.don_vi.length)
-    bang(
-      wb,
-      "Don vi",
-      `ĐƠN VỊ (${kq.don_vi.length})`,
-      [
-        { h: "STT", w: 6 },
+    danhSach(wb, {
+      trang: "Danh sach don vi",
+      coQuan,
+      tieuDe: "Danh sách đơn vị",
+      yeuCau,
+      cot: [
+        { h: "STT", w: 6, giua: true },
         { h: "Tên đơn vị", w: 40 },
         { h: "Người đứng đầu", w: 26 },
-        { h: "Số cán bộ", w: 10 },
+        { h: "Số cán bộ", w: 10, giua: true },
+        { h: "Ghi chú", w: 24 },
       ],
-      kq.don_vi.map((d, i) => [i + 1, d.ten, d.nguoi_dung_dau, d.so_can_bo]),
-    );
+      nhom: chiaNhom(kq.don_vi, null, (d) => [d.ten, d.nguoi_dung_dau, d.so_can_bo, ""]),
+    });
 
-  return toResponse(wb, `Ket_qua_tra_cuu_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  if (!wb.worksheets.length)
+    danhSach(wb, { trang: "Danh sach", coQuan, tieuDe: "Danh sách", yeuCau, cot: [{ h: "STT", w: 6 }, { h: "Nội dung", w: 60 }], nhom: [{ ten: "", dong: [["Không có nội dung phù hợp"]] }] });
+
+  const loai = kq.chi_tieu?.ds.length && !kq.cong_viec?.ds.length ? "chi_tieu" : kq.cong_viec?.ds.length && !kq.chi_tieu?.ds.length && !kq.ban_ghi.length ? "cong_viec" : "tra_cuu";
+  return toResponse(wb, `Danh_sach_${loai}_${vnDate()}.xlsx`);
 }

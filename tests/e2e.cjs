@@ -391,6 +391,10 @@ const day = (n) => {
     ok("tra cứu không dấu, từ đồng nghĩa (định danh điện tử → VNeID)", /VNeID/.test(t2), t2.slice(0, 400));
     const t3 = (await check(page, "/tra-cuu?q=" + encodeURIComponent("đèn"), "tra cứu từ đơn có dấu")).replace(/\s+/g, " ");
     ok("từ đơn có dấu (“đèn” không lẫn với “đến”)", /Đèn chiếu sáng/.test(t3) && /Nội dung: “đèn/.test(t3), t3.slice(0, 300));
+    const xc = await page.request.get(BASE + "/api/tra-cuu/xuat?q=" + encodeURIComponent("danh sách các chỉ tiêu hiện tại"));
+    require("fs").writeFileSync("/tmp/ct.xlsx", Buffer.from(await xc.body()));
+    const ss = require("child_process").execSync(`python3 -c "import zipfile;z=zipfile.ZipFile('/tmp/ct.xlsx');print(z.read('xl/sharedStrings.xml').decode());print([n for n in z.namelist() if n.startswith('xl/worksheets/')])"`).toString();
+    ok("xuất danh sách chỉ tiêu đúng cột yêu cầu", ["DANH SÁCH CHỈ TIÊU", "STT", "Tên chỉ tiêu", "Đơn vị thực hiện", "Người theo dõi", "Người thực hiện", "Thời gian hoàn thành", "Tiến độ", "Ghi chú"].every((x) => ss.includes(x)) && (ss.match(/sheet\d+\.xml/g) || []).length === 1, ss.slice(-200));
     const xe = await page.request.get(BASE + "/api/tra-cuu/xuat?q=" + encodeURIComponent("chuyển đổi số"));
     ok("xuất Excel tra cứu toàn bộ dữ liệu", xe.status() === 200 && (await xe.body()).length > 5000);
   }

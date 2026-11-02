@@ -36,8 +36,10 @@ export type ViecTim = TaskListItem &
     binh_luan: string | null;
     viec_nho: string | null;
     tep: string | null;
+    nguoi_theo_doi: string | null;
+    nguoi_phoi_hop: string | null;
   };
-type ChiTieuTim = Awaited<ReturnType<typeof loadKpis>>[number] & Khop & { ghi_chu_so_lieu: string | null };
+type ChiTieuTim = Awaited<ReturnType<typeof loadKpis>>[number] & Khop & { ghi_chu_so_lieu: string | null; don_vi_con: string | null; nguoi_con: string | null };
 export type BanGhiTim = Khop & { id: number; tieu_de: string; gia_tri: Record<string, string>; tao_luc: Date; nguoi_tao: string | null; don_vi: string | null };
 export type CanBoTim = Khop & { id: number; ho_ten: string; chuc_vu: string | null; don_vi: string | null; chuc_vu_dang: string | null; kiem_nhiem: string | null; linh_vuc: string; sdt: string | null };
 export type DonViTim = Khop & { id: number; ten: string; so_can_bo: number; nguoi_dung_dau: string | null };
@@ -130,10 +132,14 @@ export async function traCuu(user: User, q: string): Promise<KetQuaTraCuu> {
       const bl = await gop(sql`SELECT id_cong_viec AS id, string_agg(noi_dung, ' | ' ORDER BY thoi_gian) AS t FROM binh_luan WHERE id_cong_viec IN ${sql(ids)} AND loai <> 'he_thong' GROUP BY id_cong_viec`);
       const ck = await gop(sql`SELECT id_cong_viec AS id, string_agg(noi_dung, ' | ' ORDER BY thu_tu) AS t FROM checklist WHERE id_cong_viec IN ${sql(ids)} GROUP BY id_cong_viec`);
       const tp = await gop(sql`SELECT id_doi_tuong AS id, string_agg(ten_tep, ' | ') AS t FROM tep_dinh_kem WHERE doi_tuong = 'cong_viec' AND id_doi_tuong IN ${sql(ids)} GROUP BY id_doi_tuong`);
+      const td = await gop(sql`SELECT tv.id_cong_viec AS id, string_agg(n.ho_ten, ', ' ORDER BY n.ho_ten) AS t FROM cong_viec_thanh_vien tv JOIN nguoi_dung n ON n.id = tv.id_nguoi_dung WHERE tv.id_cong_viec IN ${sql(ids)} AND tv.vai_tro = 'theo_doi' GROUP BY tv.id_cong_viec`);
+      const ph = await gop(sql`SELECT tv.id_cong_viec AS id, string_agg(n.ho_ten, ', ' ORDER BY n.ho_ten) AS t FROM cong_viec_thanh_vien tv JOIN nguoi_dung n ON n.id = tv.id_nguoi_dung WHERE tv.id_cong_viec IN ${sql(ids)} AND tv.vai_tro = 'phoi_hop' GROUP BY tv.id_cong_viec`);
       for (const t of ds) {
         t.binh_luan = bl.get(t.id) || null;
         t.viec_nho = ck.get(t.id) || null;
         t.tep = tp.get(t.id) || null;
+        t.nguoi_theo_doi = td.get(t.id) || null;
+        t.nguoi_phoi_hop = ph.get(t.id) || null;
       }
     }
     if (kn.length)
@@ -221,7 +227,15 @@ export async function traCuu(user: User, q: string): Promise<KetQuaTraCuu> {
         (await sql`SELECT c.id, string_agg(DISTINCT s.ghi_chu, ' | ') AS t FROM chi_tieu c JOIN chi_tieu_so_lieu s ON s.id_chi_tieu = c.id OR s.id_chi_tieu IN (SELECT id FROM chi_tieu WHERE id_cha = c.id)
                    WHERE c.id IN ${sql(ds.map((k) => k.id))} AND s.hieu_luc AND s.ghi_chu IS NOT NULL GROUP BY c.id`).map((r) => [r.id as number, r.t as string]),
       );
-      for (const k of ds) k.ghi_chu_so_lieu = gc.get(k.id) || null;
+      const con = await sql`SELECT c.id_cha AS id, string_agg(d.ten, ', ' ORDER BY c.thu_tu, c.id) AS dv, string_agg(DISTINCT p.ho_ten, ', ') AS nguoi
+                            FROM chi_tieu c LEFT JOIN don_vi d ON d.id = c.id_don_vi_phu_trach LEFT JOIN nguoi_dung p ON p.id = c.id_phu_trach
+                            WHERE c.id_cha IN ${sql(ds.map((k) => k.id))} AND NOT c.huy GROUP BY c.id_cha`;
+      const mCon = new Map(con.map((r) => [r.id as number, r]));
+      for (const k of ds) {
+        k.ghi_chu_so_lieu = gc.get(k.id) || null;
+        k.don_vi_con = (mCon.get(k.id)?.dv as string) || null;
+        k.nguoi_con = (mCon.get(k.id)?.nguoi as string) || null;
+      }
     }
     if (kn.length)
       ds = xepHang(
