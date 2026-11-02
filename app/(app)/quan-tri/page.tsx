@@ -347,8 +347,8 @@ async function Users({ units, linhVuc, edit, q }: { units: { id: number; ten: st
         quyen={u ? [...tinhQuyen(u.vai_tro as unknown as string, u.quyen as never)] : null}
         phamVi={(u?.pham_vi as never) ?? null}
         units={units}
-        idDonVi={(u?.id_don_vi as number | null) ?? null}
-        idKiemNhiem={(u?.id_don_vi_kiem_nhiem as number | null) ?? null}
+        idDonVi={(u?.id_don_vi as unknown as number | null) ?? null}
+        idKiemNhiem={(u?.id_don_vi_kiem_nhiem as unknown as number | null) ?? null}
       />
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2 xl:col-span-4">
         {u && (
