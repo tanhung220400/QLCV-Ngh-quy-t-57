@@ -156,6 +156,48 @@ export async function saveUserAction(_: ActionState, fd: FormData): Promise<Acti
   return { ok: true, message: `Đã tạo tài khoản ${v.ten_dang_nhap}. Mật khẩu tạm: ${pw} (người dùng phải đổi khi đăng nhập lần đầu).`, reset: true };
 }
 
+/**
+ * Xóa tài khoản cán bộ (tài khoản thừa, trùng lặp). Tài khoản còn dữ liệu (việc, trao đổi, số liệu, bản ghi...)
+ * thì phải chọn tài khoản nhận dữ liệu: toàn bộ được chuyển sang rồi mới xóa (gộp tài khoản trùng).
+ * Tài khoản đã xóa nằm trong Thùng rác, khôi phục được.
+ */
+export async function deleteUserAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await need("qt.nguoi_dung");
+  if (!u) return { error: "Không có quyền." };
+  const sql = await db();
+  const id = Number(str(fd, "id"));
+  const den = Number(str(fd, "chuyen_sang")) || null;
+  const lyDo = str(fd, "ly_do") || null;
+  if (id === u.id) return { error: "Không tự xóa tài khoản đang đăng nhập." };
+  const n = (await sql`SELECT id, ho_ten, ten_dang_nhap, vai_tro, trang_thai FROM nguoi_dung WHERE id = ${id}`)[0];
+  if (!n) return { error: "Không tìm thấy tài khoản." };
+  if (n.vai_tro === "quan_tri" && n.trang_thai === "hoat_dong" && (await sql`SELECT count(*)::int AS c FROM nguoi_dung WHERE vai_tro = 'quan_tri' AND trang_thai = 'hoat_dong'`)[0].c <= 1)
+    return { error: "Đây là tài khoản quản trị duy nhất đang hoạt động, không xóa được." };
+  const { demDuLieu, chuyenDuLieu, xoaDuLieuRieng } = await import("@/lib/xoaTaiKhoan");
+  const gan = await demDuLieu(sql, id);
+  let tenDen: string | null = null;
+  if (den) {
+    if (den === id) return { error: "Tài khoản nhận dữ liệu phải khác tài khoản bị xóa." };
+    const d = (await sql`SELECT ho_ten FROM nguoi_dung WHERE id = ${den} AND trang_thai = 'hoat_dong'`)[0];
+    if (!d) return { error: "Tài khoản nhận dữ liệu không hợp lệ hoặc đã khóa." };
+    tenDen = d.ho_ten as string;
+  } else if (gan.length) {
+    return { error: `“${n.ho_ten}” đang có ${gan.map((g) => `${g.so} ${g.ten}`).join(", ")}. Chọn “Chuyển dữ liệu sang” một tài khoản khác rồi xóa, hoặc đặt “Khóa tài khoản” để giữ nguyên.` };
+  }
+  const { trashUser } = await import("@/lib/trash");
+  await sql.begin(async (tx) => {
+    if (den) await chuyenDuLieu(tx, id, den);
+    await xoaDuLieuRieng(tx, id);
+    await trashUser(tx, id, u.id, lyDo, `${n.ho_ten} (${n.ten_dang_nhap})${tenDen ? ` → dữ liệu chuyển sang ${tenDen}` : ""}`);
+    await writeLog(tx, u.id, "xoa_tai_khoan", "nguoi_dung", id, { ho_ten: n.ho_ten, ten_dang_nhap: n.ten_dang_nhap }, { chuyen_sang: den, ten_chuyen_sang: tenDen, du_lieu: gan, ly_do: lyDo });
+  });
+  return {
+    ok: true,
+    message: `Đã xóa tài khoản “${n.ho_ten}”${tenDen ? `, dữ liệu đã chuyển sang ${tenDen}` : ""}. Có thể khôi phục trong Thùng rác.`,
+    redirect: "/quan-tri?muc=nguoi_dung&xoa=1",
+  };
+}
+
 export async function resetPasswordAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await need("qt.nguoi_dung");
   if (!u) return { error: "Không có quyền." };

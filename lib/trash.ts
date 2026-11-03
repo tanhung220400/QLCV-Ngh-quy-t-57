@@ -170,6 +170,16 @@ export async function trashSimple(tx: Tx, table: "chi_tieu_so_lieu" | "binh_luan
   return tid;
 }
 
+// ---------- Tài khoản cán bộ ----------
+/** Lưu tài khoản vào Thùng rác rồi xóa (dữ liệu gắn với tài khoản đã được chuyển đi hoặc không có) */
+export async function trashUser(tx: Tx, id: number, uid: number, ly_do: string | null, tieu_de: string) {
+  const rows = await tx`SELECT * FROM nguoi_dung WHERE id = ${id}`;
+  if (!rows.length) return null;
+  const tid = await put(tx, "nguoi_dung", id, tieu_de, [{ t: "nguoi_dung", rows: pack(rows) }], uid, ly_do);
+  await tx`DELETE FROM nguoi_dung WHERE id = ${id}`;
+  return tid;
+}
+
 /** Khôi phục: chèn lại đúng các dòng đã lưu */
 export async function restore(tx: Tx, trashId: number, uid: number) {
   const r = (await tx`SELECT * FROM thung_rac WHERE id = ${trashId} AND trang_thai = 'trong_thung' FOR UPDATE`)[0];

@@ -12,10 +12,10 @@ import { getTheme, themeImageUrl } from "@/lib/theme";
 import { ModuleTree, ModuleForm, TemplateForm } from "@/components/ModuleAdmin";
 import { Icon } from "@/components/Icon";
 import type { MoDun } from "@/lib/modules";
-import { saveUnitAction, deleteUnitAction, saveUserAction, resetPasswordAction, saveHolidaysAction, saveSettingsAction, saveSmsAction, testSmsAction } from "@/app/actions/admin";
+import { saveUnitAction, deleteUnitAction, saveUserAction, deleteUserAction, resetPasswordAction, saveHolidaysAction, saveSettingsAction, saveSmsAction, testSmsAction } from "@/app/actions/admin";
 import { VAI_TRO, LOAI_DON_VI } from "@/lib/const";
 import { fmtDate, fmtDateTime } from "@/lib/time";
-import { capGiao } from "@/lib/canBo";
+import { capGiao, khongDau } from "@/lib/canBo";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +57,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
         ))}
       </div>
 
-      {muc === "nguoi_dung" && <Users units={units as never} edit={Number(sp.sua) || 0} q={sp.q || ""} />}
+      {muc === "nguoi_dung" && <Users units={units as never} edit={Number(sp.sua) || 0} q={sp.q || ""} daXoa={!!sp.xoa} anKhoa={sp.an_khoa === "1"} />}
 
       {muc === "don_vi" && <Units units={units as never} sua={Number(sp.sua) || 0} cha={Number(sp.cha) || null} luu={!!sp.luu} daXoa={sp.da_xoa || ""} />}
 
@@ -255,10 +255,10 @@ async function Units({ units, sua, cha, luu, daXoa }: { units: DonViRow[]; sua: 
   );
 }
 
-async function Users({ units, edit, q }: { units: { id: number; ten: string }[]; edit: number; q: string }) {
+async function Users({ units, edit, q, daXoa, anKhoa }: { units: { id: number; ten: string }[]; edit: number; q: string; daXoa: boolean; anKhoa: boolean }) {
   const sql = await db();
   const users = await sql`SELECT n.*, d.ten AS ten_don_vi, k.ten AS ten_don_vi_kn FROM nguoi_dung n LEFT JOIN don_vi d ON d.id = n.id_don_vi LEFT JOIN don_vi k ON k.id = n.id_don_vi_kiem_nhiem
-    WHERE ${q ? sql`(n.ho_ten ILIKE ${"%" + q + "%"} OR n.ten_dang_nhap ILIKE ${"%" + q + "%"} OR n.chuc_vu ILIKE ${"%" + q + "%"} OR d.ten ILIKE ${"%" + q + "%"})` : sql`TRUE`}
+    WHERE ${anKhoa ? sql`n.trang_thai = 'hoat_dong' AND ` : sql``}${q ? sql`(n.ho_ten ILIKE ${"%" + q + "%"} OR n.ten_dang_nhap ILIKE ${"%" + q + "%"} OR n.chuc_vu ILIKE ${"%" + q + "%"} OR d.ten ILIKE ${"%" + q + "%"})` : sql`TRUE`}
     ORDER BY d.thu_tu NULLS LAST, d.ten NULLS LAST, n.ho_ten`;
   const [cvDang, cvCq, cdBcd, cdTgv] = await Promise.all(["chuc_vu_dang", "chuc_vu", "chuc_danh_bcd", "chuc_danh_tgv"].map((k) => getCatalog(k)));
   const unitSel = (name: string, v: unknown, empty: string) => (
@@ -286,6 +286,21 @@ async function Users({ units, edit, q }: { units: { id: number; ten: string }[];
     );
   };
   const cur = edit ? users.find((u) => u.id === edit) : null;
+  // tài khoản trùng họ tên (không phân biệt dấu, hoa thường) để quản trị dễ nhận ra và gộp
+  const tatCa = (await sql`SELECT id, ho_ten, ten_dang_nhap, trang_thai FROM nguoi_dung ORDER BY ho_ten`) as unknown as { id: number; ho_ten: string; ten_dang_nhap: string; trang_thai: string }[];
+  const theoTen = new Map<string, number[]>();
+  for (const x of tatCa) theoTen.set(khongDau(x.ho_ten), [...(theoTen.get(khongDau(x.ho_ten)) || []), x.id]);
+  const trungTen = (u: { id: number; ho_ten: string }) => (theoTen.get(khongDau(u.ho_ten)) || []).filter((x) => x !== u.id);
+  const TrungChip = ({ u }: { u: { id: number; ho_ten: string } }) =>
+    trungTen(u).length ? <span className="chip ml-1 border-amber-200 bg-amber-50 py-0 text-xs text-amber-800" title="Có tài khoản khác cùng họ tên">Trùng tên</span> : null;
+  // dữ liệu đang gắn với tài khoản đang sửa (để xóa / gộp)
+  const { demDuLieu } = await import("@/lib/xoaTaiKhoan");
+  const ganCur = cur ? await demDuLieu(sql, cur.id as unknown as number) : [];
+  const nhanDuLieu = cur
+    ? ((await sql`SELECT n.id, n.ho_ten, n.ten_dang_nhap, d.ten AS don_vi FROM nguoi_dung n LEFT JOIN don_vi d ON d.id = n.id_don_vi
+                  WHERE n.trang_thai = 'hoat_dong' AND n.id <> ${cur.id} ORDER BY n.ho_ten`) as unknown as { id: number; ho_ten: string; ten_dang_nhap: string; don_vi: string | null }[])
+    : [];
+  const goiY = cur ? trungTen(cur as never).find((x) => nhanDuLieu.some((n) => n.id === x)) : undefined;
   const form = (u?: Record<string, never> | null) => (
     <ActionForm key={u?.id ?? "moi"} action={saveUserAction} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {u && <input type="hidden" name="id" value={u.id} />}
@@ -360,6 +375,7 @@ async function Users({ units, edit, q }: { units: { id: number; ten: string }[];
   const kn = (u: Record<string, string>) => (u.id_don_vi_kiem_nhiem || u.chuc_vu_kiem_nhiem ? `Kiêm nhiệm: ${[u.chuc_vu_kiem_nhiem, u.ten_don_vi_kn].filter(Boolean).join(" · ")}` : "");
   return (
     <div className="space-y-4">
+      {daXoa && <p className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-emerald-800">Đã xóa tài khoản. Có thể khôi phục trong Quản trị → Thùng rác.</p>}
       {cur ? (
         <div className="card ring-2 ring-brand-200">
           <h2 className="h2">Sửa: {cur.ho_ten}</h2>
@@ -369,6 +385,37 @@ async function Users({ units, edit, q }: { units: { id: number; ten: string }[];
             <input type="hidden" name="id" value={cur.id} />
             <Submit className="btn btn-outline btn-sm">Cấp lại mật khẩu</Submit>
           </ActionForm>
+          <details className="mt-3 border-t border-slate-200 pt-3" data-xoa-tai-khoan>
+            <summary className="cursor-pointer font-semibold text-red-700">Xóa tài khoản</summary>
+            <ActionForm action={deleteUserAction} confirm={`Xóa tài khoản “${cur.ho_ten}”? Có thể khôi phục trong Thùng rác.`} className="mt-2 grid gap-2 sm:grid-cols-2">
+              <input type="hidden" name="id" value={cur.id} />
+              {ganCur.length ? (
+                <p className="text-sm text-slate-700 sm:col-span-2">
+                  Tài khoản đang có: {ganCur.map((g) => `${g.so} ${g.ten}`).join(", ")}. Chọn tài khoản nhận dữ liệu (thường là tài khoản đúng khi bị trùng): toàn bộ được chuyển sang rồi mới xóa.
+                </p>
+              ) : (
+                <p className="text-sm text-slate-700 sm:col-span-2">Tài khoản chưa có dữ liệu, xóa được ngay.</p>
+              )}
+              <label className="block">
+                <span className="label">Chuyển dữ liệu sang{ganCur.length ? "" : " (không bắt buộc)"}</span>
+                <select name="chuyen_sang" className="input" defaultValue={goiY ?? ""} required={ganCur.length > 0}>
+                  <option value="">— {ganCur.length ? "Chọn tài khoản nhận" : "Không chuyển"} —</option>
+                  {nhanDuLieu.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.ho_ten} ({n.ten_dang_nhap}){n.don_vi ? ` · ${n.don_vi}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="label">Lý do (không bắt buộc)</span>
+                <input name="ly_do" className="input" placeholder="Ví dụ: tài khoản trùng" />
+              </label>
+              <div className="sm:col-span-2">
+                <Submit className="btn btn-danger-soft btn-sm">Xóa tài khoản</Submit>
+              </div>
+            </ActionForm>
+          </details>
         </div>
       ) : (
         <details className="card">
@@ -383,7 +430,11 @@ async function Users({ units, edit, q }: { units: { id: number; ten: string }[];
         <form className="mb-3 flex flex-wrap items-center gap-2" action="/quan-tri">
           <input type="hidden" name="muc" value="nguoi_dung" />
           <input name="q" defaultValue={q} placeholder="Tìm theo tên, chức vụ, đơn vị" className="input max-w-xs flex-1" />
+          {anKhoa && <input type="hidden" name="an_khoa" value="1" />}
           <button className="btn btn-outline">Tìm</button>
+          <Link href={`/quan-tri?muc=nguoi_dung${q ? `&q=${encodeURIComponent(q)}` : ""}${anKhoa ? "" : "&an_khoa=1"}`} className="btn btn-outline btn-sm">
+            {anKhoa ? "Hiện cả tài khoản đã khóa" : "Ẩn tài khoản đã khóa"}
+          </Link>
           <span className="ml-auto text-sm text-slate-500">{users.length} cán bộ</span>
         </form>
         <table className="tbl hidden md:table">
@@ -402,6 +453,7 @@ async function Users({ units, edit, q }: { units: { id: number; ten: string }[];
                 <td>
                   <span className="font-medium">{u.ho_ten}</span>
                   {u.trang_thai === "khoa" && " (đã khóa)"}
+                  <TrungChip u={u as never} />
                   <span className="block text-xs text-slate-500">
                     {u.ten_dang_nhap}
                     {u.otp_bat ? " · OTP" : ""}
@@ -445,6 +497,7 @@ async function Users({ units, edit, q }: { units: { id: number; ten: string }[];
                   <div className="font-medium">
                     {u.ho_ten}
                     {u.trang_thai === "khoa" && " (đã khóa)"}
+                    <TrungChip u={u as never} />
                   </div>
                   <div className="text-sm text-slate-600">{[u.chuc_vu, u.ten_don_vi].filter(Boolean).join(" · ")}</div>
                   {kn(u as never) && <div className="text-xs text-slate-500">{kn(u as never)}</div>}
@@ -751,7 +804,7 @@ async function Sms() {
   );
 }
 
-const LOAI_RAC: Record<string, string> = { cong_viec: "Công việc", chi_tieu: "Chỉ tiêu", ban_ghi: "Bản ghi", mo_dun: "Module", so_lieu: "Số liệu", binh_luan: "Trao đổi", tep: "Tệp" };
+const LOAI_RAC: Record<string, string> = { nguoi_dung: "Tài khoản", cong_viec: "Công việc", chi_tieu: "Chỉ tiêu", ban_ghi: "Bản ghi", mo_dun: "Module", so_lieu: "Số liệu", binh_luan: "Trao đổi", tep: "Tệp" };
 
 async function Catalogs({ open }: { open: string }) {
   const sql = await db();

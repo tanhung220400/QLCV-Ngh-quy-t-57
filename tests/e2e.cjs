@@ -849,6 +849,51 @@ const day = (n) => {
   await page.waitForSelector("text=Đã lưu.");
   await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=" + encodeURIComponent("Kiểm Thử Viên"));
   ok("lưu chức danh Tổ giúp việc", (await page.locator("main table").innerText()).includes("Tổ giúp việc: Tổ phó"));
+  // Xóa tài khoản: tài khoản trùng thì gộp dữ liệu sang tài khoản đúng rồi xóa; tài khoản trống xóa ngay, khôi phục được
+  {
+    await taoCanBo({ ten: "Kiểm Thử Trùng", u: "kt.trung1", chuc_vu: "Chuyên viên", id_don_vi: "Phòng Kinh tế" });
+    await taoCanBo({ ten: "Kiểm thử trùng", u: "kt.trung2", chuc_vu: "Chuyên viên", id_don_vi: "Phòng Kinh tế" });
+    await taoCanBo({ ten: "Kiểm Thử Trống", u: "kt.trong", chuc_vu: "Chuyên viên", id_don_vi: "Phòng Kinh tế" });
+    const q = (x) => require("child_process").execSync(`psql -h 127.0.0.1 -U postgres -d qlcv -At -c "${x}"`).toString().trim();
+    q(`INSERT INTO binh_luan (id_cong_viec, id_nguoi_dung, noi_dung) SELECT min(id), (SELECT id FROM nguoi_dung WHERE ten_dang_nhap = 'kt.trung2'), 'Ý kiến của tài khoản trùng' FROM cong_viec`);
+    q(`INSERT INTO cong_viec_thanh_vien (id_cong_viec, id_nguoi_dung, vai_tro) SELECT min(id), (SELECT id FROM nguoi_dung WHERE ten_dang_nhap = 'kt.trung2'), 'theo_doi' FROM cong_viec`);
+    await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=" + encodeURIComponent("trùng"));
+    ok("đánh dấu tài khoản trùng họ tên", (await page.locator("main table tr:has-text('Trùng tên')").count()) === 2);
+    await page.click("tr:has-text('kt.trung2') a:has-text('Sửa')");
+    await page.waitForSelector("h2:has-text('Sửa: Kiểm thử trùng')");
+    await page.click("summary:has-text('Xóa tài khoản')");
+    const f = page.locator("details[data-xoa-tai-khoan] form");
+    const goiY = await f.locator('select[name="chuyen_sang"] option:checked').textContent();
+    ok("xóa tài khoản: liệt kê dữ liệu đang gắn và gợi ý tài khoản trùng nhận dữ liệu", (await f.innerText()).includes("1 trao đổi") && goiY.includes("kt.trung1"), goiY);
+    // bỏ chọn tài khoản nhận (vượt kiểm tra trên trình duyệt) → máy chủ vẫn chặn
+    await f.locator('select[name="chuyen_sang"]').evaluate((el) => { el.required = false; el.value = ""; });
+    await f.locator('button:has-text("Xóa tài khoản")').click();
+    await page.waitForSelector("text=Chọn “Chuyển dữ liệu sang”");
+    ok("chặn xóa tài khoản còn dữ liệu khi chưa chọn tài khoản nhận", true);
+    await f.locator('select[name="chuyen_sang"]').selectOption({ label: goiY.trim() });
+    await f.locator('input[name="ly_do"]').fill("Tài khoản trùng");
+    await f.locator('button:has-text("Xóa tài khoản")').click();
+    await page.waitForURL(/xoa=1/, { waitUntil: "commit" });
+    await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=" + encodeURIComponent("trùng"));
+    const conLai = await page.locator("main table").innerText();
+    const chuyen = q(`SELECT n.ten_dang_nhap FROM binh_luan b JOIN nguoi_dung n ON n.id = b.id_nguoi_dung WHERE b.noi_dung = 'Ý kiến của tài khoản trùng'`);
+    const tv = q(`SELECT count(*) FROM cong_viec_thanh_vien tv JOIN nguoi_dung n ON n.id = tv.id_nguoi_dung WHERE n.ten_dang_nhap = 'kt.trung1'`);
+    ok("gộp tài khoản trùng: dữ liệu chuyển sang tài khoản còn lại rồi xóa", !conLai.includes("kt.trung2") && conLai.includes("kt.trung1") && !conLai.includes("Trùng tên") && chuyen === "kt.trung1" && tv === "1", `${chuyen} / ${tv}`);
+    // tài khoản chưa có dữ liệu: xóa ngay, rồi khôi phục từ Thùng rác
+    await page.goto(BASE + "/quan-tri?muc=nguoi_dung&q=" + encodeURIComponent("Kiểm Thử Trống"));
+    await page.click("tr:has-text('kt.trong') a:has-text('Sửa')");
+    await page.click("summary:has-text('Xóa tài khoản')");
+    await page.locator('details[data-xoa-tai-khoan] button:has-text("Xóa tài khoản")').click();
+    await page.waitForURL(/xoa=1/, { waitUntil: "commit" });
+    ok("xóa tài khoản chưa có dữ liệu", q(`SELECT count(*) FROM nguoi_dung WHERE ten_dang_nhap = 'kt.trong'`) === "0");
+    await page.goto(BASE + "/quan-tri?muc=thung_rac");
+    await page.locator('tr:has-text("kt.trong") button:has-text("Khôi phục")').click();
+    await page.waitForSelector("text=Đã khôi phục");
+    ok("khôi phục tài khoản đã xóa từ Thùng rác", q(`SELECT count(*) FROM nguoi_dung WHERE ten_dang_nhap = 'kt.trong'`) === "1");
+    // ẩn tài khoản đã khóa
+    await page.goto(BASE + "/quan-tri?muc=nguoi_dung&an_khoa=1");
+    ok("ẩn tài khoản đã khóa khỏi danh sách", !(await page.locator("main").innerText()).includes("(đã khóa)") && (await page.locator("text=Hiện cả tài khoản đã khóa").count()) === 1);
+  }
   await page.goto(BASE + "/quan-tri?muc=danh_muc&loai=chuc_vu");
   ok("danh mục chức vụ, chức danh", (await page.locator("main").innerText()).includes("Chức danh Tổ giúp việc"));
   // xóa đơn vị còn cán bộ: phải chuyển sang đơn vị khác
