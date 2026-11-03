@@ -181,8 +181,9 @@ html[data-chao] body {
 .chao-glow-b {
   right: -14vmax;
   bottom: -16vmax;
-  background: #f59e0b;
-  opacity: 0.22;
+  /* xanh da trời cùng tông với góc trên (màu cam cũ trộn nền xanh đậm thành ám nâu) */
+  background: #38bdf8;
+  opacity: 0.28;
   animation: chao-float 11s ease-in-out infinite alternate-reverse;
 }
 .chao-body {
